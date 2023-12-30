@@ -1,35 +1,37 @@
 package demoparser
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"sync"
+	"time"
 
 	demoinfocs "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs"
 	events "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs/events"
 )
 
 type KillStats struct {
-	Total        int
-	HeadShots    int
-	Precision    float64
-	WeaponsKills map[string]int
+	Total        int            `json:"total"`
+	HeadShots    int            `json:"headshots"`
+	Precision    float64        `json:"precision"`
+	WeaponsKills map[string]int `json:"weapons_kills"`
 }
 
 type AssistStats struct {
-	Total          int
-	FlashedEnemies int
-	DamageGiven    int
+	Total          int `json:"total"`
+	FlashedEnemies int `json:"flashed_enemies"`
+	DamageGiven    int `json:"damage_given"`
 }
 
 type DemoPlayer struct {
-	SteamID     uint64
-	OldName     string
-	Name        string
-	UserID      int
-	Deaths      int
-	KillStats   KillStats
-	AssistStats AssistStats
+	SteamID     uint64      `json:"steam_id"`
+	Name        string      `json:"name"`
+	UserID      int         `json:"user_id"`
+	Deaths      int         `json:"deaths"`
+	KillStats   KillStats   `json:"kill_stats"`
+	AssistStats AssistStats `json:"assist_stats"`
 }
 
 func ProcessDemo(demoPath string) map[uint64]*DemoPlayer {
@@ -53,15 +55,6 @@ func ProcessDemo(demoPath string) map[uint64]*DemoPlayer {
 	playerDemo := make(map[uint64]*DemoPlayer)
 	var wg sync.WaitGroup
 	var mu sync.Mutex // Mutex for safe map access
-
-	// wg.Add(1)
-	// go registerPlayers(demoParser, playerDemo, &wg)
-
-	// wg.Add(1)
-	// go registerKills(demoParser, playerDemo, &wg)
-
-	// wg.Add(1)
-	// go registerDamage(demoParser, playerDemo, &wg)
 
 	// Array of functions for concurrent execution
 	functions := []func(){
@@ -109,10 +102,9 @@ func registerKills(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlay
 			if e.IsHeadshot {
 				killer.KillStats.HeadShots++
 			}
-			if killer.KillStats.WeaponsKills == nil {
-				killer.KillStats.WeaponsKills = make(map[string]int)
+			if e.Weapon.String() != "World" {
+				killer.KillStats.WeaponsKills[e.Weapon.String()]++
 			}
-			killer.KillStats.WeaponsKills[e.Weapon.String()]++
 		}
 		if e.Assister != nil && !e.Assister.IsBot {
 			assister := demoPlayer[e.Assister.SteamID64]
@@ -174,4 +166,31 @@ func GetPlayersName(players map[uint64]*DemoPlayer) []string {
 		playerNames = append(playerNames, player.Name)
 	}
 	return playerNames
+}
+
+func GetPlayersToAnalyse(players map[uint64]*DemoPlayer, playersToAnalyse []string) map[uint64]*DemoPlayer {
+	var playersToAnalyseMap = make(map[uint64]*DemoPlayer)
+	for _, player := range players {
+		foundPlayer := slices.Index(playersToAnalyse, player.Name)
+		if foundPlayer != -1 {
+			playersToAnalyseMap[player.SteamID] = player
+		}
+	}
+	return playersToAnalyseMap
+}
+
+func WritePlayersToFile(players map[uint64]*DemoPlayer) (string, error) {
+	fileName := fmt.Sprintf("%d_data.json", time.Now().Unix()) // Save in the current working directory
+
+	jsonData, err := json.MarshalIndent(players, "", " ")
+	if err != nil {
+		return "", err
+	}
+
+	err = os.WriteFile(fileName, jsonData, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	return fileName, nil
 }

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"slices"
 
 	"os"
 
@@ -16,9 +15,9 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
-var players []string  // players is the list of players to analyse.
-var outputPath string // outputPath is the path to the output file.
-var demoPath string   // demoPath is the path to the demo file.
+var players []string // players is the list of players to analyse.
+var demoPath string  // demoPath is the path to the demo file.
+var store bool       // store is the flag to store the demo players data.
 
 type Options struct {
 	Players *multiselect.Selection
@@ -30,7 +29,7 @@ func init() {
 
 	analyseCmd.Flags().StringVarP(&demoPath, "demo", "d", "", "Demo path.")
 	analyseCmd.Flags().StringSliceVarP(&players, "players", "p", []string{}, "Players to analyse.")
-	analyseCmd.Flags().StringVarP(&outputPath, "output", "o", "", "Output path.")
+	analyseCmd.Flags().BoolVarP(&store, "store", "s", false, "Store the demo players data.")
 }
 
 var analyseCmd = &cobra.Command{
@@ -77,27 +76,34 @@ var analyseCmd = &cobra.Command{
 		t.SetOutputMirror(os.Stdout)
 		t.AppendHeader(table.Row{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assist", "Damage Given", "Precision (%)", "Best Weapon"})
 
-		for _, player := range allDemoPlayers {
-			foundPlayer := slices.Index(flagPlayers, player.Name)
-			if foundPlayer != -1 {
-				playerBestWeapon := demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills)
-				kd := fmt.Sprintf("%.3f", float32(player.KillStats.Total)/float32(player.Deaths))
-				t.AppendRow(table.Row{
-					player.Name,
-					player.KillStats.Total,
-					player.Deaths,
-					kd,
-					player.KillStats.HeadShots,
-					player.AssistStats.Total,
-					player.AssistStats.FlashedEnemies,
-					player.AssistStats.DamageGiven,
-					int(player.KillStats.Precision * 100),
-					playerBestWeapon,
-				})
-			}
+		playerToAnalyse := demoparser.GetPlayersToAnalyse(allDemoPlayers, flagPlayers)
+
+		for _, player := range playerToAnalyse {
+			playerBestWeapon := demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills)
+			kd := fmt.Sprintf("%.3f", float32(player.KillStats.Total)/float32(player.Deaths))
+			t.AppendRow(table.Row{
+				player.Name,
+				player.KillStats.Total,
+				player.Deaths,
+				kd,
+				player.KillStats.HeadShots,
+				player.AssistStats.Total,
+				player.AssistStats.FlashedEnemies,
+				player.AssistStats.DamageGiven,
+				int(player.KillStats.Precision * 100),
+				playerBestWeapon,
+			})
 		}
 		t.SortBy([]table.SortBy{{Name: "Kills", Mode: table.DscNumeric}})
 		t.Render()
 
+		if store {
+			fmt.Println(printstyle.StyleSuceess.Render("\nWritting data to file..."))
+			fileName, err := demoparser.WritePlayersToFile(playerToAnalyse)
+			if err != nil {
+				fmt.Println(printstyle.StyleError.Render(fmt.Sprintf("Error writing to file: %s", err)))
+			}
+			fmt.Println(printstyle.StyleSuceess.Render("Data written to file: ", fileName))
+		}
 	},
 }
