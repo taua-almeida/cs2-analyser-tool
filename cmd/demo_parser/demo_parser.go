@@ -52,15 +52,28 @@ func ProcessDemo(demoPath string) map[uint64]*DemoPlayer {
 
 	playerDemo := make(map[uint64]*DemoPlayer)
 	var wg sync.WaitGroup
+	var mu sync.Mutex // Mutex for safe map access
 
-	wg.Add(1)
-	go registerPlayers(demoParser, playerDemo, &wg)
+	// wg.Add(1)
+	// go registerPlayers(demoParser, playerDemo, &wg)
 
-	wg.Add(1)
-	go registerKills(demoParser, playerDemo, &wg)
+	// wg.Add(1)
+	// go registerKills(demoParser, playerDemo, &wg)
 
-	wg.Add(1)
-	go registerDamage(demoParser, playerDemo, &wg)
+	// wg.Add(1)
+	// go registerDamage(demoParser, playerDemo, &wg)
+
+	// Array of functions for concurrent execution
+	functions := []func(){
+		func() { registerPlayers(demoParser, playerDemo, &wg, &mu) },
+		func() { registerKills(demoParser, playerDemo, &wg, &mu) },
+		func() { registerDamage(demoParser, playerDemo, &wg, &mu) },
+	}
+
+	for _, f := range functions {
+		wg.Add(1)
+		go f()
+	}
 
 	wg.Wait()
 	demoParser.ParseToEnd()
@@ -70,18 +83,26 @@ func ProcessDemo(demoPath string) map[uint64]*DemoPlayer {
 	return playerDemo
 }
 
-func registerPlayers(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer, wg *sync.WaitGroup) {
+func registerPlayers(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer, wg *sync.WaitGroup, mu *sync.Mutex) {
 	defer wg.Done()
 	demoParser.RegisterEventHandler(func(e events.PlayerConnect) {
 		if !e.Player.IsBot {
-			demoPlayer[e.Player.SteamID64] = &DemoPlayer{SteamID: e.Player.SteamID64, Name: e.Player.Name, UserID: e.Player.UserID}
+			mu.Lock() // Lock the mutex before modifying the map
+			demoPlayer[e.Player.SteamID64] = &DemoPlayer{
+				SteamID:   e.Player.SteamID64,
+				Name:      e.Player.Name,
+				UserID:    e.Player.UserID,
+				KillStats: KillStats{WeaponsKills: make(map[string]int)},
+			}
+			mu.Unlock() // Unlock the mutex after the map is modified
 		}
 	})
 }
 
-func registerKills(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer, wg *sync.WaitGroup) {
+func registerKills(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer, wg *sync.WaitGroup, mu *sync.Mutex) {
 	defer wg.Done()
 	demoParser.RegisterEventHandler(func(e events.Kill) {
+		mu.Lock() // Lock before accessing the map
 		if !e.Killer.IsBot {
 			killer := demoPlayer[e.Killer.SteamID64]
 			killer.KillStats.Total++
@@ -104,15 +125,18 @@ func registerKills(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlay
 			victim := demoPlayer[e.Victim.SteamID64]
 			victim.Deaths++
 		}
+		mu.Unlock() // Unlock after modifying the map
 	})
 }
 
-func registerDamage(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer, wg *sync.WaitGroup) {
+func registerDamage(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer, wg *sync.WaitGroup, mu *sync.Mutex) {
 	defer wg.Done()
 	demoParser.RegisterEventHandler(func(e events.PlayerHurt) {
 		if e.Attacker != nil && !e.Attacker.IsBot {
+			mu.Lock()
 			attacker := demoPlayer[e.Attacker.SteamID64]
 			attacker.AssistStats.DamageGiven += e.HealthDamageTaken
+			mu.Unlock()
 		}
 	})
 }
