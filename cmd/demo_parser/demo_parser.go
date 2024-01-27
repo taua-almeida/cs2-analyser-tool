@@ -1,39 +1,14 @@
 package demoparser
 
 import (
-	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
 	"sync"
-	"time"
 
 	demoinfocs "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs"
 	events "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs/events"
 )
-
-type KillStats struct {
-	Total        int            `json:"total"`
-	HeadShots    int            `json:"headshots"`
-	Precision    float64        `json:"precision"`
-	WeaponsKills map[string]int `json:"weapons_kills"`
-}
-
-type AssistStats struct {
-	Total          int `json:"total"`
-	FlashedEnemies int `json:"flashed_enemies"`
-	DamageGiven    int `json:"damage_given"`
-}
-
-type DemoPlayer struct {
-	SteamID     uint64      `json:"steam_id"`
-	Name        string      `json:"name"`
-	UserID      int         `json:"user_id"`
-	Deaths      int         `json:"deaths"`
-	KillStats   KillStats   `json:"kill_stats"`
-	AssistStats AssistStats `json:"assist_stats"`
-}
 
 func ProcessDemo(demoPath string) map[uint64]*DemoPlayer {
 	file, err := os.Open(demoPath)
@@ -178,53 +153,4 @@ func GetPlayersToAnalyse(players map[uint64]*DemoPlayer, playersToAnalyse []stri
 		}
 	}
 	return playersToAnalyseMap
-}
-
-func WritePlayersToFile(players map[uint64]*DemoPlayer, saveType string) (string, error) {
-	fileName := fmt.Sprintf("%d_data.%s", time.Now().Unix(), saveType)
-
-	if saveType == "csv" {
-		csvFile, err := os.Create(fileName)
-		if err != nil {
-			return "", err
-		}
-		defer csvFile.Close()
-		w := csv.NewWriter(csvFile)
-		csvRecords := [][]string{
-			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assist", "Damage Given", "Precision (%)", "Best Weapon"},
-		}
-		for _, player := range players {
-			playerBestWeapon := GetPlayerBestWeapon(player.KillStats.WeaponsKills)
-			kd := fmt.Sprintf("%.3f", float32(player.KillStats.Total)/float32(player.Deaths))
-			csvRecords = append(csvRecords, []string{
-				player.Name,
-				fmt.Sprintf("%d", player.KillStats.Total),
-				fmt.Sprintf("%d", player.Deaths),
-				kd,
-				fmt.Sprintf("%d", player.KillStats.HeadShots),
-				fmt.Sprintf("%d", player.AssistStats.Total),
-				fmt.Sprintf("%d", player.AssistStats.FlashedEnemies),
-				fmt.Sprintf("%d", player.AssistStats.DamageGiven),
-				fmt.Sprintf("%.2f", player.KillStats.Precision),
-				playerBestWeapon,
-			})
-		}
-		w.WriteAll(csvRecords)
-		if err := w.Error(); err != nil {
-			return "", err
-		}
-		w.Flush()
-		return fileName, nil
-	}
-	jsonData, err := json.MarshalIndent(players, "", " ")
-	if err != nil {
-		return "", err
-	}
-
-	err = os.WriteFile(fileName, jsonData, 0644)
-	if err != nil {
-		return "", err
-	}
-
-	return fileName, nil
 }

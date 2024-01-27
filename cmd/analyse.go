@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
+	dataexport "github.com/taua-almeida/cs2-analyser-tool/cmd/dataexport"
 	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
 	filepicker "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/file-picker"
 	multiselect "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/multi-select"
@@ -101,7 +102,7 @@ var analyseCmd = &cobra.Command{
 
 		if save {
 			fmt.Println(printstyle.StyleSuceess.Render("\nWritting data to file..."))
-			fileName, err := demoparser.WritePlayersToFile(playerToAnalyse, saveType)
+			fileName, err := dataexport.WritePlayersToFile(playerToAnalyse, saveType)
 			if err != nil {
 				fmt.Println(printstyle.StyleError.Render(fmt.Sprintf("Error writing to file: %s", err)))
 			}
