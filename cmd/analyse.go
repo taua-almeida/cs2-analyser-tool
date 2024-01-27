@@ -17,7 +17,8 @@ import (
 
 var players []string // players is the list of players to analyse.
 var demoPath string  // demoPath is the path to the demo file.
-var store bool       // store is the flag to store the demo players data.
+var save bool        // save is the flag to save the demo players data.
+var saveType string  // saveType is the type of storage to use.
 
 type Options struct {
 	Players *multiselect.Selection
@@ -29,7 +30,8 @@ func init() {
 
 	analyseCmd.Flags().StringVarP(&demoPath, "demo", "d", "", "Demo path.")
 	analyseCmd.Flags().StringSliceVarP(&players, "players", "p", []string{}, "Players to analyse.")
-	analyseCmd.Flags().BoolVarP(&store, "store", "s", false, "Store the demo players data.")
+	analyseCmd.Flags().BoolVarP(&save, "save", "s", false, "Save the demo players data.")
+	analyseCmd.Flags().StringVarP(&saveType, "save-type", "", "json", "Type of file to save the data [json, csv], default is json.")
 }
 
 var analyseCmd = &cobra.Command{
@@ -97,9 +99,9 @@ var analyseCmd = &cobra.Command{
 		t.SortBy([]table.SortBy{{Name: "Kills", Mode: table.DscNumeric}})
 		t.Render()
 
-		if store {
+		if save {
 			fmt.Println(printstyle.StyleSuceess.Render("\nWritting data to file..."))
-			fileName, err := demoparser.WritePlayersToFile(playerToAnalyse)
+			fileName, err := demoparser.WritePlayersToFile(playerToAnalyse, saveType)
 			if err != nil {
 				fmt.Println(printstyle.StyleError.Render(fmt.Sprintf("Error writing to file: %s", err)))
 			}
