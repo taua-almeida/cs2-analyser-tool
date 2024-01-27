@@ -17,7 +17,7 @@ os = $(word 1, $@)
 # Ensure GOBIN is not set, which can conflict with cross compilation
 unexport GOBIN
 
-.PHONY: all clean tidy
+.PHONY: build-all clean tidy
 
 build-all: windows linux darwin
 
