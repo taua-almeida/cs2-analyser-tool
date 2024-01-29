@@ -4,21 +4,18 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"sync"
 
 	demoinfocs "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs"
 	events "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs/events"
 	"github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs/msgs2"
 )
 
-func ProcessDemo(demoPath string) map[uint64]*DemoPlayer {
+func ProcessDemo(demoPath string) *ProcessedDemo {
 	file, err := os.Open(demoPath)
-
 	if err != nil {
 		fmt.Println("Error opening demo file", err)
 		return nil
 	}
-
 	defer file.Close()
 
 	demoParser := demoinfocs.NewParser(file)
@@ -30,30 +27,25 @@ func ProcessDemo(demoPath string) map[uint64]*DemoPlayer {
 	}
 
 	playerDemo := make(map[uint64]*DemoPlayer)
-	var wg sync.WaitGroup
-	var mu sync.Mutex // Mutex for safe map access
+	gameData := &DemoGame{}
 
-	// Array of functions for concurrent execution
-	functions := []func(){
-		func() { registerPlayers(demoParser, playerDemo, &wg, &mu) },
-		func() { registerKills(demoParser, playerDemo, &wg, &mu) },
-		func() { registerDamage(demoParser, playerDemo, &wg, &mu) },
-		func() { registerMVP(demoParser, playerDemo, &wg, &mu) },
-	}
-
-	for _, f := range functions {
-		wg.Add(1)
-		go f()
-	}
-
-	wg.Wait()
+	getDemoNetData(demoParser, gameData)
+	registerPlayers(demoParser, playerDemo)
+	registerKills(demoParser, playerDemo)
+	registerDamage(demoParser, playerDemo)
+	registerMVP(demoParser, playerDemo)
 	registerRoundData(demoParser, playerDemo)
 
 	demoParser.ParseToEnd()
 
 	calculateKillsPrecision(playerDemo)
 
-	return playerDemo
+	processedDemoData := &ProcessedDemo{
+		Players: playerDemo,
+		Game:    *gameData,
+	}
+
+	return processedDemoData
 }
 
 func (p DemoPlayer) String() string {
@@ -61,37 +53,36 @@ func (p DemoPlayer) String() string {
 		p.Name, p.SteamID, p.KillStats.Total, p.Deaths, p.KillStats.HeadShots, p.KillStats.Precision)
 }
 
-func registerPlayers(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer, wg *sync.WaitGroup, mu *sync.Mutex) {
-	defer wg.Done()
-	var mapName string = ""
-
+func getDemoNetData(demoParser demoinfocs.Parser, gameData *DemoGame) {
 	demoParser.RegisterNetMessageHandler(func(m *msgs2.CSVCMsg_ServerInfo) {
-		mapName = m.GetMapName()
+		gameData.MapName = m.GetMapName()
+		gameSessionConfig := m.GetGameSessionConfig()
+		if gameSessionConfig != nil {
+			gameData.GameMode = gameSessionConfig.GetGamemode()
+		}
 	})
+}
+
+func registerPlayers(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer) {
 	demoParser.RegisterEventHandler(func(e events.PlayerConnect) {
 		if !e.Player.IsBot {
-			mu.Lock() // Lock the mutex before modifying the map
 			demoPlayer[e.Player.SteamID64] = &DemoPlayer{
 				SteamID:   e.Player.SteamID64,
 				Name:      e.Player.Name,
 				UserID:    e.Player.UserID,
 				KillStats: KillStats{WeaponsKills: make(map[string]int)},
 				MapStats: MapStats{
-					MapName:    mapName,
 					RoundsWon:  0,
 					RoundsLost: 0,
 					MVPs:       0,
 				},
 			}
-			mu.Unlock() // Unlock the mutex after the map is modified
 		}
 	})
 }
 
-func registerKills(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer, wg *sync.WaitGroup, mu *sync.Mutex) {
-	defer wg.Done()
+func registerKills(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer) {
 	demoParser.RegisterEventHandler(func(e events.Kill) {
-		mu.Lock() // Lock before accessing the map
 		if !e.Killer.IsBot {
 			killer := demoPlayer[e.Killer.SteamID64]
 			killer.KillStats.Total++
@@ -113,30 +104,25 @@ func registerKills(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlay
 			victim := demoPlayer[e.Victim.SteamID64]
 			victim.Deaths++
 		}
-		mu.Unlock() // Unlock after modifying the map
 	})
 }
 
-func registerDamage(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer, wg *sync.WaitGroup, mu *sync.Mutex) {
-	defer wg.Done()
+func registerDamage(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer) {
 	demoParser.RegisterEventHandler(func(e events.PlayerHurt) {
 		if e.Attacker != nil && !e.Attacker.IsBot {
-			mu.Lock()
+
 			attacker := demoPlayer[e.Attacker.SteamID64]
 			attacker.AssistStats.DamageGiven += e.HealthDamageTaken
-			mu.Unlock()
+
 		}
 	})
 }
 
-func registerMVP(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer, wg *sync.WaitGroup, mu *sync.Mutex) {
-	defer wg.Done()
+func registerMVP(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer) {
 	demoParser.RegisterEventHandler(func(e events.RoundMVPAnnouncement) {
 		if !e.Player.IsBot {
-			mu.Lock()
 			player := demoPlayer[e.Player.SteamID64]
 			player.MapStats.MVPs++
-			mu.Unlock()
 		}
 	})
 }

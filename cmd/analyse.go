@@ -2,8 +2,7 @@ package cmd
 
 import (
 	"fmt"
-
-	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -12,8 +11,6 @@ import (
 	filepicker "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/file-picker"
 	multiselect "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/multi-select"
 	printstyle "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/print-style"
-
-	"github.com/jedib0t/go-pretty/v6/table"
 )
 
 var players []string // players is the list of players to analyse.
@@ -62,12 +59,17 @@ var analyseCmd = &cobra.Command{
 
 		fmt.Println(printstyle.StyleInfo.Render("Processing CS2 demo, hang tight... \n"))
 
-		allDemoPlayers := demoparser.ProcessDemo(flagDemoPath)
+		startTime := time.Now()
+		processedDemoData := demoparser.ProcessDemo(flagDemoPath)
+		endTime := time.Since(startTime)
 
-		fmt.Println(printstyle.StyleSuceess.Render("\n\nProcessing is done!"))
-
+		fmt.Println(printstyle.StyleSuceess.Render("\n\nProcessing is done! \n"))
+		fmt.Printf("Time taken for ProcessDemo: %s\n\n", endTime)
 		if len(flagPlayers) == 0 {
-			program := tea.NewProgram(multiselect.InitialModelMultiSelect("No players were selected, select the players you want to analyse:", demoparser.GetPlayersName(allDemoPlayers), opts.Players))
+			program := tea.NewProgram(multiselect.InitialModelMultiSelect(
+				"No players were selected, select the players you want to analyse:",
+				demoparser.GetPlayersName(processedDemoData.Players), opts.Players),
+			)
 			if _, err := program.Run(); err != nil {
 				fmt.Println("Error running program:", err)
 				return
@@ -75,31 +77,9 @@ var analyseCmd = &cobra.Command{
 			flagPlayers = opts.Players.SelectedChoices
 		}
 
-		t := table.NewWriter()
-		t.SetOutputMirror(os.Stdout)
-		t.AppendHeader(table.Row{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assist", "Damage Given", "Precision (%)", "Best Weapon", "Map"})
+		playerToAnalyse := demoparser.GetPlayersToAnalyse(processedDemoData.Players, flagPlayers)
 
-		playerToAnalyse := demoparser.GetPlayersToAnalyse(allDemoPlayers, flagPlayers)
-
-		for _, player := range playerToAnalyse {
-			playerBestWeapon := demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills)
-			kd := fmt.Sprintf("%.3f", float32(player.KillStats.Total)/float32(player.Deaths))
-			t.AppendRow(table.Row{
-				player.Name,
-				player.KillStats.Total,
-				player.Deaths,
-				kd,
-				player.KillStats.HeadShots,
-				player.AssistStats.Total,
-				player.AssistStats.FlashedEnemies,
-				player.AssistStats.DamageGiven,
-				int(player.KillStats.Precision * 100),
-				playerBestWeapon,
-				player.MapStats.MapName,
-			})
-		}
-		t.SortBy([]table.SortBy{{Name: "Kills", Mode: table.DscNumeric}})
-		t.Render()
+		dataexport.PrintCLIDataTable(playerToAnalyse, &processedDemoData.Game)
 
 		if save {
 			fmt.Println(printstyle.StyleSuceess.Render("\nWritting data to file..."))

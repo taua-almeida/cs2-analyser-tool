@@ -14,10 +14,9 @@ type AssistStats struct {
 }
 
 type MapStats struct {
-	RoundsWon  int    `json:"rounds_won"`
-	RoundsLost int    `json:"rounds_lost"`
-	MapName    string `json:"map_name"`
-	MVPs       int    `json:"mvps"`
+	RoundsWon  int `json:"rounds_won"`
+	RoundsLost int `json:"rounds_lost"`
+	MVPs       int `json:"mvps"`
 }
 
 type DemoPlayer struct {
@@ -28,4 +27,14 @@ type DemoPlayer struct {
 	KillStats   KillStats   `json:"kill_stats"`
 	AssistStats AssistStats `json:"assist_stats"`
 	MapStats    MapStats    `json:"map_stats"`
+}
+
+type DemoGame struct {
+	MapName  string `json:"map_name"`
+	GameMode string `json:"game_mode"`
+}
+
+type ProcessedDemo struct {
+	Players map[uint64]*DemoPlayer `json:"players"`
+	Game    DemoGame               `json:"game"`
 }
