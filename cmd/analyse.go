@@ -77,7 +77,7 @@ var analyseCmd = &cobra.Command{
 
 		t := table.NewWriter()
 		t.SetOutputMirror(os.Stdout)
-		t.AppendHeader(table.Row{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assist", "Damage Given", "Precision (%)", "Best Weapon"})
+		t.AppendHeader(table.Row{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assist", "Damage Given", "Precision (%)", "Best Weapon", "Map"})
 
 		playerToAnalyse := demoparser.GetPlayersToAnalyse(allDemoPlayers, flagPlayers)
 
@@ -95,6 +95,7 @@ var analyseCmd = &cobra.Command{
 				player.AssistStats.DamageGiven,
 				int(player.KillStats.Precision * 100),
 				playerBestWeapon,
+				player.MapStats.MapName,
 			})
 		}
 		t.SortBy([]table.SortBy{{Name: "Kills", Mode: table.DscNumeric}})

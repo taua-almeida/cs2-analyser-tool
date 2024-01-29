@@ -5,9 +5,10 @@ Designed specifically for players and coaches, this command-line interface tool 
 
 - [ ] Analyse:
 
-    - [ ] Add map to the data
+    - [ X ] Add map to the data
     - [ ] Add clutches won and lost
-    - [ ] Add dynamic data (choose data to analyse)
+    - [ X ] Add MVP count
+    - [ X ] Add rounds
 
 - [ ] Compare:
 

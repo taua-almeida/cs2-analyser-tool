@@ -8,6 +8,7 @@ import (
 
 	demoinfocs "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs"
 	events "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs/events"
+	"github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs/msgs2"
 )
 
 func ProcessDemo(demoPath string) map[uint64]*DemoPlayer {
@@ -37,6 +38,7 @@ func ProcessDemo(demoPath string) map[uint64]*DemoPlayer {
 		func() { registerPlayers(demoParser, playerDemo, &wg, &mu) },
 		func() { registerKills(demoParser, playerDemo, &wg, &mu) },
 		func() { registerDamage(demoParser, playerDemo, &wg, &mu) },
+		func() { registerMVP(demoParser, playerDemo, &wg, &mu) },
 	}
 
 	for _, f := range functions {
@@ -45,6 +47,8 @@ func ProcessDemo(demoPath string) map[uint64]*DemoPlayer {
 	}
 
 	wg.Wait()
+	registerRoundData(demoParser, playerDemo)
+
 	demoParser.ParseToEnd()
 
 	calculateKillsPrecision(playerDemo)
@@ -52,8 +56,18 @@ func ProcessDemo(demoPath string) map[uint64]*DemoPlayer {
 	return playerDemo
 }
 
+func (p DemoPlayer) String() string {
+	return fmt.Sprintf("Player: %s (SteamID: %d)\nKills: %d, Deaths: %d, Headshots: %d, Precision: %.2f\n",
+		p.Name, p.SteamID, p.KillStats.Total, p.Deaths, p.KillStats.HeadShots, p.KillStats.Precision)
+}
+
 func registerPlayers(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer, wg *sync.WaitGroup, mu *sync.Mutex) {
 	defer wg.Done()
+	var mapName string = ""
+
+	demoParser.RegisterNetMessageHandler(func(m *msgs2.CSVCMsg_ServerInfo) {
+		mapName = m.GetMapName()
+	})
 	demoParser.RegisterEventHandler(func(e events.PlayerConnect) {
 		if !e.Player.IsBot {
 			mu.Lock() // Lock the mutex before modifying the map
@@ -62,6 +76,12 @@ func registerPlayers(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPl
 				Name:      e.Player.Name,
 				UserID:    e.Player.UserID,
 				KillStats: KillStats{WeaponsKills: make(map[string]int)},
+				MapStats: MapStats{
+					MapName:    mapName,
+					RoundsWon:  0,
+					RoundsLost: 0,
+					MVPs:       0,
+				},
 			}
 			mu.Unlock() // Unlock the mutex after the map is modified
 		}
@@ -109,6 +129,35 @@ func registerDamage(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPla
 	})
 }
 
+func registerMVP(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer, wg *sync.WaitGroup, mu *sync.Mutex) {
+	defer wg.Done()
+	demoParser.RegisterEventHandler(func(e events.RoundMVPAnnouncement) {
+		if !e.Player.IsBot {
+			mu.Lock()
+			player := demoPlayer[e.Player.SteamID64]
+			player.MapStats.MVPs++
+			mu.Unlock()
+		}
+	})
+}
+
+func registerRoundData(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer) {
+	demoParser.RegisterEventHandler(func(e events.RoundEnd) {
+		if e.WinnerState != nil {
+			winners := e.WinnerState.Members()
+			for _, player := range winners {
+				demoPlayer[player.SteamID64].MapStats.RoundsWon++
+			}
+		}
+		if e.LoserState != nil {
+			losers := e.LoserState.Members()
+			for _, player := range losers {
+				demoPlayer[player.SteamID64].MapStats.RoundsLost++
+			}
+		}
+	})
+}
+
 func calculateKillsPrecision(players map[uint64]*DemoPlayer) {
 	for _, player := range players {
 		if player.KillStats.Total > 0 {
@@ -129,11 +178,6 @@ func GetPlayerBestWeapon(weaponsKills map[string]int) string {
 		}
 	}
 	return bestWeapon
-}
-
-func (p DemoPlayer) String() string {
-	return fmt.Sprintf("Player: %s (SteamID: %d)\nKills: %d, Deaths: %d, Headshots: %d, Precision: %.2f\n",
-		p.Name, p.SteamID, p.KillStats.Total, p.Deaths, p.KillStats.HeadShots, p.KillStats.Precision)
 }
 
 func GetPlayersName(players map[uint64]*DemoPlayer) []string {

@@ -21,7 +21,7 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 		defer csvFile.Close()
 		w := csv.NewWriter(csvFile)
 		csvRecords := [][]string{
-			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assist", "Damage Given", "Precision (%)", "Best Weapon"},
+			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assist", "Damage Given", "Precision (%)", "Best Weapon", "Map"},
 		}
 		for _, player := range players {
 			playerBestWeapon := demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills)
@@ -37,6 +37,7 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 				fmt.Sprintf("%d", player.AssistStats.DamageGiven),
 				fmt.Sprintf("%.2f", player.KillStats.Precision),
 				playerBestWeapon,
+				player.MapStats.MapName,
 			})
 		}
 		w.WriteAll(csvRecords)

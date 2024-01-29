@@ -13,6 +13,13 @@ type AssistStats struct {
 	DamageGiven    int `json:"damage_given"`
 }
 
+type MapStats struct {
+	RoundsWon  int    `json:"rounds_won"`
+	RoundsLost int    `json:"rounds_lost"`
+	MapName    string `json:"map_name"`
+	MVPs       int    `json:"mvps"`
+}
+
 type DemoPlayer struct {
 	SteamID     uint64      `json:"steam_id"`
 	Name        string      `json:"name"`
@@ -20,4 +27,5 @@ type DemoPlayer struct {
 	Deaths      int         `json:"deaths"`
 	KillStats   KillStats   `json:"kill_stats"`
 	AssistStats AssistStats `json:"assist_stats"`
+	MapStats    MapStats    `json:"map_stats"`
 }
