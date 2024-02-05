@@ -9,7 +9,7 @@ import (
 	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
 )
 
-func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, gameData *demoparser.DemoGame) {
+func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, mapData *demoparser.MapData, gameMode string) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Damage Given", "Precision (%)", "Best Weapon"})
@@ -29,7 +29,7 @@ func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, gameDa
 		})
 	}
 	t.SortBy([]table.SortBy{{Name: "Kills", Mode: table.DscNumeric}})
-	t.AppendFooter(table.Row{"Map Played", gameData.MapName})
-	t.SetCaption(fmt.Sprintf("This is a demo of a: %s, game\n", strings.ToUpper(gameData.GameMode)))
+	t.AppendFooter(table.Row{"Map Played", mapData.MapName})
+	t.SetCaption(fmt.Sprintf("This is a demo of a: %s, game\n", strings.ToUpper(gameMode)))
 	t.Render()
 }

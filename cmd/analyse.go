@@ -79,7 +79,7 @@ var analyseCmd = &cobra.Command{
 
 		playerToAnalyse := demoparser.GetPlayersToAnalyse(processedDemoData.Players, flagPlayers)
 
-		dataexport.PrintCLIDataTable(playerToAnalyse, &processedDemoData.Game)
+		dataexport.PrintCLIDataTable(playerToAnalyse, &processedDemoData.Map, processedDemoData.GameMode)
 
 		if save {
 			fmt.Println(printstyle.StyleSuceess.Render("\nWritting data to file..."))

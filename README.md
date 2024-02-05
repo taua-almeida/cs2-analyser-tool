@@ -1,28 +1,6 @@
 # cs2-analyser-tool
 Designed specifically for players and coaches, this command-line interface tool provides a simple display and easy data ready to analyse, compare and start your journey towards improving your team and your personal CS2 skills.
 
-## Roadmap:
-
-- [ ] Analyse:
-
-    - [ ] Add clutches won and lost
-    - [ ] Add ACE count
-    - [ ] Add Kills Strike count
-    - [ ] Add new DemoGame struct to json
-    - [ ] CSV format save as json
-    - [ ] Finish doc
-
-- [ ] Compare:
-
-    - [ ] Compare two different players from a single demo
-    - [ ] Compare same player in two demos
-    - [ ] Compare two different players in two demos
-    - [ ] Compare two different player from a CS2-Analyser-Tool stored data
-
-- [ ] Heatmap:
-    - [ ] Generate a demo heatmap
-    - [ ] Allow specific player heatmap
-
 ## Usage
 
 ### Analyse

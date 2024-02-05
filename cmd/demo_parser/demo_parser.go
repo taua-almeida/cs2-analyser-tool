@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	demoinfocs "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs"
+	common "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs/common"
 	events "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs/events"
 	"github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs/msgs2"
 )
@@ -27,22 +28,25 @@ func ProcessDemo(demoPath string) *ProcessedDemo {
 	}
 
 	playerDemo := make(map[uint64]*DemoPlayer)
-	gameData := &DemoGame{}
+	mapData := &MapData{}
+	gameMode := ""
+	roundData := &RoundData{}
 
-	getDemoNetData(demoParser, gameData)
+	registerMap(demoParser, mapData, gameMode)
 	registerPlayers(demoParser, playerDemo)
 	registerKills(demoParser, playerDemo)
 	registerDamage(demoParser, playerDemo)
 	registerMVP(demoParser, playerDemo)
-	registerRoundData(demoParser, playerDemo)
+	registerRoundEvents(demoParser, playerDemo, roundData)
 
 	demoParser.ParseToEnd()
 
 	calculateKillsPrecision(playerDemo)
 
 	processedDemoData := &ProcessedDemo{
-		Players: playerDemo,
-		Game:    *gameData,
+		Players:  playerDemo,
+		Map:      *mapData,
+		GameMode: gameMode,
 	}
 
 	return processedDemoData
@@ -53,12 +57,12 @@ func (p DemoPlayer) String() string {
 		p.Name, p.SteamID, p.KillStats.Total, p.Deaths, p.KillStats.HeadShots, p.KillStats.Precision)
 }
 
-func getDemoNetData(demoParser demoinfocs.Parser, gameData *DemoGame) {
+func registerMap(demoParser demoinfocs.Parser, mapData *MapData, gameMode string) {
 	demoParser.RegisterNetMessageHandler(func(m *msgs2.CSVCMsg_ServerInfo) {
-		gameData.MapName = m.GetMapName()
+		mapData.MapName = m.GetMapName()
 		gameSessionConfig := m.GetGameSessionConfig()
 		if gameSessionConfig != nil {
-			gameData.GameMode = gameSessionConfig.GetGamemode()
+			gameMode = gameSessionConfig.GetGamemode()
 		}
 	})
 }
@@ -71,14 +75,62 @@ func registerPlayers(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPl
 				Name:      e.Player.Name,
 				UserID:    e.Player.UserID,
 				KillStats: KillStats{WeaponsKills: make(map[string]int)},
-				MapStats: MapStats{
-					RoundsWon:  0,
-					RoundsLost: 0,
-					MVPs:       0,
+				PlayerMapStats: PlayerMapStats{
+					ACEs: 0,
+					MVPs: 0,
 				},
 			}
 		}
 	})
+}
+
+func registerRoundEvents(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer, roundData *RoundData) {
+	demoParser.RegisterEventHandler(func(e events.RoundStart) {
+		gs := demoParser.GameState()
+		*roundData = RoundData{
+			RoundNumber:    gs.TotalRoundsPlayed() + 1,
+			KillsByPlayer:  make(map[uint64]int),
+			PlayersAliveCT: len(gs.TeamCounterTerrorists().Members()),
+			PlayersAliveT:  len(gs.TeamTerrorists().Members()),
+		}
+	})
+
+	demoParser.RegisterEventHandler(func(e events.Kill) {
+		demoParser.CurrentTime()
+		if e.Victim != nil {
+			if e.Killer.Team == common.TeamTerrorists {
+				roundData.PlayersAliveCT--
+			} else {
+				roundData.PlayersAliveT--
+			}
+			roundData.KillsByPlayer[e.Killer.SteamID64]++
+		}
+	})
+
+	demoParser.RegisterEventHandler(func(e events.RoundEnd) {
+		roundData.WinningTeam = e.Winner
+		checkClutchAndAce(roundData, demoPlayer)
+	})
+}
+
+func checkClutchAndAce(roundData *RoundData, demoPlayer map[uint64]*DemoPlayer) {
+	for playerID, kills := range roundData.KillsByPlayer {
+		if kills == 5 {
+			demoPlayer[playerID].PlayerMapStats.ACEs++
+		}
+	}
+
+	if len(roundData.KillsByPlayer) == 1 {
+		for playerID, kills := range roundData.KillsByPlayer {
+			if (roundData.PlayersAliveCT == 1 && roundData.WinningTeam == common.TeamCounterTerrorists) ||
+				(roundData.PlayersAliveT == 1 && roundData.WinningTeam == common.TeamTerrorists) {
+				if kills > 1 {
+					demoPlayer[playerID].PlayerMapStats.ClutchesWon++
+					roundData.ClutchWonByPlayer = playerID
+				}
+			}
+		}
+	}
 }
 
 func registerKills(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer) {
@@ -122,24 +174,7 @@ func registerMVP(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer
 	demoParser.RegisterEventHandler(func(e events.RoundMVPAnnouncement) {
 		if !e.Player.IsBot {
 			player := demoPlayer[e.Player.SteamID64]
-			player.MapStats.MVPs++
-		}
-	})
-}
-
-func registerRoundData(demoParser demoinfocs.Parser, demoPlayer map[uint64]*DemoPlayer) {
-	demoParser.RegisterEventHandler(func(e events.RoundEnd) {
-		if e.WinnerState != nil {
-			winners := e.WinnerState.Members()
-			for _, player := range winners {
-				demoPlayer[player.SteamID64].MapStats.RoundsWon++
-			}
-		}
-		if e.LoserState != nil {
-			losers := e.LoserState.Members()
-			for _, player := range losers {
-				demoPlayer[player.SteamID64].MapStats.RoundsLost++
-			}
+			player.PlayerMapStats.MVPs++
 		}
 	})
 }
