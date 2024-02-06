@@ -46,3 +46,7 @@ This will analyse only "player1" and "player2" from the specified demo and save 
 
 The data output showed in the terminal table is not all the analyzed data, to get more info about the available data, go to [PLAYER_DATA](./_docs/PLAYER_DATA.MD)
 
+## Contribuiting
+
+If you'd like to contribute, please fork the repository and open a pull request to the `main` branch.
+
