@@ -48,5 +48,20 @@ The data output showed in the terminal table is not all the analyzed data, to ge
 
 ## Contributing
 
+### Clone the repo
+
+```bash
+git https://github.com/taua-almeida/cs2-analyser-tool.git
+cd cs2-analyser-tool
+```
+
+### Build the project
+
+```bash
+go build
+```
+
+### Submit a pull request
+
 If you'd like to contribute, please fork the repository and open a pull request to the `main` branch.
 
