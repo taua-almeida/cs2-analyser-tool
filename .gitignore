@@ -19,6 +19,7 @@
 
 # Go workspace file
 go.work
+go.work.sum
 
 # Remove cs2 demos files
 *.dem

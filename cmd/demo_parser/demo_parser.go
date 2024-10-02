@@ -22,11 +22,6 @@ func ProcessDemo(demoPath string) *ProcessedDemo {
 	demoParser := demoinfocs.NewParser(file)
 	defer demoParser.Close()
 
-	if err != nil {
-		fmt.Println("Error parsing demo file", err)
-		return nil
-	}
-
 	playerDemo := make(map[uint64]*DemoPlayer)
 	mapData := &MapData{}
 	gameMode := ""
