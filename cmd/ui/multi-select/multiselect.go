@@ -2,6 +2,8 @@ package multiselect
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -24,7 +26,7 @@ type model struct {
 
 func InitialModelMultiSelect(msg string, choices []string, selections *Selection) model {
 	m := model{
-		viewMsg:    "Select the players you want to analyse:",
+		viewMsg:    msg,
 		cursor:     0,
 		choices:    choices,
 		selections: selections,
@@ -58,7 +60,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected[m.cursor] = struct{}{}
 			}
 		case "y":
-			for i := range m.selected {
+			for _, i := range slices.Sorted(maps.Keys(m.selected)) {
 				m.selections.SetChoices(m.choices[i])
 			}
 			return m, tea.Quit

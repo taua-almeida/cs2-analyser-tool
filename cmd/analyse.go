@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 	dataexport "github.com/taua-almeida/cs2-analyser-tool/cmd/dataexport"
 	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
@@ -18,10 +20,6 @@ var demoPath string  // demoPath is the path to the demo file.
 var save bool        // save is the flag to save the demo players data.
 var saveType string  // saveType is the type of storage to use.
 
-type Options struct {
-	Players *multiselect.Selection
-}
-
 func init() {
 	// Add the analyse command as a subcommand of rootCmd.
 	rootCmd.AddCommand(analyseCmd)
@@ -29,69 +27,80 @@ func init() {
 	analyseCmd.Flags().StringVarP(&demoPath, "demo", "d", "", "Demo path.")
 	analyseCmd.Flags().StringSliceVarP(&players, "players", "p", []string{}, "Players to analyse.")
 	analyseCmd.Flags().BoolVarP(&save, "save", "s", false, "Save the demo players data.")
-	analyseCmd.Flags().StringVarP(&saveType, "save-type", "", "json", "Type of file to save the data [json, csv], default is json.")
+	analyseCmd.Flags().StringVar(&saveType, "save-type", "json", "Type of file to save the data [json, csv], default is json.")
 }
 
 var analyseCmd = &cobra.Command{
-	Use:   "analyse",
-	Short: "Analyse a CS2 game demo.",
-	Long:  "This command will parse your cs2 demo and give you some stats about it. Use history to see your previous demos.",
-	Run: func(cmd *cobra.Command, args []string) {
-		flagDemoPath := cmd.Flag("demo").Value.String()
-		flagPlayers, err := cmd.Flags().GetStringSlice("players")
-		if err != nil {
-			fmt.Println("Error getting players flag: ", err)
-			return
+	Use:          "analyse",
+	Short:        "Analyse a CS2 game demo.",
+	Long:         "This command will parse your cs2 demo and give you some stats about it. Use history to see your previous demos.",
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if saveType != "json" && saveType != "csv" {
+			return fmt.Errorf("invalid --save-type %q, must be json or csv", saveType)
 		}
 
-		opts := &Options{
-			Players: &multiselect.Selection{},
-		}
-
-		if flagDemoPath == "" {
-			_, selectedFilePath := filepicker.InitialModelFilePicker()
-			if selectedFilePath == "" {
-				fmt.Println("No file was selected :(. \n Ending program...")
-				return
+		if demoPath == "" {
+			selected, err := filepicker.PickDemoFile()
+			if err != nil {
+				return fmt.Errorf("picking demo file: %w", err)
 			}
-			flagDemoPath = selectedFilePath
+			if selected == "" {
+				fmt.Println("No file was selected :(. \n Ending program...")
+				return nil
+			}
+			demoPath = selected
 		}
 
-		fmt.Println(printstyle.StyleInfo.Render("Processing CS2 demo, hang tight... \n"))
+		lipgloss.Println(printstyle.StyleInfo.Render("Processing CS2 demo, hang tight... \n"))
 
 		startTime := time.Now()
-		processedDemoData, err := demoparser.ProcessDemo(flagDemoPath)
+		processedDemoData, err := demoparser.ProcessDemo(demoPath)
 		if err != nil {
-			fmt.Println(printstyle.StyleError.Render(fmt.Sprintf("Error processing demo: %s", err)))
-			return
+			return err
 		}
-		endTime := time.Since(startTime)
 
-		fmt.Println(printstyle.StyleSuceess.Render("\n\nProcessing is done! \n"))
-		fmt.Printf("Time taken for ProcessDemo: %s\n\n", endTime)
-		if len(flagPlayers) == 0 {
+		lipgloss.Println(printstyle.StyleSuccess.Render("\n\nProcessing is done! \n"))
+		fmt.Printf("Time taken for ProcessDemo: %s\n\n", time.Since(startTime))
+
+		availablePlayers := demoparser.GetPlayersName(processedDemoData.Players)
+		if len(availablePlayers) == 0 {
+			return fmt.Errorf("no players found in demo %s", demoPath)
+		}
+
+		if len(players) == 0 {
+			selection := &multiselect.Selection{}
 			program := tea.NewProgram(multiselect.InitialModelMultiSelect(
 				"No players were selected, select the players you want to analyse:",
-				demoparser.GetPlayersName(processedDemoData.Players), opts.Players),
+				availablePlayers, selection),
 			)
 			if _, err := program.Run(); err != nil {
-				fmt.Println("Error running program:", err)
-				return
+				return fmt.Errorf("running player selection: %w", err)
 			}
-			flagPlayers = opts.Players.SelectedChoices
+			players = selection.SelectedChoices
 		}
 
-		playerToAnalyse := demoparser.GetPlayersToAnalyse(processedDemoData.Players, flagPlayers)
+		if len(players) == 0 {
+			lipgloss.Println(printstyle.StyleInfo.Render("No players selected, analysing everyone."))
+			players = availablePlayers
+		}
 
-		dataexport.PrintCLIDataTable(playerToAnalyse, &processedDemoData.Map, processedDemoData.GameMode)
+		playersToAnalyse := demoparser.GetPlayersToAnalyse(processedDemoData.Players, players)
+		if len(playersToAnalyse) == 0 {
+			return fmt.Errorf("no players named %s in this demo, available players: %s",
+				strings.Join(players, ", "), strings.Join(availablePlayers, ", "))
+		}
+
+		dataexport.PrintCLIDataTable(playersToAnalyse, &processedDemoData.Map, processedDemoData.GameMode)
 
 		if save {
-			fmt.Println(printstyle.StyleSuceess.Render("\nWritting data to file..."))
-			fileName, err := dataexport.WritePlayersToFile(playerToAnalyse, saveType)
+			lipgloss.Println(printstyle.StyleSuccess.Render("\nWritting data to file..."))
+			fileName, err := dataexport.WritePlayersToFile(playersToAnalyse, saveType)
 			if err != nil {
-				fmt.Println(printstyle.StyleError.Render(fmt.Sprintf("Error writing to file: %s", err)))
+				return fmt.Errorf("writing to file: %w", err)
 			}
-			fmt.Println(printstyle.StyleSuceess.Render("Data written to file: ", fileName))
+			lipgloss.Println(printstyle.StyleSuccess.Render("Data written to file: " + fileName))
 		}
+		return nil
 	},
 }

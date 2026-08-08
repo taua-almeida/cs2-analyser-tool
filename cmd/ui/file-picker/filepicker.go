@@ -26,8 +26,9 @@ func clearErrorAfter(t time.Duration) tea.Cmd {
 	})
 }
 
-// InitialModelFilePicker initializes the file picker model and returns it along with the selected file path.
-func InitialModelFilePicker() (model, string) {
+// PickDemoFile opens an interactive picker and returns the selected .dem
+// file path. The path is empty when the user quits without confirming.
+func PickDemoFile() (string, error) {
 	fp := filepicker.New()
 	fp.AllowedTypes = []string{".dem"}
 	fp.CurrentDirectory, _ = os.UserHomeDir()
@@ -35,9 +36,15 @@ func InitialModelFilePicker() (model, string) {
 	m := model{
 		filepicker: fp,
 	}
-	tm, _ := tea.NewProgram(m, tea.WithOutput(os.Stderr)).Run()
-	mm := tm.(model)
-	return mm, mm.selectedFile
+	tm, err := tea.NewProgram(m, tea.WithOutput(os.Stderr)).Run()
+	if err != nil {
+		return "", err
+	}
+	mm, ok := tm.(model)
+	if !ok {
+		return "", errors.New("unexpected model type returned by file picker")
+	}
+	return mm.selectedFile, nil
 }
 
 func (m model) Init() tea.Cmd {
