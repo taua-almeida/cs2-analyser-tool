@@ -3,7 +3,7 @@ package multiselect
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 type Selection struct {
@@ -39,9 +39,9 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
-		case "crtl+c", "q":
+		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "up", "k":
 			if m.cursor > 0 {
@@ -51,7 +51,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.choices)-1 {
 				m.cursor++
 			}
-		case "enter", " ":
+		case "enter", "space":
 			if _, ok := m.selected[m.cursor]; ok {
 				delete(m.selected, m.cursor)
 			} else {
@@ -67,7 +67,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) View() string {
+func (m model) View() tea.View {
 	s := m.viewMsg + "\n\n"
 
 	for i, choice := range m.choices {
@@ -86,5 +86,5 @@ func (m model) View() string {
 
 	s += "\nPress q to quit and y to confirm selection\n"
 
-	return s
+	return tea.NewView(s)
 }

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/filepicker"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/filepicker"
+	tea "charm.land/bubbletea/v2"
 )
 
 type model struct {
@@ -35,7 +35,7 @@ func InitialModelFilePicker() (model, string) {
 	m := model{
 		filepicker: fp,
 	}
-	tm, _ := tea.NewProgram(&m, tea.WithOutput(os.Stderr)).Run()
+	tm, _ := tea.NewProgram(m, tea.WithOutput(os.Stderr)).Run()
 	mm := tm.(model)
 	return mm, mm.selectedFile
 }
@@ -46,7 +46,7 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if m.confirming {
 			switch msg.String() {
 			case "y", "Y":
@@ -91,9 +91,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) View() string {
+func (m model) View() tea.View {
 	if m.quitting {
-		return ""
+		return tea.NewView("")
 	}
 	var s strings.Builder
 	s.WriteString("\n  ")
@@ -107,5 +107,5 @@ func (m model) View() string {
 		s.WriteString("Selected file: " + m.filepicker.Styles.Selected.Render(m.selectedFile))
 	}
 	s.WriteString("\n\n" + m.filepicker.View() + "\n")
-	return s.String()
+	return tea.NewView(s.String())
 }

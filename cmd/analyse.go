@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 	dataexport "github.com/taua-almeida/cs2-analyser-tool/cmd/dataexport"
 	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"

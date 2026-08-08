@@ -5,10 +5,10 @@ import (
 	"os"
 	"slices"
 
-	demoinfocs "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs"
-	common "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs/common"
-	events "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs/events"
-	"github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs/msgs2"
+	demoinfocs "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs"
+	common "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
+	events "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/events"
+	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/msg"
 )
 
 func ProcessDemo(demoPath string) *ProcessedDemo {
@@ -53,7 +53,7 @@ func (p DemoPlayer) String() string {
 }
 
 func registerMap(demoParser demoinfocs.Parser, mapData *MapData, gameMode string) {
-	demoParser.RegisterNetMessageHandler(func(m *msgs2.CSVCMsg_ServerInfo) {
+	demoParser.RegisterNetMessageHandler(func(m *msg.CSVCMsg_ServerInfo) {
 		mapData.MapName = m.GetMapName()
 		gameSessionConfig := m.GetGameSessionConfig()
 		if gameSessionConfig != nil {

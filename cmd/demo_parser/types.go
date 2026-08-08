@@ -1,6 +1,6 @@
 package demoparser
 
-import common "github.com/markus-wa/demoinfocs-golang/v4/pkg/demoinfocs/common"
+import common "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
 
 type KillStats struct {
 	Total        int            `json:"total"`
