@@ -1,34 +1,26 @@
 package demoparser
 
-import common "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
-
 type KillStats struct {
 	Total        int            `json:"total"`
 	HeadShots    int            `json:"headshots"`
 	Precision    float64        `json:"precision"`
 	WeaponsKills map[string]int `json:"weapons_kills"`
 	TradeKills   int            `json:"trade_kills"`
+	TeamKills    int            `json:"team_kills"`
 }
 
 type AssistStats struct {
-	Total          int `json:"total"`
-	FlashedEnemies int `json:"flashed_enemies"`
-	DamageGiven    int `json:"damage_given"`
+	Total          int     `json:"total"`
+	FlashedEnemies int     `json:"flashed_enemies"`
+	DamageGiven    int     `json:"damage_given"`
+	ADR            float64 `json:"adr"`
 }
 
 type PlayerMapStats struct {
-	MVPs        int `json:"mvps"`
-	ACEs        int `json:"aces"`
-	ClutchesWon int `json:"clutches_won"`
-}
-
-type RoundData struct {
-	RoundNumber       int
-	KillsByPlayer     map[uint64]int // Key: Player's SteamID64, Value: Number of kills in the round
-	PlayersAliveCT    int
-	PlayersAliveT     int
-	WinningTeam       common.Team
-	ClutchWonByPlayer uint64 // SteamID of the player who won the clutch, if any
+	MVPs        int     `json:"mvps"`
+	ACEs        int     `json:"aces"`
+	ClutchesWon int     `json:"clutches_won"`
+	KAST        float64 `json:"kast"`
 }
 
 type DemoPlayer struct {
@@ -39,7 +31,6 @@ type DemoPlayer struct {
 	KillStats      KillStats      `json:"kill_stats"`
 	AssistStats    AssistStats    `json:"assist_stats"`
 	PlayerMapStats PlayerMapStats `json:"player_map_stats"`
-	RoundData      []RoundData    `json:"round_data"`
 }
 
 type MapData struct {

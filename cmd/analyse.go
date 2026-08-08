@@ -60,7 +60,11 @@ var analyseCmd = &cobra.Command{
 		fmt.Println(printstyle.StyleInfo.Render("Processing CS2 demo, hang tight... \n"))
 
 		startTime := time.Now()
-		processedDemoData := demoparser.ProcessDemo(flagDemoPath)
+		processedDemoData, err := demoparser.ProcessDemo(flagDemoPath)
+		if err != nil {
+			fmt.Println(printstyle.StyleError.Render(fmt.Sprintf("Error processing demo: %s", err)))
+			return
+		}
 		endTime := time.Since(startTime)
 
 		fmt.Println(printstyle.StyleSuceess.Render("\n\nProcessing is done! \n"))

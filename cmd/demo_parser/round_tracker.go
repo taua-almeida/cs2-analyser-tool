@@ -1,0 +1,161 @@
+package demoparser
+
+import (
+	"time"
+
+	common "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
+)
+
+// tradeWindow is how long after a teammate's death a revenge kill still
+// counts as a trade.
+const tradeWindow = 5 * time.Second
+
+// aceKills is the number of enemy kills in a single round that make an ace.
+const aceKills = 5
+
+var bothTeams = []common.Team{common.TeamTerrorists, common.TeamCounterTerrorists}
+
+type deathRecord struct {
+	killer     uint64
+	victim     uint64
+	victimTeam common.Team
+	at         time.Duration
+}
+
+// roundOutcome is what a finished round contributes to player stats.
+type roundOutcome struct {
+	played       bool
+	aces         []uint64
+	clutcher     uint64 // winner-side player that won a 1vX, 0 if none
+	participants map[uint64]common.Team
+	kast         map[uint64]bool // players that got a Kill, Assist, Survived or were Traded
+}
+
+// roundTracker keeps the per-round state needed for clutches, aces, trades
+// and KAST. It is fed plain values instead of parser types so tests can
+// drive it without a demo file.
+type roundTracker struct {
+	live       bool
+	startAlive map[uint64]common.Team
+	alive      map[uint64]common.Team
+	enemyKills map[uint64]int
+	assists    map[uint64]bool
+	traded     map[uint64]bool
+	deaths     []deathRecord
+	clutchers  map[common.Team]uint64
+}
+
+func newRoundTracker() *roundTracker {
+	return &roundTracker{}
+}
+
+func (rt *roundTracker) startRound(alive map[uint64]common.Team) {
+	rt.live = true
+	rt.startAlive = make(map[uint64]common.Team, len(alive))
+	rt.alive = make(map[uint64]common.Team, len(alive))
+	for id, team := range alive {
+		rt.startAlive[id] = team
+		rt.alive[id] = team
+	}
+	rt.enemyKills = make(map[uint64]int)
+	rt.assists = make(map[uint64]bool)
+	rt.traded = make(map[uint64]bool)
+	rt.deaths = nil
+	rt.clutchers = make(map[common.Team]uint64)
+	rt.updateClutchCandidates()
+}
+
+// kill records a death in the current round. killer and assister are 0 for
+// world deaths and suicides. It reports whether the kill traded the death of
+// one of the killer's teammates.
+func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam common.Team, assister uint64, at time.Duration) bool {
+	if !rt.live {
+		return false
+	}
+
+	isTrade := false
+	if killer != 0 && killerTeam != victimTeam {
+		rt.enemyKills[killer]++
+		if assister != 0 {
+			rt.assists[assister] = true
+		}
+		for _, d := range rt.deaths {
+			if d.killer == victim && d.victimTeam == killerTeam && at-d.at <= tradeWindow {
+				rt.traded[d.victim] = true
+				isTrade = true
+			}
+		}
+	}
+
+	rt.deaths = append(rt.deaths, deathRecord{killer: killer, victim: victim, victimTeam: victimTeam, at: at})
+	rt.remove(victim)
+	return isTrade
+}
+
+// remove takes a player out of the alive set, on death or disconnect.
+func (rt *roundTracker) remove(player uint64) {
+	if !rt.live {
+		return
+	}
+	delete(rt.alive, player)
+	rt.updateClutchCandidates()
+}
+
+// updateClutchCandidates marks the last alive player of a team as that
+// team's clutch candidate the moment they are left alone against at least
+// one enemy. The candidacy sticks for the rest of the round.
+func (rt *roundTracker) updateClutchCandidates() {
+	for _, team := range bothTeams {
+		if _, started := rt.clutchers[team]; started {
+			continue
+		}
+		if last, enemies := rt.lastAlive(team); last != 0 && enemies >= 1 {
+			rt.clutchers[team] = last
+		}
+	}
+}
+
+// lastAlive returns the only alive member of team (0 when the team has zero
+// or more than one player alive) and the number of alive enemies.
+func (rt *roundTracker) lastAlive(team common.Team) (uint64, int) {
+	var last uint64
+	count, enemies := 0, 0
+	for id, t := range rt.alive {
+		if t == team {
+			count++
+			last = id
+		} else {
+			enemies++
+		}
+	}
+	if count != 1 {
+		return 0, enemies
+	}
+	return last, enemies
+}
+
+func (rt *roundTracker) endRound(winner common.Team) roundOutcome {
+	if !rt.live {
+		return roundOutcome{}
+	}
+	rt.live = false
+
+	outcome := roundOutcome{
+		played:       true,
+		clutcher:     rt.clutchers[winner],
+		participants: rt.startAlive,
+		kast:         make(map[uint64]bool),
+	}
+	for id, kills := range rt.enemyKills {
+		if kills >= aceKills {
+			outcome.aces = append(outcome.aces, id)
+		}
+	}
+	for id := range rt.startAlive {
+		_, survived := rt.alive[id]
+		if survived || rt.enemyKills[id] > 0 || rt.assists[id] || rt.traded[id] {
+			outcome.kast[id] = true
+		}
+	}
+	return outcome
+}
