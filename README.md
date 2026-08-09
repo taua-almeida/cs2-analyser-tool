@@ -16,8 +16,8 @@ analyse [flags]
 #### Flags
 
 - `-d, --demo <path>`: Path to the CS2 demo file.
-- `p, --players <players>`: A list of player to analyse. This should be provided as a comma-separated list of player names.
-- `s, --save`: Flag to save the demo player's data.
+- `-p, --players <players>`: A list of players to analyse. This should be provided as a comma-separated list of player names.
+- `-s, --save`: Flag to save the demo player's data.
 - `--save-type <type>`: Type of file to save the data. Options are `json` and `csv`. The default is `json`.
 
 #### Options
@@ -51,7 +51,7 @@ The data output showed in the terminal table is not all the analyzed data, to ge
 ### Clone the repo
 
 ```bash
-git https://github.com/taua-almeida/cs2-analyser-tool.git
+git clone https://github.com/taua-almeida/cs2-analyser-tool.git
 cd cs2-analyser-tool
 ```
 

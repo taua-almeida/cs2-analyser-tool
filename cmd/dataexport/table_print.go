@@ -9,27 +9,39 @@ import (
 	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
 )
 
+// kdRatio formats kills/deaths, treating zero deaths as one so the ratio
+// stays finite.
+func kdRatio(kills, deaths int) string {
+	if deaths == 0 {
+		deaths = 1
+	}
+	return fmt.Sprintf("%.3f", float64(kills)/float64(deaths))
+}
+
 func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, mapData *demoparser.MapData, gameMode string) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Damage Given", "Precision (%)", "Best Weapon"})
+	t.AppendHeader(table.Row{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "ADR", "KAST (%)", "Precision (%)", "Best Weapon"})
 	for _, player := range playerToAnalyse {
 		playerBestWeapon := demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills)
-		kd := fmt.Sprintf("%.3f", float32(player.KillStats.Total)/float32(player.Deaths))
 		t.AppendRow(table.Row{
 			player.Name,
 			player.KillStats.Total,
 			player.Deaths,
-			kd,
+			kdRatio(player.KillStats.Total, player.Deaths),
 			player.KillStats.HeadShots,
 			player.AssistStats.Total,
-			player.AssistStats.DamageGiven,
-			int(player.KillStats.Precision * 100),
+			fmt.Sprintf("%.1f", player.AssistStats.ADR),
+			fmt.Sprintf("%.1f", player.PlayerMapStats.KAST),
+			fmt.Sprintf("%.1f", player.KillStats.Precision*100),
 			playerBestWeapon,
 		})
 	}
 	t.SortBy([]table.SortBy{{Name: "Kills", Mode: table.DscNumeric}})
 	t.AppendFooter(table.Row{"Map Played", mapData.MapName})
-	t.SetCaption(fmt.Sprintf("This is a demo of a: %s, game\n", strings.ToUpper(gameMode)))
+	t.AppendFooter(table.Row{"Score CT : T", fmt.Sprintf("%d : %d", mapData.RoundsWonCT, mapData.RoundsWonT)})
+	if gameMode != "" {
+		t.SetCaption("This is a demo of a: %s game\n", strings.ToUpper(gameMode))
+	}
 	t.Render()
 }

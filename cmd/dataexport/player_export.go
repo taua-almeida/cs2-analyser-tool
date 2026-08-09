@@ -1,10 +1,13 @@
 package dataexport
 
 import (
+	"cmp"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"time"
 
 	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
@@ -19,33 +22,43 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 			return "", err
 		}
 		defer csvFile.Close()
-		w := csv.NewWriter(csvFile)
+
+		// Sort rows by kills so the CSV matches the table output.
+		sortedPlayers := slices.SortedFunc(maps.Values(players), func(a, b *demoparser.DemoPlayer) int {
+			return cmp.Compare(b.KillStats.Total, a.KillStats.Total)
+		})
+
 		csvRecords := [][]string{
-			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assist", "Damage Given", "Precision (%)", "Best Weapon"},
+			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "MVPs", "ACEs", "Clutches Won", "Best Weapon"},
 		}
-		for _, player := range players {
-			playerBestWeapon := demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills)
-			kd := fmt.Sprintf("%.3f", float32(player.KillStats.Total)/float32(player.Deaths))
+		for _, player := range sortedPlayers {
 			csvRecords = append(csvRecords, []string{
 				player.Name,
 				fmt.Sprintf("%d", player.KillStats.Total),
 				fmt.Sprintf("%d", player.Deaths),
-				kd,
+				kdRatio(player.KillStats.Total, player.Deaths),
 				fmt.Sprintf("%d", player.KillStats.HeadShots),
 				fmt.Sprintf("%d", player.AssistStats.Total),
 				fmt.Sprintf("%d", player.AssistStats.FlashedEnemies),
 				fmt.Sprintf("%d", player.AssistStats.DamageGiven),
-				fmt.Sprintf("%.2f", player.KillStats.Precision),
-				playerBestWeapon,
+				fmt.Sprintf("%.1f", player.AssistStats.ADR),
+				fmt.Sprintf("%.1f", player.PlayerMapStats.KAST),
+				fmt.Sprintf("%.1f", player.KillStats.Precision*100),
+				fmt.Sprintf("%d", player.KillStats.TradeKills),
+				fmt.Sprintf("%d", player.PlayerMapStats.MVPs),
+				fmt.Sprintf("%d", player.PlayerMapStats.ACEs),
+				fmt.Sprintf("%d", player.PlayerMapStats.ClutchesWon),
+				demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills),
 			})
 		}
-		w.WriteAll(csvRecords)
-		if err := w.Error(); err != nil {
+
+		w := csv.NewWriter(csvFile)
+		if err := w.WriteAll(csvRecords); err != nil {
 			return "", err
 		}
-		w.Flush()
 		return fileName, nil
 	}
+
 	jsonData, err := json.MarshalIndent(players, "", " ")
 	if err != nil {
 		return "", err
