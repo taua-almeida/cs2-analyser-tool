@@ -70,9 +70,10 @@ func (rt *roundTracker) startRound(alive map[uint64]common.Team) {
 }
 
 // kill records a death in the current round. killer and assister are 0 for
-// world deaths and suicides. It reports whether the kill traded the death of
-// one of the killer's teammates.
-func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam common.Team, assister uint64, at time.Duration) bool {
+// world deaths and suicides; byWorld marks deaths with no real cause (falls,
+// match-end cleanup kills), as opposed to the bomb or an enemy. It reports
+// whether the kill traded the death of one of the killer's teammates.
+func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam common.Team, assister uint64, byWorld bool, at time.Duration) bool {
 	if !rt.live {
 		return false
 	}
@@ -92,10 +93,10 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 	}
 
 	rt.deaths = append(rt.deaths, deathRecord{killer: killer, victim: victim, victimTeam: victimTeam, at: at})
-	// After the round is decided, only a real enemy exit frag cancels
-	// survival. World/self deaths in the post-round seconds (the bomb going
-	// off, match-end cleanup kills) do not.
-	if !(rt.ending && killer == 0) {
+	// Dying before the round officially ends cancels survival, including to
+	// the post-round bomb explosion (HLTV convention). Only match-end world
+	// cleanup kills are ignored once the round is decided.
+	if !(rt.ending && byWorld) {
 		rt.remove(victim)
 	}
 	return isTrade

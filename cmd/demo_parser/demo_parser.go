@@ -19,6 +19,7 @@ type analyser struct {
 	players    map[uint64]*DemoPlayer
 	tracker    *roundTracker
 	kastRounds map[uint64]int
+	lastHealth map[uint64]int
 	mapData    MapData
 	gameMode   string
 }
@@ -35,6 +36,7 @@ func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
 		players:    make(map[uint64]*DemoPlayer),
 		tracker:    newRoundTracker(),
 		kastRounds: make(map[uint64]int),
+		lastHealth: make(map[uint64]int),
 	}
 	defer a.parser.Close()
 
@@ -126,6 +128,7 @@ func (a *analyser) onRoundStart(e events.RoundStart) {
 			continue
 		}
 		alive[trackerID(p)] = p.Team
+		a.lastHealth[trackerID(p)] = p.Health()
 		a.ensurePlayer(p)
 	}
 	a.tracker.startRound(alive)
@@ -175,7 +178,11 @@ func (a *analyser) onKill(e events.Kill) {
 		}
 	}
 
-	isTrade := a.tracker.kill(killerID, trackerID(e.Victim), killerTeam, e.Victim.Team, assisterID, a.parser.CurrentTime())
+	// World kills carry the victim as their own killer in CS2 demos
+	// (mid-round disconnects, match-end cleanup), so suicides by World
+	// count as artificial deaths too. Bomb kills stay real deaths.
+	byWorld := (e.Killer == nil || suicide) && (e.Weapon == nil || e.Weapon.Type == common.EqWorld)
+	isTrade := a.tracker.kill(killerID, trackerID(e.Victim), killerTeam, e.Victim.Team, assisterID, byWorld, a.parser.CurrentTime())
 	if isTrade && !teamkill {
 		if killer := a.ensurePlayer(e.Killer); killer != nil {
 			killer.KillStats.TradeKills++
@@ -184,15 +191,36 @@ func (a *analyser) onKill(e events.Kill) {
 }
 
 func (a *analyser) onPlayerHurt(e events.PlayerHurt) {
-	if a.inWarmup() || e.Attacker == nil || e.Player == nil {
+	if a.inWarmup() || e.Player == nil {
 		return
 	}
-	// Team damage and self damage never count towards damage given.
+
+	// HealthDamageTaken is capped by the victim's health at the start of
+	// the tick, so simultaneous shotgun pellets each report overlapping
+	// damage. Capping every event at the victim's actual health drop
+	// removes the overlap without crediting engine rounding leftovers.
+	victimID := trackerID(e.Player)
+	before, seen := a.lastHealth[victimID]
+	if !seen {
+		before = 100
+	}
+	realDamage := min(e.HealthDamageTaken, max(0, before-e.Health))
+	a.lastHealth[victimID] = e.Health
+
+	if e.Attacker == nil {
+		return
+	}
+	// Team damage and self damage never count towards damage given, and
+	// following HLTV convention neither does bomb damage (when the game
+	// credits the explosion to the planter).
 	if e.Attacker.SteamID64 == e.Player.SteamID64 || e.Attacker.Team == e.Player.Team {
 		return
 	}
+	if e.Weapon != nil && e.Weapon.Type == common.EqBomb {
+		return
+	}
 	if attacker := a.ensurePlayer(e.Attacker); attacker != nil {
-		attacker.AssistStats.DamageGiven += e.HealthDamageTaken
+		attacker.AssistStats.DamageGiven += realDamage
 	}
 }
 

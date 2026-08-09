@@ -30,7 +30,7 @@ The `--save` flag writes every analysed player to a file. JSON contains all fiel
 | --- | --- | --- |
 | Total | `total` | Assists on enemy kills, flash assists included. |
 | FlashedEnemies | `flashed_enemies` | Flash assists: the victim was blinded by this player's flashbang when killed. |
-| DamageGiven | `damage_given` | Health damage dealt to enemies. Team damage and self damage never count. |
+| DamageGiven | `damage_given` | Health damage dealt to enemies. Team damage, self damage and bomb damage never count (HLTV convention). |
 | ADR | `adr` | Average damage per round: `damage_given / total rounds of the match`. |
 
 ### Map stats (`player_map_stats`)
@@ -40,7 +40,7 @@ The `--save` flag writes every analysed player to a file. JSON contains all fiel
 | MVPs | `mvps` | Round MVP awards. |
 | ACEs | `aces` | Rounds with 5 or more enemy kills. |
 | ClutchesWon | `clutches_won` | Rounds won after being the last player alive on the team against at least one enemy (1v1 counts). Winning by defuse or time counts — no kills required. |
-| KAST | `kast` | Percentage of the match's rounds with a Kill, Assist, Survival or Traded death (a teammate killed your killer within 5 seconds). An enemy exit frag in the post-round seconds cancels survival; dying to the bomb after the round is decided does not. |
+| KAST | `kast` | Percentage of the match's rounds with a Kill, Assist, Survival or Traded death (a teammate killed your killer within 5 seconds). Dying before the round officially ends cancels survival — including exit frags and the bomb going off after the whistle (HLTV convention). Match-end cleanup kills do not count. |
 
 ## Match data
 
