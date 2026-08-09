@@ -15,13 +15,12 @@ import (
 // analyser accumulates player stats while the demo is parsed. Round-scoped
 // bookkeeping (clutches, aces, trades, KAST) is delegated to roundTracker.
 type analyser struct {
-	parser       demoinfocs.Parser
-	players      map[uint64]*DemoPlayer
-	tracker      *roundTracker
-	roundsPlayed map[uint64]int
-	kastRounds   map[uint64]int
-	mapData      MapData
-	gameMode     string
+	parser     demoinfocs.Parser
+	players    map[uint64]*DemoPlayer
+	tracker    *roundTracker
+	kastRounds map[uint64]int
+	mapData    MapData
+	gameMode   string
 }
 
 func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
@@ -32,11 +31,10 @@ func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
 	defer file.Close()
 
 	a := &analyser{
-		parser:       demoinfocs.NewParser(file),
-		players:      make(map[uint64]*DemoPlayer),
-		tracker:      newRoundTracker(),
-		roundsPlayed: make(map[uint64]int),
-		kastRounds:   make(map[uint64]int),
+		parser:     demoinfocs.NewParser(file),
+		players:    make(map[uint64]*DemoPlayer),
+		tracker:    newRoundTracker(),
+		kastRounds: make(map[uint64]int),
 	}
 	defer a.parser.Close()
 
@@ -72,6 +70,7 @@ func (a *analyser) registerHandlers() {
 	a.parser.RegisterEventHandler(a.onPlayerHurt)
 	a.parser.RegisterEventHandler(a.onRoundMVP)
 	a.parser.RegisterEventHandler(a.onRoundEnd)
+	a.parser.RegisterEventHandler(a.onRoundEndOfficial)
 	a.parser.RegisterEventHandler(a.onDisconnect)
 }
 
@@ -118,6 +117,9 @@ func (a *analyser) onRoundStart(e events.RoundStart) {
 	if a.inWarmup() {
 		return
 	}
+	// Close the previous round in case its official end was never seen.
+	a.applyRoundOutcome(a.tracker.finalize())
+
 	alive := make(map[uint64]common.Team)
 	for _, p := range a.parser.GameState().Participants().Playing() {
 		if p.Team != common.TeamTerrorists && p.Team != common.TeamCounterTerrorists {
@@ -205,14 +207,20 @@ func (a *analyser) onRoundMVP(e events.RoundMVPAnnouncement) {
 
 func (a *analyser) onDisconnect(e events.PlayerDisconnected) {
 	if e.Player != nil {
-		a.tracker.remove(trackerID(e.Player))
+		a.tracker.disconnect(trackerID(e.Player))
 	}
 }
 
 func (a *analyser) onRoundEnd(e events.RoundEnd) {
 	a.syncScoreboardMVPs()
+	a.tracker.markEnd(e.Winner)
+}
 
-	outcome := a.tracker.endRound(e.Winner)
+func (a *analyser) onRoundEndOfficial(e events.RoundEndOfficial) {
+	a.applyRoundOutcome(a.tracker.finalize())
+}
+
+func (a *analyser) applyRoundOutcome(outcome roundOutcome) {
 	if !outcome.played {
 		return
 	}
@@ -228,7 +236,6 @@ func (a *analyser) onRoundEnd(e events.RoundEnd) {
 		if _, isHuman := a.players[id]; !isHuman {
 			continue
 		}
-		a.roundsPlayed[id]++
 		if outcome.kast[id] {
 			a.kastRounds[id]++
 		}
@@ -250,6 +257,7 @@ func (a *analyser) syncScoreboardMVPs() {
 // finalise fills in everything that needs the full match: final score and
 // the per-player derived stats (precision, ADR, KAST).
 func (a *analyser) finalise() {
+	a.applyRoundOutcome(a.tracker.finalize())
 	a.syncScoreboardMVPs()
 
 	gs := a.parser.GameState()
@@ -261,11 +269,11 @@ func (a *analyser) finalise() {
 		if p.KillStats.Total > 0 {
 			p.KillStats.Precision = float64(p.KillStats.HeadShots) / float64(p.KillStats.Total)
 		}
+		// ADR and KAST both use the match's round count, following the
+		// convention of HLTV-style stat sites.
 		if a.mapData.TotalRounds > 0 {
 			p.AssistStats.ADR = float64(p.AssistStats.DamageGiven) / float64(a.mapData.TotalRounds)
-		}
-		if rounds := a.roundsPlayed[id]; rounds > 0 {
-			p.PlayerMapStats.KAST = 100 * float64(a.kastRounds[id]) / float64(rounds)
+			p.PlayerMapStats.KAST = 100 * float64(a.kastRounds[id]) / float64(a.mapData.TotalRounds)
 		}
 	}
 }
@@ -274,7 +282,8 @@ func GetPlayerBestWeapon(weaponsKills map[string]int) string {
 	var bestWeapon string
 	var bestWeaponKills int
 	for weapon, kills := range weaponsKills {
-		if kills > bestWeaponKills {
+		// Ties break alphabetically so the result is deterministic.
+		if kills > bestWeaponKills || (kills == bestWeaponKills && bestWeapon != "" && weapon < bestWeapon) {
 			bestWeapon = weapon
 			bestWeaponKills = kills
 		}

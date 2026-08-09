@@ -40,7 +40,7 @@ The `--save` flag writes every analysed player to a file. JSON contains all fiel
 | MVPs | `mvps` | Round MVP awards. |
 | ACEs | `aces` | Rounds with 5 or more enemy kills. |
 | ClutchesWon | `clutches_won` | Rounds won after being the last player alive on the team against at least one enemy (1v1 counts). Winning by defuse or time counts — no kills required. |
-| KAST | `kast` | Percentage of played rounds with a Kill, Assist, Survival or Traded death (a teammate killed your killer within 5 seconds). |
+| KAST | `kast` | Percentage of the match's rounds with a Kill, Assist, Survival or Traded death (a teammate killed your killer within 5 seconds). An enemy exit frag in the post-round seconds cancels survival; dying to the bomb after the round is decided does not. |
 
 ## Match data
 

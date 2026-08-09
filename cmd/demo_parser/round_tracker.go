@@ -36,6 +36,8 @@ type roundOutcome struct {
 // drive it without a demo file.
 type roundTracker struct {
 	live       bool
+	ending     bool
+	winner     common.Team
 	startAlive map[uint64]common.Team
 	alive      map[uint64]common.Team
 	enemyKills map[uint64]int
@@ -51,6 +53,8 @@ func newRoundTracker() *roundTracker {
 
 func (rt *roundTracker) startRound(alive map[uint64]common.Team) {
 	rt.live = true
+	rt.ending = false
+	rt.winner = common.TeamUnassigned
 	rt.startAlive = make(map[uint64]common.Team, len(alive))
 	rt.alive = make(map[uint64]common.Team, len(alive))
 	for id, team := range alive {
@@ -88,11 +92,26 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 	}
 
 	rt.deaths = append(rt.deaths, deathRecord{killer: killer, victim: victim, victimTeam: victimTeam, at: at})
-	rt.remove(victim)
+	// After the round is decided, only a real enemy exit frag cancels
+	// survival. World/self deaths in the post-round seconds (the bomb going
+	// off, match-end cleanup kills) do not.
+	if !(rt.ending && killer == 0) {
+		rt.remove(victim)
+	}
 	return isTrade
 }
 
-// remove takes a player out of the alive set, on death or disconnect.
+// disconnect handles a player leaving mid-round: they count as dead for
+// the round, unless the round is already decided (players leaving after
+// the final whistle keep their survival).
+func (rt *roundTracker) disconnect(player uint64) {
+	if rt.ending {
+		return
+	}
+	rt.remove(player)
+}
+
+// remove takes a player out of the alive set.
 func (rt *roundTracker) remove(player uint64) {
 	if !rt.live {
 		return
@@ -103,8 +122,12 @@ func (rt *roundTracker) remove(player uint64) {
 
 // updateClutchCandidates marks the last alive player of a team as that
 // team's clutch candidate the moment they are left alone against at least
-// one enemy. The candidacy sticks for the rest of the round.
+// one enemy. The candidacy sticks for the rest of the round. Once the round
+// is decided, post-round deaths cannot start a clutch anymore.
 func (rt *roundTracker) updateClutchCandidates() {
+	if rt.ending {
+		return
+	}
 	for _, team := range bothTeams {
 		if _, started := rt.clutchers[team]; started {
 			continue
@@ -134,15 +157,29 @@ func (rt *roundTracker) lastAlive(team common.Team) (uint64, int) {
 	return last, enemies
 }
 
-func (rt *roundTracker) endRound(winner common.Team) roundOutcome {
+// markEnd records the winner when the round is decided. The round stays
+// open until finalize so that deaths in the post-round seconds (bomb
+// explosions, exit frags) still cancel survival credit.
+func (rt *roundTracker) markEnd(winner common.Team) {
+	if !rt.live {
+		return
+	}
+	rt.ending = true
+	rt.winner = winner
+}
+
+// finalize closes the round, normally at the official round end, and
+// returns what it contributes to player stats.
+func (rt *roundTracker) finalize() roundOutcome {
 	if !rt.live {
 		return roundOutcome{}
 	}
 	rt.live = false
+	rt.ending = false
 
 	outcome := roundOutcome{
 		played:       true,
-		clutcher:     rt.clutchers[winner],
+		clutcher:     rt.clutchers[rt.winner],
 		participants: rt.startAlive,
 		kast:         make(map[uint64]bool),
 	}
