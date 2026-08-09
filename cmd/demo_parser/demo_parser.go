@@ -210,6 +210,8 @@ func (a *analyser) onDisconnect(e events.PlayerDisconnected) {
 }
 
 func (a *analyser) onRoundEnd(e events.RoundEnd) {
+	a.syncScoreboardMVPs()
+
 	outcome := a.tracker.endRound(e.Winner)
 	if !outcome.played {
 		return
@@ -233,9 +235,23 @@ func (a *analyser) onRoundEnd(e events.RoundEnd) {
 	}
 }
 
+// syncScoreboardMVPs mirrors the scoreboard MVP counter into the player
+// stats. CS2 demos no longer carry the round_mvp game event, so the
+// RoundMVPAnnouncement handler never fires and the entity property is the
+// only reliable source. Synced every round end so leavers keep theirs.
+func (a *analyser) syncScoreboardMVPs() {
+	for _, pl := range a.parser.GameState().Participants().Playing() {
+		if dp := a.ensurePlayer(pl); dp != nil {
+			dp.PlayerMapStats.MVPs = max(dp.PlayerMapStats.MVPs, pl.MVPs())
+		}
+	}
+}
+
 // finalise fills in everything that needs the full match: final score and
 // the per-player derived stats (precision, ADR, KAST).
 func (a *analyser) finalise() {
+	a.syncScoreboardMVPs()
+
 	gs := a.parser.GameState()
 	a.mapData.TotalRounds = gs.TotalRoundsPlayed()
 	a.mapData.RoundsWonCT = gs.TeamCounterTerrorists().Score()
