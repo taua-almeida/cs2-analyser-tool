@@ -22,11 +22,20 @@ type deathRecord struct {
 	at         time.Duration
 }
 
+// openingDuel is the first enemy kill of a round. A zero killer means the
+// round had none.
+type openingDuel struct {
+	killer, victim         uint64
+	killerTeam, victimTeam common.Team
+}
+
 // roundOutcome is what a finished round contributes to player stats.
 type roundOutcome struct {
 	played       bool
 	aces         []uint64
 	clutcher     uint64 // winner-side player that won a 1vX, 0 if none
+	opening      openingDuel
+	openingWon   bool // the opening killer's team won the round
 	participants map[uint64]common.Team
 	kast         map[uint64]bool // players that got a Kill, Assist, Survived or were Traded
 }
@@ -45,6 +54,7 @@ type roundTracker struct {
 	traded     map[uint64]bool
 	deaths     []deathRecord
 	clutchers  map[common.Team]uint64
+	opening    openingDuel
 }
 
 func newRoundTracker() *roundTracker {
@@ -66,6 +76,7 @@ func (rt *roundTracker) startRound(alive map[uint64]common.Team) {
 	rt.traded = make(map[uint64]bool)
 	rt.deaths = nil
 	rt.clutchers = make(map[common.Team]uint64)
+	rt.opening = openingDuel{}
 	rt.updateClutchCandidates()
 }
 
@@ -80,6 +91,13 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 
 	isTrade := false
 	if killer != 0 && killerTeam != victimTeam {
+		// The first enemy kill is the round's opening duel. Teamkills,
+		// suicides and world deaths never open a round, and once the round
+		// is decided nothing can (a bomb explosion or exit frag in an
+		// otherwise killless round is not an entry).
+		if rt.opening.killer == 0 && !rt.ending {
+			rt.opening = openingDuel{killer: killer, victim: victim, killerTeam: killerTeam, victimTeam: victimTeam}
+		}
 		rt.enemyKills[killer]++
 		if assister != 0 {
 			rt.assists[assister] = true
@@ -181,6 +199,8 @@ func (rt *roundTracker) finalize() roundOutcome {
 	outcome := roundOutcome{
 		played:       true,
 		clutcher:     rt.clutchers[rt.winner],
+		opening:      rt.opening,
+		openingWon:   rt.opening.killer != 0 && rt.opening.killerTeam == rt.winner,
 		participants: rt.startAlive,
 		kast:         make(map[uint64]bool),
 	}

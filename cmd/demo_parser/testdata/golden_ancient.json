@@ -27,6 +27,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 87.5
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 1,
+          "ct": 1,
+          "t": 0
+        },
+        "opening_success_rate": 0
       }
     },
     "76561198071075349": {
@@ -57,6 +70,19 @@
         "aces": 0,
         "clutches_won": 1,
         "kast": 100
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_success_rate": 0
       }
     },
     "76561198307159112": {
@@ -85,6 +111,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 37.5
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_success_rate": 0
       }
     },
     "76561198387460920": {
@@ -111,6 +150,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 87.5
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 1,
+          "ct": 1,
+          "t": 0
+        },
+        "opening_success_rate": 0
       }
     },
     "76561198826243397": {
@@ -140,6 +192,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 75
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 2,
+          "ct": 2,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_success_rate": 100
       }
     },
     "76561198966281369": {
@@ -172,6 +237,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 100
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 3,
+          "ct": 3,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_success_rate": 100
       }
     },
     "76561199102419525": {
@@ -202,6 +280,19 @@
         "aces": 0,
         "clutches_won": 1,
         "kast": 62.5
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_success_rate": 0
       }
     },
     "76561199271102802": {
@@ -230,6 +321,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 25
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 1,
+          "ct": 0,
+          "t": 1
+        },
+        "opening_deaths": {
+          "total": 2,
+          "ct": 0,
+          "t": 2
+        },
+        "opening_success_rate": 100
       }
     },
     "76561199311359933": {
@@ -259,6 +363,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 25
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 1,
+          "ct": 0,
+          "t": 1
+        },
+        "opening_deaths": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_success_rate": 100
       }
     },
     "76561199558715190": {
@@ -288,6 +405,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 62.5
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 3,
+          "ct": 0,
+          "t": 3
+        },
+        "opening_success_rate": 0
       }
     }
   },

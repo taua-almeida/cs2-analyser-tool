@@ -29,7 +29,7 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 		})
 
 		csvRecords := [][]string{
-			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "MVPs", "ACEs", "Clutches Won", "Best Weapon"},
+			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "Clutches Won", "Best Weapon"},
 		}
 		for _, player := range sortedPlayers {
 			csvRecords = append(csvRecords, []string{
@@ -45,6 +45,9 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 				fmt.Sprintf("%.1f", player.PlayerMapStats.KAST),
 				fmt.Sprintf("%.1f", player.KillStats.Precision*100),
 				fmt.Sprintf("%d", player.KillStats.TradeKills),
+				fmt.Sprintf("%d", player.OpeningDuelStats.OpeningKills.Total),
+				fmt.Sprintf("%d", player.OpeningDuelStats.OpeningDeaths.Total),
+				fmt.Sprintf("%.1f", player.OpeningDuelStats.OpeningSuccessRate),
 				fmt.Sprintf("%d", player.PlayerMapStats.MVPs),
 				fmt.Sprintf("%d", player.PlayerMapStats.ACEs),
 				fmt.Sprintf("%d", player.PlayerMapStats.ClutchesWon),

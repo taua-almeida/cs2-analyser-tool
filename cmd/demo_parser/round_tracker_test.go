@@ -316,6 +316,75 @@ func TestNoClutchCandidacyAfterRoundDecided(t *testing.T) {
 	}
 }
 
+func TestOpeningDuelGoesToFirstEnemyKill(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+
+	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	rt.kill(2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(12))
+
+	outcome := endRound(rt, common.TeamCounterTerrorists)
+	want := openingDuel{killer: 11, victim: 1, killerTeam: common.TeamCounterTerrorists, victimTeam: common.TeamTerrorists}
+	if outcome.opening != want {
+		t.Errorf("opening = %+v, want %+v", outcome.opening, want)
+	}
+	if !outcome.openingWon {
+		t.Error("player 11's team took the opening kill and won, openingWon must be true")
+	}
+}
+
+func TestOpeningDuelInLostRoundIsNotWon(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+
+	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+
+	if outcome := endRound(rt, common.TeamTerrorists); outcome.openingWon {
+		t.Error("the opening killer's team lost the round, openingWon must be false")
+	}
+}
+
+func TestOpeningDuelSkipsTeamkillsAndWorldDeaths(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+
+	// A teamkill and a fall death come first; neither opens the round.
+	rt.kill(1, 2, common.TeamTerrorists, common.TeamTerrorists, 0, false, at(5))
+	rt.kill(0, 3, common.TeamUnassigned, common.TeamTerrorists, 0, true, at(8))
+	rt.kill(11, 4, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+
+	outcome := endRound(rt, common.TeamCounterTerrorists)
+	if outcome.opening.killer != 11 || outcome.opening.victim != 4 {
+		t.Errorf("opening = %+v, want the first enemy kill (11 on 4)", outcome.opening)
+	}
+}
+
+func TestRoundWithoutKillsHasNoOpeningDuel(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+
+	outcome := endRound(rt, common.TeamCounterTerrorists)
+	if outcome.opening.killer != 0 {
+		t.Errorf("opening = %+v, want none", outcome.opening)
+	}
+	if outcome.openingWon {
+		t.Error("a round without an opening kill cannot be an opening success")
+	}
+}
+
+func TestPostRoundKillIsNotAnOpeningDuel(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+	rt.markEnd(common.TeamCounterTerrorists)
+
+	// An exit frag in an otherwise killless round is no entry.
+	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(70))
+
+	if outcome := rt.finalize(); outcome.opening.killer != 0 {
+		t.Errorf("opening = %+v, want none after the round was decided", outcome.opening)
+	}
+}
+
 func TestGetPlayerBestWeapon(t *testing.T) {
 	weapon := GetPlayerBestWeapon(map[string]int{"AK-47": 12, "AWP": 7, "Glock-18": 1})
 	if weapon != "AK-47" {
