@@ -2,25 +2,46 @@ package demoparser
 
 import (
 	"testing"
+	"time"
 
 	demoinfocs "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs"
 	common "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
 	events "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/events"
 )
 
-// onPlayerHurt only asks the parser whether the demo is in warmup, so these
-// stubs answer that one question and leave the embedded interfaces nil.
-type liveParser struct{ demoinfocs.Parser }
+// The handlers under test only ask the parser whether the demo is in
+// warmup, who is playing, and what time it is, so these stubs answer those
+// three questions and leave the embedded interfaces nil.
+type matchParser struct {
+	demoinfocs.Parser
+	playing []*common.Player
+}
 
-func (liveParser) GameState() demoinfocs.GameState { return liveGameState{} }
+func (p *matchParser) GameState() demoinfocs.GameState { return matchGameState{playing: p.playing} }
 
-type liveGameState struct{ demoinfocs.GameState }
+func (*matchParser) CurrentTime() time.Duration { return 0 }
 
-func (liveGameState) IsWarmupPeriod() bool { return false }
+type matchGameState struct {
+	demoinfocs.GameState
+	playing []*common.Player
+}
 
-func liveAnalyser() *analyser {
+func (matchGameState) IsWarmupPeriod() bool { return false }
+
+func (g matchGameState) Participants() demoinfocs.Participants {
+	return matchParticipants{playing: g.playing}
+}
+
+type matchParticipants struct {
+	demoinfocs.Participants
+	playing []*common.Player
+}
+
+func (p matchParticipants) Playing() []*common.Player { return p.playing }
+
+func liveAnalyser(playing ...*common.Player) *analyser {
 	return &analyser{
-		parser:     liveParser{},
+		parser:     &matchParser{playing: playing},
 		players:    make(map[uint64]*DemoPlayer),
 		tracker:    newRoundTracker(),
 		kastRounds: make(map[uint64]int),
@@ -33,12 +54,16 @@ const (
 	victimID  = uint64(2)
 )
 
+func player(id uint64, name string, team common.Team) *common.Player {
+	return &common.Player{SteamID64: id, UserID: int(id), Name: name, Team: team}
+}
+
 // hurt builds a PlayerHurt from an enemy shooter, where healthAfter is the
 // victim's health once the event has been applied.
 func hurt(weapon common.EquipmentType, damageTaken, healthAfter int) events.PlayerHurt {
 	return events.PlayerHurt{
-		Player:            &common.Player{SteamID64: victimID, Name: "victim", Team: common.TeamCounterTerrorists},
-		Attacker:          &common.Player{SteamID64: shooterID, Name: "shooter", Team: common.TeamTerrorists},
+		Player:            player(victimID, "victim", common.TeamCounterTerrorists),
+		Attacker:          player(shooterID, "shooter", common.TeamTerrorists),
 		Weapon:            &common.Equipment{Type: weapon},
 		HealthDamageTaken: damageTaken,
 		Health:            healthAfter,
@@ -103,5 +128,67 @@ func TestHealingBetweenEventsGivesNoDamage(t *testing.T) {
 
 	if got := damageGiven(a); got != 30 {
 		t.Errorf("damage given = %d, want 30", got)
+	}
+}
+
+// A round only counts as survived once it is officially over, so the
+// handlers have to finalize on RoundEndOfficial rather than RoundEnd. The
+// two tests below pin that wiring down: finalizing early would hand the
+// victim a survival they did not earn.
+func liveRound() (*analyser, *common.Player, *common.Player) {
+	shooter := player(shooterID, "shooter", common.TeamTerrorists)
+	victim := player(victimID, "victim", common.TeamCounterTerrorists)
+	a := liveAnalyser(shooter, victim)
+	a.onRoundStart(events.RoundStart{})
+	return a, shooter, victim
+}
+
+func TestSurvivorsGetKastWhenTheRoundEndsOfficially(t *testing.T) {
+	a, _, _ := liveRound()
+
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamCounterTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	if got := a.kastRounds[victimID]; got != 1 {
+		t.Errorf("victim kast rounds = %d, want 1: nobody died all round", got)
+	}
+}
+
+func TestPostRoundDeathBeforeOfficialEndCancelsKast(t *testing.T) {
+	a, shooter, victim := liveRound()
+
+	// The exit frag lands after the round is decided but before it is
+	// officially over, so the victim did not survive it.
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamCounterTerrorists})
+	a.onKill(events.Kill{Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47}})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	if got := a.kastRounds[victimID]; got != 0 {
+		t.Errorf("victim kast rounds = %d, want 0: they were killed before the official round end", got)
+	}
+	// The shooter keeps their survival, which also proves the round was
+	// finalized at all rather than the whole outcome being dropped.
+	if got := a.kastRounds[shooterID]; got != 1 {
+		t.Errorf("shooter kast rounds = %d, want 1", got)
+	}
+}
+
+// The clutch goes to the last player alive on the winning side, so the
+// winner carried by the RoundEnd event has to reach the tracker. A lone
+// terrorist holding a 1v2 and winning is only credited if it does.
+func TestClutchGoesToTheTeamThatWonTheRound(t *testing.T) {
+	lone := player(shooterID, "lone", common.TeamTerrorists)
+	first := player(3, "ct1", common.TeamCounterTerrorists)
+	second := player(4, "ct2", common.TeamCounterTerrorists)
+	a := liveAnalyser(lone, first, second)
+
+	a.onRoundStart(events.RoundStart{})
+	a.onKill(events.Kill{Killer: lone, Victim: first, Weapon: &common.Equipment{Type: common.EqAK47}})
+	a.onKill(events.Kill{Killer: lone, Victim: second, Weapon: &common.Equipment{Type: common.EqAK47}})
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	if got := a.players[shooterID].PlayerMapStats.ClutchesWon; got != 1 {
+		t.Errorf("clutches won = %d, want 1", got)
 	}
 }
