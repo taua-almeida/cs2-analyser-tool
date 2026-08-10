@@ -20,7 +20,8 @@ os = $(word 1, $@)
 
 # Integration test fixtures. Both are real CS2 demos pinned by SHA-256; the
 # checksums here must match the ones in cmd/demo_parser/integration_test.go,
-# which explains what each demo is there to cover.
+# which explains what each demo is there to cover. Sources, licenses and
+# attribution are in cmd/demo_parser/testdata/README.md.
 TESTDATA_DIR := cmd/demo_parser/testdata
 
 MIRAGE_DEMO_URL := https://raw.githubusercontent.com/LaihoE/demoparser/4131a4fc02fda291b22421c20e1ca33f149535a7/src/parser/test_demo.dem

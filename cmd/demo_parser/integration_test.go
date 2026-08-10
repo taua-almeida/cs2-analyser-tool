@@ -31,8 +31,10 @@ type demoFixture struct {
 //     its MVP counts can only come from the scoreboard entity property.
 //     Dropping syncScoreboardMVPs zeroes this golden's MVPs.
 //
-// Neither demo contains shotgun damage, so the per-event damage cap that
-// deals with double-reported pellets is not locked here. See issue #12.
+// Neither demo contains shotgun damage, so the per-event damage cap for
+// double-reported pellets cannot be locked from here; it is covered by
+// TestShotgunPelletsDoNotDoubleCountDamage instead. A fixture with shotgun
+// hits would close that end to end, tracked in issue #12.
 var demoFixtures = []demoFixture{
 	{
 		name:   "mirage_round_mvp_events",

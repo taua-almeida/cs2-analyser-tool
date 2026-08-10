@@ -24,6 +24,6 @@ go.work.sum
 # Build output (see Makefile BUILD_DIR)
 build/
 
-# Remove cs2 demos files, including the downloaded test fixture
-# (see `make download-test-demo`)
+# Remove cs2 demos files, including the downloaded test fixtures
+# (see `make download-test-demos`)
 *.dem
