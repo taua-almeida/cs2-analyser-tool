@@ -146,7 +146,10 @@ func (a *analyser) onKill(e events.Kill) {
 	}
 
 	// Suicides and world deaths (fall damage, C4) have no killer to credit.
-	suicide := e.Killer != nil && e.Killer.SteamID64 == e.Victim.SteamID64
+	// Bots all report SteamID64 0, so identity has to go through trackerID
+	// (which gives each bot a distinct ID) or two different bots trading
+	// kills would misread as one bot suiciding on itself.
+	suicide := e.Killer != nil && trackerID(e.Killer) == trackerID(e.Victim)
 	var killerID uint64
 	var killerTeam common.Team
 	if e.Killer != nil && !suicide {

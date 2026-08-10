@@ -59,6 +59,11 @@ func player(id uint64, name string, team common.Team) *common.Player {
 	return &common.Player{SteamID64: id, UserID: int(id), Name: name, Team: team}
 }
 
+// botPlayer builds a bot, whose SteamID64 is always 0 like every other bot's.
+func botPlayer(userID int, name string, team common.Team) *common.Player {
+	return &common.Player{IsBot: true, UserID: userID, Name: name, Team: team}
+}
+
 // hurt builds a PlayerHurt from an enemy shooter, where healthAfter is the
 // victim's health once the event has been applied.
 func hurt(weapon common.EquipmentType, damageTaken, healthAfter int) events.PlayerHurt {
@@ -194,6 +199,28 @@ func TestOpeningDuelIsCredited(t *testing.T) {
 	}
 	if got := a.openingWins[shooterID]; got != 1 {
 		t.Errorf("shooter opening wins = %d, want 1: their team won the round", got)
+	}
+}
+
+// Bots all report SteamID64 0, so a kill between two different bots must
+// not be misread as one bot suiciding on itself (both sides comparing
+// equal). Getting that wrong drops the bot kill as a killerless event,
+// which would let a later human kill wrongly become the round's opener.
+func TestBotOnBotKillDoesNotStealTheOpeningDuel(t *testing.T) {
+	botT := botPlayer(101, "bot-t", common.TeamTerrorists)
+	botCT := botPlayer(102, "bot-ct", common.TeamCounterTerrorists)
+	shooter := player(shooterID, "shooter", common.TeamTerrorists)
+	victim := player(victimID, "victim", common.TeamCounterTerrorists)
+	a := liveAnalyser(botT, botCT, shooter, victim)
+
+	a.onRoundStart(events.RoundStart{})
+	a.onKill(events.Kill{Killer: botT, Victim: botCT, Weapon: &common.Equipment{Type: common.EqAK47}})
+	a.onKill(events.Kill{Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47}})
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	if got := a.players[shooterID].OpeningDuelStats.OpeningKills.Total; got != 0 {
+		t.Errorf("shooter opening kills = %d, want 0: the bot-on-bot kill opened the round first", got)
 	}
 }
 
