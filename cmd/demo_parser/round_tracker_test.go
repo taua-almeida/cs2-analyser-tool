@@ -202,6 +202,27 @@ func TestFreezeTimeJoinKeepsSideAndDoesNotRevive(t *testing.T) {
 	}
 }
 
+func TestFreezeTimeJoinerTradedDeathUsesJoinedSide(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(map[uint64]common.Team{
+		1: common.TeamTerrorists, 11: common.TeamCounterTerrorists,
+	})
+	rt.joinRound(map[uint64]common.Team{
+		1: common.TeamTerrorists, 11: common.TeamCounterTerrorists, 16: common.TeamCounterTerrorists,
+	})
+
+	rt.kill(1, 16, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
+	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(13))
+	outcome := endRound(rt, common.TeamCounterTerrorists)
+
+	a := liveAnalyser()
+	a.players[16] = &DemoPlayer{SteamID: 16}
+	a.applyRoundOutcome(outcome)
+	if got, want := a.players[16].DeathsTraded, (SideCount{Total: 1, CT: 1}); got != want {
+		t.Errorf("freeze-time joiner's deaths traded = %+v, want %+v", got, want)
+	}
+}
+
 func TestClutchWon(t *testing.T) {
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())
@@ -335,10 +356,8 @@ func TestOneTradeKillCanTradeTwoDeaths(t *testing.T) {
 }
 
 func TestDeathsTradedFollowTheHalftimeSwap(t *testing.T) {
-	a := &analyser{
-		players:    map[uint64]*DemoPlayer{1: {SteamID: 1}},
-		kastRounds: make(map[uint64]SideCount),
-	}
+	a := liveAnalyser()
+	a.players[1] = &DemoPlayer{SteamID: 1}
 	rt := newRoundTracker()
 
 	// Player 1 starts on T, dies, and has that death avenged by player 2.

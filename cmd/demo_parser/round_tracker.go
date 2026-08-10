@@ -42,7 +42,7 @@ type roundOutcome struct {
 	opening      openingDuel
 	openingWon   bool // the opening killer's team won the round
 	participants map[uint64]common.Team
-	deathsTraded map[uint64]bool // players whose death was avenged inside the trade window
+	deathsTraded map[uint64]bool // players with a death avenged inside the trade window
 	kast         map[uint64]bool // players that got a Kill, Assist, Survived or were Traded
 }
 
