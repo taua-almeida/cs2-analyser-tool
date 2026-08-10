@@ -16,11 +16,22 @@ type AssistStats struct {
 	ADR            float64 `json:"adr"`
 }
 
+// MultiKillRounds counts rounds by how many enemies the player killed in
+// them. The buckets are exclusive, so a 4k round is only a 4k and the four
+// of them add up to the rounds with at least two enemy kills.
+type MultiKillRounds struct {
+	K2 int `json:"k2"`
+	K3 int `json:"k3"`
+	K4 int `json:"k4"`
+	K5 int `json:"k5"`
+}
+
 type PlayerMapStats struct {
-	MVPs        int     `json:"mvps"`
-	ACEs        int     `json:"aces"`
-	ClutchesWon int     `json:"clutches_won"`
-	KAST        float64 `json:"kast"`
+	MVPs        int             `json:"mvps"`
+	ACEs        int             `json:"aces"`
+	MultiKills  MultiKillRounds `json:"multi_kills"`
+	ClutchesWon int             `json:"clutches_won"`
+	KAST        float64         `json:"kast"`
 }
 
 // SideCount is a per-round counter split by the side the player was on.

@@ -1,6 +1,6 @@
 # Player data
 
-The `--save` flag writes every analysed player to a file. JSON contains all fields below; CSV contains a flattened selection of them plus the computed K/D. Stats never include warmup. Bots are never listed, but kills on bots count like any other kill.
+The `--save` flag writes every analysed player to a file. JSON contains all fields below; CSV contains a flattened selection of them plus the computed K/D. The CLI table shows a narrower selection still, with `--details` printing the rest in extra tables below it. Stats never include warmup. Bots are never listed, but kills on bots count like any other kill.
 
 ## Fields
 
@@ -50,8 +50,21 @@ The 5-second window is a deliberate choice, not a value read out of the demo: HL
 | --- | --- | --- |
 | MVPs | `mvps` | Round MVP awards. |
 | ACEs | `aces` | Rounds with 5 or more enemy kills. |
+| MultiKills | `multi_kills` | Multi-kill rounds bucketed by kill count: `{k2, k3, k4, k5}`. See [multi-kill rounds](#multi-kill-rounds). |
 | ClutchesWon | `clutches_won` | Rounds won after being the last player alive on the team against at least one enemy (1v1 counts). Winning by defuse or time counts — no kills required. |
 | KAST | `kast` | Percentage of the match's rounds with a Kill, Assist, Survival or Traded death (a teammate killed your killer within 5 seconds). Dying before the round officially ends cancels survival — including exit frags and the bomb going off after the whistle (HLTV convention). Match-end cleanup kills do not count. |
+
+#### Multi-kill rounds
+
+`multi_kills` counts rounds, not kills. A round with three enemy kills adds one to `k3`, and nothing else.
+
+- **Buckets are exclusive.** A 4k is only a 4k, never also a 2k and a 3k. So `k2 + k3 + k4 + k5` is the number of rounds the player got at least two enemy kills in, and each bucket is directly usable as one of the six sub-ratings of HLTV Rating 3.0.
+- **Enemy kills only**, the same rule ACEs use. Teamkills never count, so four enemy kills plus a teamkill is a 4k.
+- **A round with 0 or 1 kills is in no bucket.** The smallest multi-kill is the 2k.
+- **Post-round kills count**, exit frags included, again matching ACEs.
+- **`k5` and `aces` are the same rounds by construction.** Both are "5 or more enemy kills" — `k5` takes everything from 5 up rather than exactly 5, so the two can never disagree even in the freak case of a sixth kill after a disconnect and reconnect. The duplication is deliberate: `multi_kills` stays a complete, self-contained bucket set for the rating work, and `aces` stays where it has always been for anything already reading it.
+
+The four counts are in the JSON, in the CSV as the `2K`/`3K`/`4K`/`5K` columns, and in the `Multi-kill rounds` table that `--details` prints. The main table does not show them; it is already wide enough.
 
 ### Opening duel stats (`opening_duel_stats`)
 

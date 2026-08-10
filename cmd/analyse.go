@@ -19,6 +19,7 @@ var players []string // players is the list of players to analyse.
 var demoPath string  // demoPath is the path to the demo file.
 var save bool        // save is the flag to save the demo players data.
 var saveType string  // saveType is the type of storage to use.
+var details bool     // details prints the stats that do not fit the main table.
 
 func init() {
 	// Add the analyse command as a subcommand of rootCmd.
@@ -28,6 +29,7 @@ func init() {
 	analyseCmd.Flags().StringSliceVarP(&players, "players", "p", []string{}, "Players to analyse.")
 	analyseCmd.Flags().BoolVarP(&save, "save", "s", false, "Save the demo players data.")
 	analyseCmd.Flags().StringVar(&saveType, "save-type", "json", "Type of file to save the data [json, csv], default is json.")
+	analyseCmd.Flags().BoolVar(&details, "details", false, "Print the extra stat tables that do not fit the main one.")
 }
 
 var analyseCmd = &cobra.Command{
@@ -92,6 +94,9 @@ var analyseCmd = &cobra.Command{
 		}
 
 		dataexport.PrintCLIDataTable(playersToAnalyse, &processedDemoData.Map, processedDemoData.GameMode)
+		if details {
+			dataexport.PrintCLIDetailTables(playersToAnalyse)
+		}
 
 		if save {
 			lipgloss.Println(printstyle.StyleSuccess.Render("\nWritting data to file..."))

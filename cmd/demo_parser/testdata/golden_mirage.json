@@ -27,6 +27,12 @@
       "player_map_stats": {
         "mvps": 1,
         "aces": 0,
+        "multi_kills": {
+          "k2": 2,
+          "k3": 1,
+          "k4": 0,
+          "k5": 0
+        },
         "clutches_won": 0,
         "kast": 100
       },
@@ -70,6 +76,12 @@
       "player_map_stats": {
         "mvps": 0,
         "aces": 0,
+        "multi_kills": {
+          "k2": 0,
+          "k3": 0,
+          "k4": 0,
+          "k5": 0
+        },
         "clutches_won": 0,
         "kast": 70
       },
@@ -112,6 +124,12 @@
       "player_map_stats": {
         "mvps": 1,
         "aces": 0,
+        "multi_kills": {
+          "k2": 1,
+          "k3": 0,
+          "k4": 0,
+          "k5": 0
+        },
         "clutches_won": 0,
         "kast": 80
       },
@@ -157,6 +175,12 @@
       "player_map_stats": {
         "mvps": 1,
         "aces": 0,
+        "multi_kills": {
+          "k2": 2,
+          "k3": 0,
+          "k4": 0,
+          "k5": 0
+        },
         "clutches_won": 1,
         "kast": 50
       },
@@ -200,6 +224,12 @@
       "player_map_stats": {
         "mvps": 3,
         "aces": 0,
+        "multi_kills": {
+          "k2": 1,
+          "k3": 0,
+          "k4": 0,
+          "k5": 0
+        },
         "clutches_won": 0,
         "kast": 90
       },
@@ -243,6 +273,12 @@
       "player_map_stats": {
         "mvps": 1,
         "aces": 0,
+        "multi_kills": {
+          "k2": 2,
+          "k3": 0,
+          "k4": 0,
+          "k5": 0
+        },
         "clutches_won": 0,
         "kast": 90
       },
@@ -286,6 +322,12 @@
       "player_map_stats": {
         "mvps": 1,
         "aces": 0,
+        "multi_kills": {
+          "k2": 3,
+          "k3": 0,
+          "k4": 0,
+          "k5": 0
+        },
         "clutches_won": 0,
         "kast": 60
       },
@@ -328,6 +370,12 @@
       "player_map_stats": {
         "mvps": 1,
         "aces": 0,
+        "multi_kills": {
+          "k2": 4,
+          "k3": 0,
+          "k4": 0,
+          "k5": 0
+        },
         "clutches_won": 0,
         "kast": 100
       },
@@ -371,6 +419,12 @@
       "player_map_stats": {
         "mvps": 0,
         "aces": 0,
+        "multi_kills": {
+          "k2": 1,
+          "k3": 0,
+          "k4": 0,
+          "k5": 0
+        },
         "clutches_won": 0,
         "kast": 30
       },
@@ -413,6 +467,12 @@
       "player_map_stats": {
         "mvps": 0,
         "aces": 0,
+        "multi_kills": {
+          "k2": 0,
+          "k3": 0,
+          "k4": 0,
+          "k5": 0
+        },
         "clutches_won": 0,
         "kast": 70
       },

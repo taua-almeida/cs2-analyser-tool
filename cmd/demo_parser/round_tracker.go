@@ -13,6 +13,10 @@ const tradeWindow = 5 * time.Second
 // aceKills is the number of enemy kills in a single round that make an ace.
 const aceKills = 5
 
+// multiKillMin is the fewest enemy kills in a round that make it a
+// multi-kill round, the smallest bucket being the 2k.
+const multiKillMin = 2
+
 var bothTeams = []common.Team{common.TeamTerrorists, common.TeamCounterTerrorists}
 
 type deathRecord struct {
@@ -33,7 +37,8 @@ type openingDuel struct {
 type roundOutcome struct {
 	played       bool
 	aces         []uint64
-	clutcher     uint64 // winner-side player that won a 1vX, 0 if none
+	multiKills   map[uint64]int // enemy kills of the players that got at least a 2k
+	clutcher     uint64         // winner-side player that won a 1vX, 0 if none
 	opening      openingDuel
 	openingWon   bool // the opening killer's team won the round
 	participants map[uint64]common.Team
@@ -198,6 +203,7 @@ func (rt *roundTracker) finalize() roundOutcome {
 
 	outcome := roundOutcome{
 		played:       true,
+		multiKills:   make(map[uint64]int),
 		clutcher:     rt.clutchers[rt.winner],
 		opening:      rt.opening,
 		openingWon:   rt.opening.killer != 0 && rt.opening.killerTeam == rt.winner,
@@ -207,6 +213,9 @@ func (rt *roundTracker) finalize() roundOutcome {
 	for id, kills := range rt.enemyKills {
 		if kills >= aceKills {
 			outcome.aces = append(outcome.aces, id)
+		}
+		if kills >= multiKillMin {
+			outcome.multiKills[id] = kills
 		}
 	}
 	for id := range rt.startAlive {
