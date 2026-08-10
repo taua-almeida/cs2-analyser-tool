@@ -18,8 +18,9 @@ type analyser struct {
 	parser      demoinfocs.Parser
 	players     map[uint64]*DemoPlayer
 	tracker     *roundTracker
-	kastRounds  map[uint64]int
-	openingWins map[uint64]int // rounds won after taking the opening kill
+	kastRounds  map[uint64]SideCount // rounds with KAST, total and per side
+	sideDamage  map[uint64]SideCount // damage given, total and per side
+	openingWins map[uint64]int       // rounds won after taking the opening kill
 	lastHealth  map[uint64]int
 	mapData     MapData
 	gameMode    string
@@ -36,7 +37,8 @@ func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
 		parser:      demoinfocs.NewParser(file),
 		players:     make(map[uint64]*DemoPlayer),
 		tracker:     newRoundTracker(),
-		kastRounds:  make(map[uint64]int),
+		kastRounds:  make(map[uint64]SideCount),
+		sideDamage:  make(map[uint64]SideCount),
 		openingWins: make(map[uint64]int),
 		lastHealth:  make(map[uint64]int),
 	}
@@ -143,6 +145,7 @@ func (a *analyser) onKill(e events.Kill) {
 
 	if victim := a.ensurePlayer(e.Victim); victim != nil {
 		victim.Deaths++
+		victim.SideStats.Deaths.count(e.Victim.Team)
 	}
 
 	// Suicides and world deaths (fall damage, C4) have no killer to credit.
@@ -163,6 +166,7 @@ func (a *analyser) onKill(e events.Kill) {
 			killer.KillStats.TeamKills++
 		} else {
 			killer.KillStats.Total++
+			killer.SideStats.Kills.count(killerTeam)
 			if e.IsHeadshot {
 				killer.KillStats.HeadShots++
 			}
@@ -226,6 +230,7 @@ func (a *analyser) onPlayerHurt(e events.PlayerHurt) {
 	}
 	if attacker := a.ensurePlayer(e.Attacker); attacker != nil {
 		attacker.AssistStats.DamageGiven += realDamage
+		addSide(a.sideDamage, attacker.SteamID, e.Attacker.Team, realDamage)
 	}
 }
 
@@ -253,15 +258,30 @@ func (a *analyser) onRoundEndOfficial(e events.RoundEndOfficial) {
 	a.applyRoundOutcome(a.tracker.finalize())
 }
 
-// count records one round on the side the player was playing.
-func (s *SideCount) count(side common.Team) {
-	s.Total++
+// add credits n to the side the player was on. Anything but CT and T only
+// reaches the total, which cannot happen for the events that call this: a
+// player has to be on a side to kill, die or deal damage.
+func (s *SideCount) add(side common.Team, n int) {
+	s.Total += n
 	switch side {
 	case common.TeamCounterTerrorists:
-		s.CT++
+		s.CT += n
 	case common.TeamTerrorists:
-		s.T++
+		s.T += n
 	}
+}
+
+// count records one round on the side the player was playing.
+func (s *SideCount) count(side common.Team) {
+	s.add(side, 1)
+}
+
+// addSide credits n to the counter kept under id, which the maps hold by
+// value so a player that has never been counted reads as an empty one.
+func addSide(counters map[uint64]SideCount, id uint64, side common.Team, n int) {
+	counter := counters[id]
+	counter.add(side, n)
+	counters[id] = counter
 }
 
 // add credits one round with the given number of enemy kills to its bucket.
@@ -306,12 +326,17 @@ func (a *analyser) applyRoundOutcome(outcome roundOutcome) {
 	if p := a.players[outcome.opening.victim]; p != nil {
 		p.OpeningDuelStats.OpeningDeaths.count(outcome.opening.victimTeam)
 	}
-	for id := range outcome.participants {
-		if _, isHuman := a.players[id]; !isHuman {
+	// The side a player counts on is the one they started the round on, so
+	// that a halftime swap moves them without touching what they did before
+	// it. Everything else here comes from the same round.
+	for id, side := range outcome.participants {
+		p := a.players[id]
+		if p == nil {
 			continue
 		}
+		p.SideStats.Rounds.count(side)
 		if outcome.kast[id] {
-			a.kastRounds[id]++
+			addSide(a.kastRounds, id, side, 1)
 		}
 	}
 }
@@ -329,7 +354,7 @@ func (a *analyser) syncScoreboardMVPs() {
 }
 
 // finalise fills in everything that needs the full match: final score and
-// the per-player derived stats (precision, ADR, KAST).
+// the per-player derived stats.
 func (a *analyser) finalise() {
 	a.applyRoundOutcome(a.tracker.finalize())
 	a.syncScoreboardMVPs()
@@ -339,15 +364,45 @@ func (a *analyser) finalise() {
 	a.mapData.RoundsWonCT = gs.TeamCounterTerrorists().Score()
 	a.mapData.RoundsWonT = gs.TeamTerrorists().Score()
 
+	a.derive(a.mapData.TotalRounds)
+}
+
+// perRound divides by the rounds the value was accumulated over, reporting
+// 0 for a player who never played any of them.
+func perRound(value, rounds int) float64 {
+	if rounds == 0 {
+		return 0
+	}
+	return float64(value) / float64(rounds)
+}
+
+// derive computes the per-player stats that need the finished match:
+// precision, ADR, KAST and the side splits of the last two. It is separate
+// from finalise so tests can drive it with a round count instead of a demo.
+func (a *analyser) derive(totalRounds int) {
 	for id, p := range a.players {
 		if p.KillStats.Total > 0 {
 			p.KillStats.Precision = float64(p.KillStats.HeadShots) / float64(p.KillStats.Total)
 		}
-		// ADR and KAST both use the match's round count, following the
-		// convention of HLTV-style stat sites.
-		if a.mapData.TotalRounds > 0 {
-			p.AssistStats.ADR = float64(p.AssistStats.DamageGiven) / float64(a.mapData.TotalRounds)
-			p.PlayerMapStats.KAST = 100 * float64(a.kastRounds[id]) / float64(a.mapData.TotalRounds)
+		// The match-wide ADR and KAST both use the match's round count,
+		// following the convention of HLTV-style stat sites.
+		if totalRounds > 0 {
+			p.AssistStats.ADR = perRound(p.AssistStats.DamageGiven, totalRounds)
+			p.PlayerMapStats.KAST = 100 * perRound(a.kastRounds[id].Total, totalRounds)
+		}
+		// Their side splits cannot: sides swap at halftime, so there is no
+		// match-wide CT or T round count that holds for every player. Each
+		// side is divided by the rounds that player spent on it, which for
+		// anyone who played the whole match adds back up to the same total.
+		rounds := p.SideStats.Rounds
+		damage, kast := a.sideDamage[id], a.kastRounds[id]
+		p.SideStats.ADR = SideRate{
+			CT: perRound(damage.CT, rounds.CT),
+			T:  perRound(damage.T, rounds.T),
+		}
+		p.SideStats.KAST = SideRate{
+			CT: 100 * perRound(kast.CT, rounds.CT),
+			T:  100 * perRound(kast.T, rounds.T),
 		}
 		if kills := p.OpeningDuelStats.OpeningKills.Total; kills > 0 {
 			p.OpeningDuelStats.OpeningSuccessRate = 100 * float64(a.openingWins[id]) / float64(kills)

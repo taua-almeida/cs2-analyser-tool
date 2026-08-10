@@ -31,10 +31,15 @@ type demoFixture struct {
 //     its MVP counts can only come from the scoreboard entity property.
 //     Dropping syncScoreboardMVPs zeroes this golden's MVPs.
 //
-// Neither demo contains shotgun damage, so the per-event damage cap for
-// double-reported pellets cannot be locked from here; it is covered by
-// TestShotgunPelletsDoNotDoubleCountDamage instead. A fixture with shotgun
-// hits would close that end to end, tracked in issue #12.
+// Two things these fixtures cannot cover, both left to unit tests:
+//
+//   - Neither demo contains shotgun damage, so the per-event damage cap for
+//     double-reported pellets is covered by
+//     TestShotgunPelletsDoNotDoubleCountDamage instead. A fixture with
+//     shotgun hits would close that end to end, tracked in issue #12.
+//   - Both matches end before halftime (8 and 10 rounds), so every player
+//     stays on one side and the goldens never exercise the side swap. That
+//     is TestSideStatsFollowTheHalftimeSwap's job.
 var demoFixtures = []demoFixture{
 	{
 		name:   "mirage_round_mvp_events",

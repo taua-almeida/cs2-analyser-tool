@@ -46,6 +46,31 @@
           "t": 0
         },
         "opening_success_rate": 0
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 8,
+          "ct": 8,
+          "t": 0
+        },
+        "kills": {
+          "total": 4,
+          "ct": 4,
+          "t": 0
+        },
+        "deaths": {
+          "total": 4,
+          "ct": 4,
+          "t": 0
+        },
+        "adr": {
+          "ct": 47.75,
+          "t": 0
+        },
+        "kast": {
+          "ct": 87.5,
+          "t": 0
+        }
       }
     },
     "76561198071075349": {
@@ -95,6 +120,31 @@
           "t": 0
         },
         "opening_success_rate": 0
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 8,
+          "ct": 8,
+          "t": 0
+        },
+        "kills": {
+          "total": 9,
+          "ct": 9,
+          "t": 0
+        },
+        "deaths": {
+          "total": 3,
+          "ct": 3,
+          "t": 0
+        },
+        "adr": {
+          "ct": 96.75,
+          "t": 0
+        },
+        "kast": {
+          "ct": 100,
+          "t": 0
+        }
       }
     },
     "76561198307159112": {
@@ -142,6 +192,31 @@
           "t": 0
         },
         "opening_success_rate": 0
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 8,
+          "ct": 0,
+          "t": 8
+        },
+        "kills": {
+          "total": 1,
+          "ct": 0,
+          "t": 1
+        },
+        "deaths": {
+          "total": 7,
+          "ct": 0,
+          "t": 7
+        },
+        "adr": {
+          "ct": 0,
+          "t": 18.25
+        },
+        "kast": {
+          "ct": 0,
+          "t": 37.5
+        }
       }
     },
     "76561198387460920": {
@@ -187,6 +262,31 @@
           "t": 0
         },
         "opening_success_rate": 0
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 8,
+          "ct": 8,
+          "t": 0
+        },
+        "kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "deaths": {
+          "total": 5,
+          "ct": 5,
+          "t": 0
+        },
+        "adr": {
+          "ct": 9.125,
+          "t": 0
+        },
+        "kast": {
+          "ct": 87.5,
+          "t": 0
+        }
       }
     },
     "76561198826243397": {
@@ -235,6 +335,31 @@
           "t": 0
         },
         "opening_success_rate": 100
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 8,
+          "ct": 8,
+          "t": 0
+        },
+        "kills": {
+          "total": 3,
+          "ct": 3,
+          "t": 0
+        },
+        "deaths": {
+          "total": 4,
+          "ct": 4,
+          "t": 0
+        },
+        "adr": {
+          "ct": 50.125,
+          "t": 0
+        },
+        "kast": {
+          "ct": 75,
+          "t": 0
+        }
       }
     },
     "76561198966281369": {
@@ -286,6 +411,31 @@
           "t": 0
         },
         "opening_success_rate": 100
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 8,
+          "ct": 8,
+          "t": 0
+        },
+        "kills": {
+          "total": 10,
+          "ct": 10,
+          "t": 0
+        },
+        "deaths": {
+          "total": 5,
+          "ct": 5,
+          "t": 0
+        },
+        "adr": {
+          "ct": 136.5,
+          "t": 0
+        },
+        "kast": {
+          "ct": 100,
+          "t": 0
+        }
       }
     },
     "76561199102419525": {
@@ -335,6 +485,31 @@
           "t": 0
         },
         "opening_success_rate": 0
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 8,
+          "ct": 0,
+          "t": 8
+        },
+        "kills": {
+          "total": 6,
+          "ct": 0,
+          "t": 6
+        },
+        "deaths": {
+          "total": 7,
+          "ct": 0,
+          "t": 7
+        },
+        "adr": {
+          "ct": 0,
+          "t": 80.125
+        },
+        "kast": {
+          "ct": 0,
+          "t": 62.5
+        }
       }
     },
     "76561199271102802": {
@@ -382,6 +557,31 @@
           "t": 2
         },
         "opening_success_rate": 100
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 8,
+          "ct": 0,
+          "t": 8
+        },
+        "kills": {
+          "total": 1,
+          "ct": 0,
+          "t": 1
+        },
+        "deaths": {
+          "total": 8,
+          "ct": 0,
+          "t": 8
+        },
+        "adr": {
+          "ct": 0,
+          "t": 22.25
+        },
+        "kast": {
+          "ct": 0,
+          "t": 25
+        }
       }
     },
     "76561199311359933": {
@@ -430,6 +630,31 @@
           "t": 0
         },
         "opening_success_rate": 100
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 3,
+          "ct": 0,
+          "t": 3
+        },
+        "kills": {
+          "total": 5,
+          "ct": 0,
+          "t": 5
+        },
+        "deaths": {
+          "total": 2,
+          "ct": 0,
+          "t": 2
+        },
+        "adr": {
+          "ct": 0,
+          "t": 159
+        },
+        "kast": {
+          "ct": 0,
+          "t": 66.66666666666666
+        }
       }
     },
     "76561199558715190": {
@@ -478,6 +703,31 @@
           "t": 3
         },
         "opening_success_rate": 0
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 8,
+          "ct": 0,
+          "t": 8
+        },
+        "kills": {
+          "total": 3,
+          "ct": 0,
+          "t": 3
+        },
+        "deaths": {
+          "total": 7,
+          "ct": 0,
+          "t": 7
+        },
+        "adr": {
+          "ct": 0,
+          "t": 57.25
+        },
+        "kast": {
+          "ct": 0,
+          "t": 62.5
+        }
       }
     }
   },
