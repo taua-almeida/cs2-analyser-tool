@@ -21,7 +21,7 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 		defer csvFile.Close()
 
 		csvRecords := [][]string{
-			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon"},
+			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Deaths Traded", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "Deaths Traded CT", "Deaths Traded T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon"},
 		}
 		for _, player := range sortedByKills(players) {
 			csvRecords = append(csvRecords, []string{
@@ -37,6 +37,7 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 				fmt.Sprintf("%.1f", player.PlayerMapStats.KAST),
 				fmt.Sprintf("%.1f", player.KillStats.Precision*100),
 				fmt.Sprintf("%d", player.KillStats.TradeKills),
+				fmt.Sprintf("%d", player.DeathsTraded.Total),
 				fmt.Sprintf("%d", player.OpeningDuelStats.OpeningKills.Total),
 				fmt.Sprintf("%d", player.OpeningDuelStats.OpeningDeaths.Total),
 				fmt.Sprintf("%.1f", player.OpeningDuelStats.OpeningSuccessRate),
@@ -53,6 +54,8 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 				fmt.Sprintf("%d", player.SideStats.Kills.T),
 				fmt.Sprintf("%d", player.SideStats.Deaths.CT),
 				fmt.Sprintf("%d", player.SideStats.Deaths.T),
+				fmt.Sprintf("%d", player.DeathsTraded.CT),
+				fmt.Sprintf("%d", player.DeathsTraded.T),
 				fmt.Sprintf("%.1f", player.SideStats.ADR.CT),
 				fmt.Sprintf("%.1f", player.SideStats.ADR.T),
 				fmt.Sprintf("%.1f", player.SideStats.KAST.CT),

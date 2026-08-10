@@ -42,6 +42,7 @@ type roundOutcome struct {
 	opening      openingDuel
 	openingWon   bool // the opening killer's team won the round
 	participants map[uint64]common.Team
+	deathsTraded map[uint64]bool // players whose death was avenged inside the trade window
 	kast         map[uint64]bool // players that got a Kill, Assist, Survived or were Traded
 }
 
@@ -128,6 +129,9 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 		if assister != 0 {
 			rt.assists[assister] = true
 		}
+		// Deliberately no rt.ending guard: deaths and revenge kills stay
+		// eligible until finalize, so a post-round death can still be
+		// avenged inside the window.
 		for _, d := range rt.deaths {
 			if d.killer == victim && d.victimTeam == killerTeam && at-d.at <= tradeWindow {
 				rt.traded[d.victim] = true
@@ -229,6 +233,7 @@ func (rt *roundTracker) finalize() roundOutcome {
 		opening:      rt.opening,
 		openingWon:   rt.opening.killer != 0 && rt.opening.killerTeam == rt.winner,
 		participants: rt.startAlive,
+		deathsTraded: make(map[uint64]bool),
 		kast:         make(map[uint64]bool),
 	}
 	for id, kills := range rt.enemyKills {
@@ -241,6 +246,9 @@ func (rt *roundTracker) finalize() roundOutcome {
 	}
 	for id := range rt.startAlive {
 		_, survived := rt.alive[id]
+		if rt.traded[id] {
+			outcome.deathsTraded[id] = true
+		}
 		if survived || rt.enemyKills[id] > 0 || rt.assists[id] || rt.traded[id] {
 			outcome.kast[id] = true
 		}

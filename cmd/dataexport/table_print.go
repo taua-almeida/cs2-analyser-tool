@@ -71,6 +71,7 @@ func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, mapDat
 // each in its own narrow table. Only shown with --details.
 func PrintCLIDetailTables(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
 	printMultiKillTable(playerToAnalyse)
+	printTradeTable(playerToAnalyse)
 	printSideSplitTable(playerToAnalyse)
 }
 
@@ -82,6 +83,25 @@ func countSplit(count demoparser.SideCount) string {
 // rateSplit formats a side-split rate as "ct / t".
 func rateSplit(rate demoparser.SideRate) string {
 	return fmt.Sprintf("%.1f / %.1f", rate.CT, rate.T)
+}
+
+// printTradeTable puts the two sides of a trade next to each other: the
+// kill that avenged a teammate and the player's own deaths that were
+// avenged. One kill can trade more than one death, so the totals may differ.
+func printTradeTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.SetTitle("Trade stats")
+	t.AppendHeader(table.Row{"Name", "Trade kills", "Deaths traded", "Deaths traded (CT / T)"})
+	for _, player := range sortedByKills(playerToAnalyse) {
+		t.AppendRow(table.Row{
+			player.Name,
+			player.KillStats.TradeKills,
+			player.DeathsTraded.Total,
+			countSplit(player.DeathsTraded),
+		})
+	}
+	t.Render()
 }
 
 // printSideSplitTable lists the core stats split by side. Rounds are in

@@ -5,6 +5,11 @@
       "name": "Подсосник blick'a",
       "user_id": 0,
       "deaths": 6,
+      "deaths_traded": {
+        "total": 2,
+        "ct": 0,
+        "t": 2
+      },
       "kill_stats": {
         "total": 11,
         "headshots": 4,
@@ -80,6 +85,11 @@
       "name": "miu miu",
       "user_id": 8,
       "deaths": 9,
+      "deaths_traded": {
+        "total": 1,
+        "ct": 1,
+        "t": 0
+      },
       "kill_stats": {
         "total": 3,
         "headshots": 2,
@@ -154,6 +164,11 @@
       "name": "Голова, глаза",
       "user_id": 2,
       "deaths": 8,
+      "deaths_traded": {
+        "total": 1,
+        "ct": 0,
+        "t": 1
+      },
       "kill_stats": {
         "total": 5,
         "headshots": 4,
@@ -227,6 +242,11 @@
       "name": "Dog",
       "user_id": 7,
       "deaths": 8,
+      "deaths_traded": {
+        "total": 0,
+        "ct": 0,
+        "t": 0
+      },
       "kill_stats": {
         "total": 6,
         "headshots": 1,
@@ -303,6 +323,11 @@
       "name": "IMI Negev",
       "user_id": 4,
       "deaths": 3,
+      "deaths_traded": {
+        "total": 1,
+        "ct": 0,
+        "t": 1
+      },
       "kill_stats": {
         "total": 4,
         "headshots": 4,
@@ -377,6 +402,11 @@
       "name": "NIGHTSOUL",
       "user_id": 1,
       "deaths": 6,
+      "deaths_traded": {
+        "total": 0,
+        "ct": 0,
+        "t": 0
+      },
       "kill_stats": {
         "total": 10,
         "headshots": 6,
@@ -451,6 +481,11 @@
       "name": "-ExΩtiC-",
       "user_id": 9,
       "deaths": 9,
+      "deaths_traded": {
+        "total": 1,
+        "ct": 1,
+        "t": 0
+      },
       "kill_stats": {
         "total": 8,
         "headshots": 2,
@@ -525,6 +560,11 @@
       "name": "123",
       "user_id": 3,
       "deaths": 5,
+      "deaths_traded": {
+        "total": 1,
+        "ct": 0,
+        "t": 1
+      },
       "kill_stats": {
         "total": 11,
         "headshots": 8,
@@ -598,6 +638,11 @@
       "name": "povergo",
       "user_id": 6,
       "deaths": 9,
+      "deaths_traded": {
+        "total": 0,
+        "ct": 0,
+        "t": 0
+      },
       "kill_stats": {
         "total": 4,
         "headshots": 2,
@@ -672,6 +717,11 @@
       "name": "Trahun \u003c3 V",
       "user_id": 5,
       "deaths": 10,
+      "deaths_traded": {
+        "total": 2,
+        "ct": 2,
+        "t": 0
+      },
       "kill_stats": {
         "total": 2,
         "headshots": 2,

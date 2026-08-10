@@ -5,6 +5,11 @@
       "name": "bonK",
       "user_id": 4,
       "deaths": 4,
+      "deaths_traded": {
+        "total": 1,
+        "ct": 1,
+        "t": 0
+      },
       "kill_stats": {
         "total": 4,
         "headshots": 0,
@@ -78,6 +83,11 @@
       "name": "mattos-v",
       "user_id": 1,
       "deaths": 3,
+      "deaths_traded": {
+        "total": 0,
+        "ct": 0,
+        "t": 0
+      },
       "kill_stats": {
         "total": 9,
         "headshots": 5,
@@ -152,6 +162,11 @@
       "name": "CHARRADÃO DE FROZEN",
       "user_id": 9,
       "deaths": 7,
+      "deaths_traded": {
+        "total": 0,
+        "ct": 0,
+        "t": 0
+      },
       "kill_stats": {
         "total": 1,
         "headshots": 0,
@@ -224,6 +239,11 @@
       "name": "tandu",
       "user_id": 2,
       "deaths": 5,
+      "deaths_traded": {
+        "total": 2,
+        "ct": 2,
+        "t": 0
+      },
       "kill_stats": {
         "total": 0,
         "headshots": 0,
@@ -294,6 +314,11 @@
       "name": "botu360",
       "user_id": 0,
       "deaths": 4,
+      "deaths_traded": {
+        "total": 0,
+        "ct": 0,
+        "t": 0
+      },
       "kill_stats": {
         "total": 3,
         "headshots": 2,
@@ -367,6 +392,11 @@
       "name": "cmz-",
       "user_id": 3,
       "deaths": 5,
+      "deaths_traded": {
+        "total": 0,
+        "ct": 0,
+        "t": 0
+      },
       "kill_stats": {
         "total": 10,
         "headshots": 7,
@@ -443,6 +473,11 @@
       "name": "seloko-numcompensa",
       "user_id": 6,
       "deaths": 7,
+      "deaths_traded": {
+        "total": 1,
+        "ct": 0,
+        "t": 1
+      },
       "kill_stats": {
         "total": 6,
         "headshots": 3,
@@ -517,6 +552,11 @@
       "name": "! Ømegapr1v",
       "user_id": 5,
       "deaths": 8,
+      "deaths_traded": {
+        "total": 0,
+        "ct": 0,
+        "t": 0
+      },
       "kill_stats": {
         "total": 1,
         "headshots": 0,
@@ -589,6 +629,11 @@
       "name": "Nagi",
       "user_id": 7,
       "deaths": 2,
+      "deaths_traded": {
+        "total": 0,
+        "ct": 0,
+        "t": 0
+      },
       "kill_stats": {
         "total": 5,
         "headshots": 4,
@@ -662,6 +707,11 @@
       "name": "BushBandit",
       "user_id": 8,
       "deaths": 7,
+      "deaths_traded": {
+        "total": 0,
+        "ct": 0,
+        "t": 0
+      },
       "kill_stats": {
         "total": 3,
         "headshots": 1,

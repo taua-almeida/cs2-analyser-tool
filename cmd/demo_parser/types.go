@@ -81,6 +81,7 @@ type DemoPlayer struct {
 	Name             string           `json:"name"`
 	UserID           int              `json:"user_id"`
 	Deaths           int              `json:"deaths"`
+	DeathsTraded     SideCount        `json:"deaths_traded"`
 	KillStats        KillStats        `json:"kill_stats"`
 	AssistStats      AssistStats      `json:"assist_stats"`
 	PlayerMapStats   PlayerMapStats   `json:"player_map_stats"`
