@@ -41,7 +41,7 @@
           "ct": 0,
           "t": 0
         },
-        "opening_success": 100
+        "opening_success_rate": 100
       }
     },
     "76561198073049527": {
@@ -84,7 +84,7 @@
           "ct": 2,
           "t": 0
         },
-        "opening_success": 0
+        "opening_success_rate": 0
       }
     },
     "76561198118803912": {
@@ -126,7 +126,7 @@
           "ct": 0,
           "t": 1
         },
-        "opening_success": 0
+        "opening_success_rate": 0
       }
     },
     "76561198194694750": {
@@ -171,7 +171,7 @@
           "ct": 2,
           "t": 0
         },
-        "opening_success": 0
+        "opening_success_rate": 0
       }
     },
     "76561198202353993": {
@@ -214,7 +214,7 @@
           "ct": 0,
           "t": 0
         },
-        "opening_success": 0
+        "opening_success_rate": 0
       }
     },
     "76561198244754626": {
@@ -257,7 +257,7 @@
           "ct": 0,
           "t": 0
         },
-        "opening_success": 80
+        "opening_success_rate": 80
       }
     },
     "76561198258044111": {
@@ -300,7 +300,7 @@
           "ct": 0,
           "t": 0
         },
-        "opening_success": 0
+        "opening_success_rate": 0
       }
     },
     "76561198265366770": {
@@ -342,7 +342,7 @@
           "ct": 0,
           "t": 0
         },
-        "opening_success": 100
+        "opening_success_rate": 100
       }
     },
     "76561198280975787": {
@@ -385,7 +385,7 @@
           "ct": 1,
           "t": 0
         },
-        "opening_success": 100
+        "opening_success_rate": 100
       }
     },
     "76561198324843075": {
@@ -427,7 +427,7 @@
           "ct": 3,
           "t": 0
         },
-        "opening_success": 0
+        "opening_success_rate": 0
       }
     }
   },

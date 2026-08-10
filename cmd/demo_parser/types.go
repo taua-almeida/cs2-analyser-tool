@@ -30,10 +30,14 @@ type SideCount struct {
 	T     int `json:"t"`
 }
 
+// OpeningDuelStats counts the rounds a player opened or was opened on.
+// OpeningSuccessRate is a percentage rather than a count, and is named apart
+// from the counts because other trackers use "opening success" for the
+// opening-kill tally itself.
 type OpeningDuelStats struct {
-	OpeningKills   SideCount `json:"opening_kills"`
-	OpeningDeaths  SideCount `json:"opening_deaths"`
-	OpeningSuccess float64   `json:"opening_success"`
+	OpeningKills       SideCount `json:"opening_kills"`
+	OpeningDeaths      SideCount `json:"opening_deaths"`
+	OpeningSuccessRate float64   `json:"opening_success_rate"`
 }
 
 type DemoPlayer struct {

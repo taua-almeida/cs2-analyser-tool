@@ -21,8 +21,19 @@ The `--save` flag writes every analysed player to a file. JSON contains all fiel
 | HeadShots | `headshots` | Enemy kills that were headshots. |
 | Precision | `precision` | Headshot ratio: `headshots / total`, from 0 to 1. Shown as a percentage in the table and CSV. |
 | WeaponsKills | `weapons_kills` | Kills per weapon name. |
-| TradeKills | `trade_kills` | Kills on an enemy who had killed a teammate within the previous 5 seconds. |
+| TradeKills | `trade_kills` | Kills on the enemy who had killed a teammate earlier in the same round, within 5 seconds of that death. See [trade window](#trade-window) for the exact rule. |
 | TeamKills | `team_kills` | Kills on teammates. |
+
+#### Trade window
+
+A kill is a trade when it lands on the *specific* enemy who killed a teammate, within 5 seconds of that teammate's death. In detail:
+
+- It must be that killer. Killing any other enemy inside the window is not a trade.
+- Both deaths have to fall in the same round.
+- One kill counts once, even when the enemy it lands on had killed two teammates.
+- Kills after the round is decided still count, so exit frags can be trades.
+
+The 5-second window is a deliberate choice, not a value read out of the demo: HLTV states 5 seconds for Rating 3.0 ("two kills within 5 seconds") and Refrag documents the same for its Trades column. Other trackers differ — Leetify builds 4-second kill chains instead — so trade counts are not comparable between tools even when the label matches. If you are forking and your league counts trades differently, the window is the `tradeWindow` constant at the top of `cmd/demo_parser/round_tracker.go`.
 
 ### Assist stats (`assist_stats`)
 
@@ -50,7 +61,7 @@ The opening duel is the first enemy kill of a round. Teamkills, suicides and wor
 | --- | --- | --- |
 | OpeningKills | `opening_kills` | Rounds opened by a kill from this player: `{total, ct, t}`, split by the side the player was on. |
 | OpeningDeaths | `opening_deaths` | Rounds opened by this player's death, with the same side split. |
-| OpeningSuccess | `opening_success` | Percentage of the player's opening kills whose round their team went on to win. 0 without any opening kills. |
+| OpeningSuccessRate | `opening_success_rate` | Percentage of the player's opening kills whose round their team went on to win. 0 without any opening kills. This is a rate, not a count — some trackers use "opening success" to mean the opening-kill tally instead. |
 
 ## Match data
 

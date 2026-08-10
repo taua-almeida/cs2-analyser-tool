@@ -47,7 +47,7 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 				fmt.Sprintf("%d", player.KillStats.TradeKills),
 				fmt.Sprintf("%d", player.OpeningDuelStats.OpeningKills.Total),
 				fmt.Sprintf("%d", player.OpeningDuelStats.OpeningDeaths.Total),
-				fmt.Sprintf("%.1f", player.OpeningDuelStats.OpeningSuccess),
+				fmt.Sprintf("%.1f", player.OpeningDuelStats.OpeningSuccessRate),
 				fmt.Sprintf("%d", player.PlayerMapStats.MVPs),
 				fmt.Sprintf("%d", player.PlayerMapStats.ACEs),
 				fmt.Sprintf("%d", player.PlayerMapStats.ClutchesWon),

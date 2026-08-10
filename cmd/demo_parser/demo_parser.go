@@ -329,7 +329,7 @@ func (a *analyser) finalise() {
 			p.PlayerMapStats.KAST = 100 * float64(a.kastRounds[id]) / float64(a.mapData.TotalRounds)
 		}
 		if kills := p.OpeningDuelStats.OpeningKills.Total; kills > 0 {
-			p.OpeningDuelStats.OpeningSuccess = 100 * float64(a.openingWins[id]) / float64(kills)
+			p.OpeningDuelStats.OpeningSuccessRate = 100 * float64(a.openingWins[id]) / float64(kills)
 		}
 	}
 }
