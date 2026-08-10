@@ -11,70 +11,103 @@ import (
 	"testing"
 )
 
-// The fixture is a real CS2 Premier demo (de_mirage, 10 rounds) taken from
-// the MIT-licensed LaihoE/demoparser test data, pinned to an immutable
-// commit so the bytes can never change underneath us. It is not committed
-// to the repo; fetch it with `make download-test-demo`.
-const (
-	fixtureDemoPath   = "testdata/test_demo.dem"
-	fixtureDemoSHA256 = "84a1a4191302bdd2a3bbb5a727842093744b1fb1a228aeec630369e44b622cb2"
-	goldenPath        = "testdata/golden_test_demo.json"
-)
+// demoFixture is a real CS2 demo the parser is run against. The demos are
+// not committed to the repo (they are tens of megabytes); fetch them with
+// `make download-test-demos`. Each is pinned by SHA-256 so the bytes cannot
+// change underneath the golden files.
+type demoFixture struct {
+	name   string
+	demo   string
+	sha256 string
+	golden string
+}
 
-var updateGolden = flag.Bool("update", false, "rewrite the golden file from current ProcessDemo output")
+// The two fixtures cover the two ways a CS2 demo reports round MVPs, which
+// matters because the parser has to handle both:
+//
+//   - mirage is from January 2024 and still carries round_mvp game events,
+//     so it exercises the RoundMVPAnnouncement handler.
+//   - ancient is a later Premier match with no round_mvp events at all, so
+//     its MVP counts can only come from the scoreboard entity property.
+//     Dropping syncScoreboardMVPs zeroes this golden's MVPs.
+//
+// Neither demo contains shotgun damage, so the per-event damage cap that
+// deals with double-reported pellets is not locked here. See issue #12.
+var demoFixtures = []demoFixture{
+	{
+		name:   "mirage_round_mvp_events",
+		demo:   "testdata/mirage.dem",
+		sha256: "84a1a4191302bdd2a3bbb5a727842093744b1fb1a228aeec630369e44b622cb2",
+		golden: "testdata/golden_mirage.json",
+	},
+	{
+		name:   "ancient_scoreboard_mvps",
+		demo:   "testdata/ancient.dem",
+		sha256: "b29a9cb537a181deef97b15cfed10ee722a37999644a27bb2226fdd77a1337fc",
+		golden: "testdata/golden_ancient.json",
+	},
+}
 
-// TestProcessDemoGolden runs the full parser pipeline on the fixture demo
-// and compares the marshalled ProcessedDemo against the golden file. The
-// golden output was validated against the in-game scoreboard convention
-// (see issue #9), so any diff here means a stat regression, not a test
-// problem. To accept an intentional behaviour change, regenerate with:
+var updateGolden = flag.Bool("update", false, "rewrite the golden files from current ProcessDemo output")
+
+// TestProcessDemoGolden runs the full parser pipeline on each fixture demo
+// and compares the marshalled ProcessedDemo against its golden file. The
+// golden output is a snapshot of behaviour that was validated against the
+// in-game scoreboard (see issue #9), so any diff here means a stat
+// regression, not a test problem. To accept an intentional behaviour
+// change, regenerate with:
 //
 //	go test ./cmd/demo_parser -run TestProcessDemoGolden -update
 func TestProcessDemoGolden(t *testing.T) {
-	demoBytes, err := os.ReadFile(fixtureDemoPath)
-	if os.IsNotExist(err) {
-		// CI sets REQUIRE_TEST_DEMO so a fixture that silently fails to
-		// land in the expected place is a red build rather than a skip
-		// that leaves the whole integration test unrun and unnoticed.
-		if os.Getenv("REQUIRE_TEST_DEMO") != "" {
-			t.Fatalf("fixture %s is missing and REQUIRE_TEST_DEMO is set", fixtureDemoPath)
-		}
-		t.Skipf("fixture %s not present, run `make download-test-demo` to fetch it", fixtureDemoPath)
-	}
-	if err != nil {
-		t.Fatalf("reading fixture: %v", err)
-	}
-	sum := sha256.Sum256(demoBytes)
-	if got := hex.EncodeToString(sum[:]); got != fixtureDemoSHA256 {
-		t.Fatalf("fixture %s has sha256 %s, want %s; delete it and run `make download-test-demo` again",
-			fixtureDemoPath, got, fixtureDemoSHA256)
-	}
+	for _, f := range demoFixtures {
+		t.Run(f.name, func(t *testing.T) {
+			demoBytes, err := os.ReadFile(f.demo)
+			if os.IsNotExist(err) {
+				// CI sets REQUIRE_TEST_DEMO so a fixture that silently
+				// fails to land in the expected place is a red build
+				// rather than a skip that leaves the integration test
+				// unrun and unnoticed.
+				if os.Getenv("REQUIRE_TEST_DEMO") != "" {
+					t.Fatalf("fixture %s is missing and REQUIRE_TEST_DEMO is set", f.demo)
+				}
+				t.Skipf("fixture %s not present, run `make download-test-demos` to fetch it", f.demo)
+			}
+			if err != nil {
+				t.Fatalf("reading fixture: %v", err)
+			}
+			sum := sha256.Sum256(demoBytes)
+			if got := hex.EncodeToString(sum[:]); got != f.sha256 {
+				t.Fatalf("fixture %s has sha256 %s, want %s; delete it and run `make download-test-demos` again",
+					f.demo, got, f.sha256)
+			}
 
-	result, err := ProcessDemo(fixtureDemoPath)
-	if err != nil {
-		t.Fatalf("ProcessDemo: %v", err)
-	}
+			result, err := ProcessDemo(f.demo)
+			if err != nil {
+				t.Fatalf("ProcessDemo: %v", err)
+			}
 
-	got, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		t.Fatalf("marshalling result: %v", err)
-	}
-	got = append(got, '\n')
+			got, err := json.MarshalIndent(result, "", "  ")
+			if err != nil {
+				t.Fatalf("marshalling result: %v", err)
+			}
+			got = append(got, '\n')
 
-	if *updateGolden {
-		if err := os.WriteFile(goldenPath, got, 0o644); err != nil {
-			t.Fatalf("writing golden file: %v", err)
-		}
-		t.Logf("golden file %s updated", goldenPath)
-		return
-	}
+			if *updateGolden {
+				if err := os.WriteFile(f.golden, got, 0o644); err != nil {
+					t.Fatalf("writing golden file: %v", err)
+				}
+				t.Logf("golden file %s updated", f.golden)
+				return
+			}
 
-	want, err := os.ReadFile(goldenPath)
-	if err != nil {
-		t.Fatalf("reading golden file: %v", err)
-	}
-	if diff := diffLines(string(want), string(got)); diff != "" {
-		t.Errorf("ProcessDemo output drifted from %s:\n%s", goldenPath, diff)
+			want, err := os.ReadFile(f.golden)
+			if err != nil {
+				t.Fatalf("reading golden file: %v", err)
+			}
+			if diff := diffLines(string(want), string(got)); diff != "" {
+				t.Errorf("ProcessDemo output drifted from %s:\n%s", f.golden, diff)
+			}
+		})
 	}
 }
 

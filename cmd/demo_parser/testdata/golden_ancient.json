@@ -1,0 +1,301 @@
+{
+  "players": {
+    "76561198032044481": {
+      "steam_id": 76561198032044481,
+      "name": "bonK",
+      "user_id": 4,
+      "deaths": 4,
+      "kill_stats": {
+        "total": 4,
+        "headshots": 0,
+        "precision": 0,
+        "weapons_kills": {
+          "AK-47": 3,
+          "Knife": 1
+        },
+        "trade_kills": 0,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 1,
+        "flashed_enemies": 0,
+        "damage_given": 382,
+        "adr": 47.75
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 87.5
+      }
+    },
+    "76561198071075349": {
+      "steam_id": 76561198071075349,
+      "name": "mattos-v",
+      "user_id": 1,
+      "deaths": 3,
+      "kill_stats": {
+        "total": 9,
+        "headshots": 5,
+        "precision": 0.5555555555555556,
+        "weapons_kills": {
+          "Galil AR": 2,
+          "M4A4": 6,
+          "P2000": 1
+        },
+        "trade_kills": 2,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 1,
+        "flashed_enemies": 0,
+        "damage_given": 774,
+        "adr": 96.75
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "clutches_won": 1,
+        "kast": 100
+      }
+    },
+    "76561198307159112": {
+      "steam_id": 76561198307159112,
+      "name": "CHARRADÃO DE FROZEN",
+      "user_id": 9,
+      "deaths": 7,
+      "kill_stats": {
+        "total": 1,
+        "headshots": 0,
+        "precision": 0,
+        "weapons_kills": {
+          "Glock-18": 1
+        },
+        "trade_kills": 1,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 1,
+        "flashed_enemies": 0,
+        "damage_given": 146,
+        "adr": 18.25
+      },
+      "player_map_stats": {
+        "mvps": 0,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 37.5
+      }
+    },
+    "76561198387460920": {
+      "steam_id": 76561198387460920,
+      "name": "tandu",
+      "user_id": 2,
+      "deaths": 5,
+      "kill_stats": {
+        "total": 0,
+        "headshots": 0,
+        "precision": 0,
+        "weapons_kills": {},
+        "trade_kills": 0,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 1,
+        "flashed_enemies": 0,
+        "damage_given": 73,
+        "adr": 9.125
+      },
+      "player_map_stats": {
+        "mvps": 0,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 87.5
+      }
+    },
+    "76561198826243397": {
+      "steam_id": 76561198826243397,
+      "name": "botu360",
+      "user_id": 0,
+      "deaths": 4,
+      "kill_stats": {
+        "total": 3,
+        "headshots": 2,
+        "precision": 0.6666666666666666,
+        "weapons_kills": {
+          "M4A1": 1,
+          "USP-S": 2
+        },
+        "trade_kills": 0,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 1,
+        "flashed_enemies": 0,
+        "damage_given": 401,
+        "adr": 50.125
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 75
+      }
+    },
+    "76561198966281369": {
+      "steam_id": 76561198966281369,
+      "name": "cmz-",
+      "user_id": 3,
+      "deaths": 5,
+      "kill_stats": {
+        "total": 10,
+        "headshots": 7,
+        "precision": 0.7,
+        "weapons_kills": {
+          "AWP": 2,
+          "Five-SeveN": 1,
+          "M4A4": 5,
+          "P2000": 1,
+          "P250": 1
+        },
+        "trade_kills": 1,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 2,
+        "flashed_enemies": 0,
+        "damage_given": 1092,
+        "adr": 136.5
+      },
+      "player_map_stats": {
+        "mvps": 2,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 100
+      }
+    },
+    "76561199102419525": {
+      "steam_id": 76561199102419525,
+      "name": "seloko-numcompensa",
+      "user_id": 6,
+      "deaths": 7,
+      "kill_stats": {
+        "total": 6,
+        "headshots": 3,
+        "precision": 0.5,
+        "weapons_kills": {
+          "AK-47": 3,
+          "Galil AR": 2,
+          "Glock-18": 1
+        },
+        "trade_kills": 0,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 1,
+        "flashed_enemies": 0,
+        "damage_given": 641,
+        "adr": 80.125
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "clutches_won": 1,
+        "kast": 62.5
+      }
+    },
+    "76561199271102802": {
+      "steam_id": 76561199271102802,
+      "name": "! Ømegapr1v",
+      "user_id": 5,
+      "deaths": 8,
+      "kill_stats": {
+        "total": 1,
+        "headshots": 0,
+        "precision": 0,
+        "weapons_kills": {
+          "AK-47": 1
+        },
+        "trade_kills": 0,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 1,
+        "flashed_enemies": 0,
+        "damage_given": 178,
+        "adr": 22.25
+      },
+      "player_map_stats": {
+        "mvps": 0,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 25
+      }
+    },
+    "76561199311359933": {
+      "steam_id": 76561199311359933,
+      "name": "Nagi",
+      "user_id": 7,
+      "deaths": 2,
+      "kill_stats": {
+        "total": 5,
+        "headshots": 4,
+        "precision": 0.8,
+        "weapons_kills": {
+          "AK-47": 2,
+          "Glock-18": 3
+        },
+        "trade_kills": 0,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 0,
+        "flashed_enemies": 0,
+        "damage_given": 477,
+        "adr": 59.625
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 25
+      }
+    },
+    "76561199558715190": {
+      "steam_id": 76561199558715190,
+      "name": "BushBandit",
+      "user_id": 8,
+      "deaths": 7,
+      "kill_stats": {
+        "total": 3,
+        "headshots": 1,
+        "precision": 0.3333333333333333,
+        "weapons_kills": {
+          "AK-47": 2,
+          "Glock-18": 1
+        },
+        "trade_kills": 0,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 1,
+        "flashed_enemies": 0,
+        "damage_given": 458,
+        "adr": 57.25
+      },
+      "player_map_stats": {
+        "mvps": 0,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 62.5
+      }
+    }
+  },
+  "map_data": {
+    "map_name": "de_ancient",
+    "total_rounds": 8,
+    "rounds_won_ct": 6,
+    "rounds_won_t": 2
+  },
+  "game_mode": "premier"
+}
