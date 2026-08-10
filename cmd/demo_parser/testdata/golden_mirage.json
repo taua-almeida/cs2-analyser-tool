@@ -1,0 +1,311 @@
+{
+  "players": {
+    "76561197964020430": {
+      "steam_id": 76561197964020430,
+      "name": "Подсосник blick'a",
+      "user_id": 0,
+      "deaths": 6,
+      "kill_stats": {
+        "total": 11,
+        "headshots": 4,
+        "precision": 0.36363636363636365,
+        "weapons_kills": {
+          "AK-47": 2,
+          "AWP": 6,
+          "MAC-10": 2,
+          "P250": 1
+        },
+        "trade_kills": 1,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 4,
+        "flashed_enemies": 0,
+        "damage_given": 1207,
+        "adr": 120.7
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 100
+      }
+    },
+    "76561198073049527": {
+      "steam_id": 76561198073049527,
+      "name": "miu miu",
+      "user_id": 8,
+      "deaths": 9,
+      "kill_stats": {
+        "total": 3,
+        "headshots": 2,
+        "precision": 0.6666666666666666,
+        "weapons_kills": {
+          "M4A1": 1,
+          "M4A4": 1,
+          "P2000": 1
+        },
+        "trade_kills": 0,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 3,
+        "flashed_enemies": 1,
+        "damage_given": 523,
+        "adr": 52.3
+      },
+      "player_map_stats": {
+        "mvps": 0,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 70
+      }
+    },
+    "76561198118803912": {
+      "steam_id": 76561198118803912,
+      "name": "Голова, глаза",
+      "user_id": 2,
+      "deaths": 8,
+      "kill_stats": {
+        "total": 5,
+        "headshots": 4,
+        "precision": 0.8,
+        "weapons_kills": {
+          "AK-47": 4,
+          "Glock-18": 1
+        },
+        "trade_kills": 2,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 2,
+        "flashed_enemies": 0,
+        "damage_given": 566,
+        "adr": 56.6
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 80
+      }
+    },
+    "76561198194694750": {
+      "steam_id": 76561198194694750,
+      "name": "Dog",
+      "user_id": 7,
+      "deaths": 8,
+      "kill_stats": {
+        "total": 6,
+        "headshots": 1,
+        "precision": 0.16666666666666666,
+        "weapons_kills": {
+          "AK-47": 1,
+          "FAMAS": 1,
+          "Five-SeveN": 1,
+          "M4A1": 2,
+          "USP-S": 1
+        },
+        "trade_kills": 2,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 2,
+        "flashed_enemies": 0,
+        "damage_given": 742,
+        "adr": 74.2
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "clutches_won": 1,
+        "kast": 50
+      }
+    },
+    "76561198202353993": {
+      "steam_id": 76561198202353993,
+      "name": "IMI Negev",
+      "user_id": 4,
+      "deaths": 3,
+      "kill_stats": {
+        "total": 4,
+        "headshots": 4,
+        "precision": 1,
+        "weapons_kills": {
+          "AK-47": 1,
+          "Glock-18": 2,
+          "SSG 08": 1
+        },
+        "trade_kills": 0,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 0,
+        "flashed_enemies": 0,
+        "damage_given": 313,
+        "adr": 31.3
+      },
+      "player_map_stats": {
+        "mvps": 3,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 90
+      }
+    },
+    "76561198244754626": {
+      "steam_id": 76561198244754626,
+      "name": "NIGHTSOUL",
+      "user_id": 1,
+      "deaths": 6,
+      "kill_stats": {
+        "total": 10,
+        "headshots": 6,
+        "precision": 0.6,
+        "weapons_kills": {
+          "AK-47": 8,
+          "HE Grenade": 1,
+          "MAC-10": 1
+        },
+        "trade_kills": 1,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 1,
+        "flashed_enemies": 0,
+        "damage_given": 942,
+        "adr": 94.2
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 90
+      }
+    },
+    "76561198258044111": {
+      "steam_id": 76561198258044111,
+      "name": "-ExΩtiC-",
+      "user_id": 9,
+      "deaths": 9,
+      "kill_stats": {
+        "total": 8,
+        "headshots": 2,
+        "precision": 0.25,
+        "weapons_kills": {
+          "M4A1": 5,
+          "SSG 08": 2,
+          "USP-S": 1
+        },
+        "trade_kills": 1,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 1,
+        "flashed_enemies": 0,
+        "damage_given": 775,
+        "adr": 77.5
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 60
+      }
+    },
+    "76561198265366770": {
+      "steam_id": 76561198265366770,
+      "name": "123",
+      "user_id": 3,
+      "deaths": 5,
+      "kill_stats": {
+        "total": 11,
+        "headshots": 8,
+        "precision": 0.7272727272727273,
+        "weapons_kills": {
+          "AK-47": 10,
+          "Desert Eagle": 1
+        },
+        "trade_kills": 1,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 1,
+        "flashed_enemies": 0,
+        "damage_given": 1139,
+        "adr": 113.9
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 100
+      }
+    },
+    "76561198280975787": {
+      "steam_id": 76561198280975787,
+      "name": "povergo",
+      "user_id": 6,
+      "deaths": 9,
+      "kill_stats": {
+        "total": 4,
+        "headshots": 2,
+        "precision": 0.5,
+        "weapons_kills": {
+          "MP9": 1,
+          "P2000": 2,
+          "P250": 1
+        },
+        "trade_kills": 0,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 0,
+        "flashed_enemies": 0,
+        "damage_given": 341,
+        "adr": 34.1
+      },
+      "player_map_stats": {
+        "mvps": 0,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 30
+      }
+    },
+    "76561198324843075": {
+      "steam_id": 76561198324843075,
+      "name": "Trahun \u003c3 V",
+      "user_id": 5,
+      "deaths": 10,
+      "kill_stats": {
+        "total": 2,
+        "headshots": 2,
+        "precision": 1,
+        "weapons_kills": {
+          "Desert Eagle": 1,
+          "USP-S": 1
+        },
+        "trade_kills": 1,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 3,
+        "flashed_enemies": 0,
+        "damage_given": 425,
+        "adr": 42.5
+      },
+      "player_map_stats": {
+        "mvps": 0,
+        "aces": 0,
+        "clutches_won": 0,
+        "kast": 70
+      }
+    }
+  },
+  "map_data": {
+    "map_name": "de_mirage",
+    "total_rounds": 10,
+    "rounds_won_ct": 2,
+    "rounds_won_t": 8
+  },
+  "game_mode": "premier"
+}
