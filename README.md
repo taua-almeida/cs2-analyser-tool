@@ -19,6 +19,7 @@ analyse [flags]
 - `-p, --players <players>`: A list of players to analyse. This should be provided as a comma-separated list of player names.
 - `-s, --save`: Flag to save the demo player's data.
 - `--save-type <type>`: Type of file to save the data. Options are `json` and `csv`. The default is `json`.
+- `--details`: Print the extra stat tables that do not fit the main one, such as multi-kill rounds.
 
 #### Options
 

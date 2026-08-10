@@ -1,13 +1,10 @@
 package dataexport
 
 import (
-	"cmp"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"os"
-	"slices"
 	"time"
 
 	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
@@ -23,15 +20,10 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 		}
 		defer csvFile.Close()
 
-		// Sort rows by kills so the CSV matches the table output.
-		sortedPlayers := slices.SortedFunc(maps.Values(players), func(a, b *demoparser.DemoPlayer) int {
-			return cmp.Compare(b.KillStats.Total, a.KillStats.Total)
-		})
-
 		csvRecords := [][]string{
-			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "Clutches Won", "Best Weapon"},
+			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Best Weapon"},
 		}
-		for _, player := range sortedPlayers {
+		for _, player := range sortedByKills(players) {
 			csvRecords = append(csvRecords, []string{
 				player.Name,
 				fmt.Sprintf("%d", player.KillStats.Total),
@@ -50,6 +42,10 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 				fmt.Sprintf("%.1f", player.OpeningDuelStats.OpeningSuccessRate),
 				fmt.Sprintf("%d", player.PlayerMapStats.MVPs),
 				fmt.Sprintf("%d", player.PlayerMapStats.ACEs),
+				fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K2),
+				fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K3),
+				fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K4),
+				fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K5),
 				fmt.Sprintf("%d", player.PlayerMapStats.ClutchesWon),
 				demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills),
 			})

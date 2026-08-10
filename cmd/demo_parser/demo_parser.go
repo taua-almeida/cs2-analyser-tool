@@ -264,6 +264,22 @@ func (s *SideCount) count(side common.Team) {
 	}
 }
 
+// add credits one round with the given number of enemy kills to its bucket.
+// The top bucket takes everything from aceKills up, so it always holds the
+// same rounds as ACEs, and rounds below multiKillMin fall through uncounted.
+func (m *MultiKillRounds) add(kills int) {
+	switch {
+	case kills >= aceKills:
+		m.K5++
+	case kills == 4:
+		m.K4++
+	case kills == 3:
+		m.K3++
+	case kills == 2:
+		m.K2++
+	}
+}
+
 func (a *analyser) applyRoundOutcome(outcome roundOutcome) {
 	if !outcome.played {
 		return
@@ -271,6 +287,11 @@ func (a *analyser) applyRoundOutcome(outcome roundOutcome) {
 	for _, id := range outcome.aces {
 		if p := a.players[id]; p != nil {
 			p.PlayerMapStats.ACEs++
+		}
+	}
+	for id, kills := range outcome.multiKills {
+		if p := a.players[id]; p != nil {
+			p.PlayerMapStats.MultiKills.add(kills)
 		}
 	}
 	if p := a.players[outcome.clutcher]; p != nil {

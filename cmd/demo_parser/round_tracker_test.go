@@ -79,6 +79,102 @@ func TestTeamkillsDoNotMakeAnAce(t *testing.T) {
 	}
 }
 
+// killEnemies has player 1 kill n CTs in one round.
+func killEnemies(rt *roundTracker, n int) {
+	for i := range n {
+		rt.kill(1, uint64(11+i), common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10+i))
+	}
+}
+
+// bucketOf runs a round in which player 1 gets n enemy kills and reports
+// which multi-kill bucket it landed in, or 0 for no multi-kill at all.
+// Landing in two buckets is the failure the exclusivity test is after, so
+// it is reported here rather than silently collapsed.
+func bucketOf(t *testing.T, n int) int {
+	t.Helper()
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+	killEnemies(rt, n)
+
+	var got MultiKillRounds
+	got.add(endRound(rt, common.TeamTerrorists).multiKills[1])
+	switch got {
+	case MultiKillRounds{}:
+		return 0
+	case MultiKillRounds{K2: 1}:
+		return 2
+	case MultiKillRounds{K3: 1}:
+		return 3
+	case MultiKillRounds{K4: 1}:
+		return 4
+	case MultiKillRounds{K5: 1}:
+		return 5
+	}
+	t.Fatalf("%d enemy kills landed in more than one bucket: %+v", n, got)
+	return 0
+}
+
+func TestMultiKillBuckets(t *testing.T) {
+	// Buckets are exclusive: every round lands in exactly one of them, and
+	// a single kill is no multi-kill at all.
+	cases := []struct{ kills, bucket int }{
+		{0, 0}, {1, 0}, {2, 2}, {3, 3}, {4, 4}, {5, 5},
+	}
+	for _, c := range cases {
+		if got := bucketOf(t, c.kills); got != c.bucket {
+			t.Errorf("%d enemy kills landed in bucket %d, want %d (0 = no multi-kill)", c.kills, got, c.bucket)
+		}
+	}
+}
+
+func TestMultiKillTopBucketMatchesAce(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+
+	// Six enemy kills need a CT who reconnected, but if it ever happens the
+	// round has to stay a single 5k so the bucket cannot drift from ACEs.
+	killEnemies(rt, 5)
+	rt.kill(1, 16, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(20))
+
+	outcome := endRound(rt, common.TeamTerrorists)
+	var got MultiKillRounds
+	got.add(outcome.multiKills[1])
+	if want := (MultiKillRounds{K5: 1}); got != want {
+		t.Errorf("six kills gave %+v, want %+v", got, want)
+	}
+	if !slices.Contains(outcome.aces, uint64(1)) {
+		t.Errorf("six kills must also be an ace, aces = %v", outcome.aces)
+	}
+}
+
+func TestTeamkillsDoNotMakeAMultiKill(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+
+	// One enemy kill plus two teamkills is not a 3k, and not even a 2k.
+	rt.kill(1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
+	rt.kill(1, 2, common.TeamTerrorists, common.TeamTerrorists, 0, false, at(12))
+	rt.kill(1, 3, common.TeamTerrorists, common.TeamTerrorists, 0, false, at(14))
+
+	if outcome := endRound(rt, common.TeamTerrorists); len(outcome.multiKills) != 0 {
+		t.Errorf("teamkills counted towards a multi-kill: %v", outcome.multiKills)
+	}
+}
+
+func TestMultiKillCountsPostRoundKills(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+	rt.markEnd(common.TeamTerrorists)
+
+	// Exit frags are enemy kills like any other, the same way they already
+	// count towards an ace.
+	killEnemies(rt, 2)
+
+	if outcome := rt.finalize(); outcome.multiKills[1] != 2 {
+		t.Errorf("multiKills[1] = %d, want 2 post-round kills to count", outcome.multiKills[1])
+	}
+}
+
 func TestClutchWon(t *testing.T) {
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())
