@@ -202,6 +202,27 @@ func TestFreezeTimeJoinKeepsSideAndDoesNotRevive(t *testing.T) {
 	}
 }
 
+func TestFreezeTimeJoinerTradedDeathUsesJoinedSide(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(map[uint64]common.Team{
+		1: common.TeamTerrorists, 11: common.TeamCounterTerrorists,
+	})
+	rt.joinRound(map[uint64]common.Team{
+		1: common.TeamTerrorists, 11: common.TeamCounterTerrorists, 16: common.TeamCounterTerrorists,
+	})
+
+	rt.kill(1, 16, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
+	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(13))
+	outcome := endRound(rt, common.TeamCounterTerrorists)
+
+	a := liveAnalyser()
+	a.players[16] = &DemoPlayer{SteamID: 16}
+	a.applyRoundOutcome(outcome)
+	if got, want := a.players[16].DeathsTraded, (SideCount{Total: 1, CT: 1}); got != want {
+		t.Errorf("freeze-time joiner's deaths traded = %+v, want %+v", got, want)
+	}
+}
+
 func TestClutchWon(t *testing.T) {
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())
@@ -277,6 +298,9 @@ func TestTradeKill(t *testing.T) {
 	}
 
 	outcome := endRound(rt, common.TeamCounterTerrorists)
+	if len(outcome.deathsTraded) != 1 || !outcome.deathsTraded[1] {
+		t.Errorf("deaths traded = %v, want only player 1 counted once", outcome.deathsTraded)
+	}
 	if !outcome.kast[1] {
 		t.Error("player 1's death was traded, so player 1 keeps KAST")
 	}
@@ -289,6 +313,71 @@ func TestKillOutsideTradeWindowIsNoTrade(t *testing.T) {
 	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
 	if rt.kill(2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(16)) {
 		t.Error("revenge kill 6s later should not be a trade")
+	}
+	if outcome := endRound(rt, common.TeamCounterTerrorists); len(outcome.deathsTraded) != 0 {
+		t.Errorf("death outside the trade window was counted as traded: %v", outcome.deathsTraded)
+	}
+}
+
+func TestPostRoundDeathCanBeTraded(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+
+	rt.markEnd(common.TeamCounterTerrorists)
+	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	isTrade := rt.kill(2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(13))
+
+	if !isTrade {
+		t.Error("post-round death avenged inside the window should be a trade")
+	}
+	if outcome := rt.finalize(); !outcome.deathsTraded[1] {
+		t.Errorf("post-round death was not marked as traded: %v", outcome.deathsTraded)
+	}
+}
+
+func TestOneTradeKillCanTradeTwoDeaths(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+
+	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	rt.kill(11, 2, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(12))
+	tradeKills := 0
+	if rt.kill(3, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(14)) {
+		tradeKills++
+	}
+
+	outcome := endRound(rt, common.TeamTerrorists)
+	if tradeKills != 1 {
+		t.Errorf("trade kills = %d, want one revenge kill", tradeKills)
+	}
+	if len(outcome.deathsTraded) != 2 || !outcome.deathsTraded[1] || !outcome.deathsTraded[2] {
+		t.Errorf("deaths traded = %v, want players 1 and 2", outcome.deathsTraded)
+	}
+}
+
+func TestDeathsTradedFollowTheHalftimeSwap(t *testing.T) {
+	a := liveAnalyser()
+	a.players[1] = &DemoPlayer{SteamID: 1}
+	rt := newRoundTracker()
+
+	// Player 1 starts on T, dies, and has that death avenged by player 2.
+	rt.startRound(map[uint64]common.Team{
+		1: common.TeamTerrorists, 2: common.TeamTerrorists, 11: common.TeamCounterTerrorists,
+	})
+	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	rt.kill(2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(13))
+	a.applyRoundOutcome(endRound(rt, common.TeamTerrorists))
+
+	// After halftime the same players swap sides and repeat the trade.
+	rt.startRound(map[uint64]common.Team{
+		1: common.TeamCounterTerrorists, 2: common.TeamCounterTerrorists, 11: common.TeamTerrorists,
+	})
+	rt.kill(11, 1, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(20))
+	rt.kill(2, 11, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(23))
+	a.applyRoundOutcome(endRound(rt, common.TeamCounterTerrorists))
+
+	if got, want := a.players[1].DeathsTraded, (SideCount{Total: 2, CT: 1, T: 1}); got != want {
+		t.Errorf("deaths traded = %+v, want %+v after the side swap", got, want)
 	}
 }
 

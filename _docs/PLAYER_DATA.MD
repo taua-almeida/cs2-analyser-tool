@@ -12,6 +12,7 @@ The `--save` flag writes every analysed player to a file. JSON contains all fiel
 | Name | `name` | Last name the player used in the demo. |
 | UserID | `user_id` | Server user ID in this demo. |
 | Deaths | `deaths` | Deaths, including suicides and world deaths (fall damage, C4). |
+| DeathsTraded | `deaths_traded` | Per-round traded-death count: `{total, ct, t}`. A round contributes once when at least one of the player's deaths was avenged inside the trade window. |
 
 ### Kill stats (`kill_stats`)
 
@@ -30,10 +31,14 @@ A kill is a trade when it lands on the *specific* enemy who killed a teammate, w
 
 - It must be that killer. Killing any other enemy inside the window is not a trade.
 - Both deaths have to fall in the same round.
-- One kill counts once, even when the enemy it lands on had killed two teammates.
-- Kills after the round is decided still count, so exit frags can be trades.
+- One kill gives its player one `trade_kill`, even when the enemy it lands on had killed two teammates. Each qualifying teammate gets one `deaths_traded`, so that one kill can trade two deaths.
+- Post-round events deliberately remain eligible: a death after the round is decided can be traded, and a revenge kill after the round can trade an earlier death, as long as both events stay in this round and inside the window. This differs from opening duels, which cannot start after the round is decided.
+
+`deaths_traded` lives at the player top level beside `deaths` because it describes what happened to the player who died, not a kill they made. It is a per-round count, not a per-death count: the tracker records a boolean per player, so a round adds at most one even when a respawn mode lets that player die and be traded more than once. Its CT/T split always uses the side that player held in that round, never the team they finished the match on. No separate rate is stored. `deaths_traded.total / deaths` is only a per-death rate in modes without mid-round respawns; in respawn modes the numerator stays per-round while `deaths` counts every death.
 
 The 5-second window is a deliberate choice, not a value read out of the demo: HLTV states 5 seconds for Rating 3.0 ("two kills within 5 seconds") and Refrag documents the same for its Trades column. Other trackers differ — Leetify builds 4-second kill chains instead — so trade counts are not comparable between tools even when the label matches. If you are forking and your league counts trades differently, the window is the `tradeWindow` constant at the top of `cmd/demo_parser/round_tracker.go`.
+
+The count is in JSON, in CSV as `Deaths Traded` plus its CT/T columns, and in the `Trade stats` table that `--details` prints. The 11-column main table stays unchanged.
 
 ### Assist stats (`assist_stats`)
 

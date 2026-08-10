@@ -19,7 +19,7 @@ analyse [flags]
 - `-p, --players <players>`: A list of players to analyse. This should be provided as a comma-separated list of player names.
 - `-s, --save`: Flag to save the demo player's data.
 - `--save-type <type>`: Type of file to save the data. Options are `json` and `csv`. The default is `json`.
-- `--details`: Print the extra stat tables that do not fit the main one: multi-kill rounds and CT/T side splits.
+- `--details`: Print the extra stat tables that do not fit the main one: multi-kill rounds, trades and CT/T side splits.
 
 #### Options
 
@@ -65,4 +65,3 @@ go build
 ### Submit a pull request
 
 If you'd like to contribute, please fork the repository and open a pull request to the `main` branch.
-

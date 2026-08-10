@@ -353,6 +353,9 @@ func (a *analyser) applyRoundOutcome(outcome roundOutcome) {
 			continue
 		}
 		p.SideStats.Rounds.count(side)
+		if outcome.deathsTraded[id] {
+			p.DeathsTraded.count(side)
+		}
 		if outcome.kast[id] {
 			addSide(a.kastRounds, id, side, 1)
 		}
