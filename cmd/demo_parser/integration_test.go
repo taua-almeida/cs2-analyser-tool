@@ -33,6 +33,12 @@ var updateGolden = flag.Bool("update", false, "rewrite the golden file from curr
 func TestProcessDemoGolden(t *testing.T) {
 	demoBytes, err := os.ReadFile(fixtureDemoPath)
 	if os.IsNotExist(err) {
+		// CI sets REQUIRE_TEST_DEMO so a fixture that silently fails to
+		// land in the expected place is a red build rather than a skip
+		// that leaves the whole integration test unrun and unnoticed.
+		if os.Getenv("REQUIRE_TEST_DEMO") != "" {
+			t.Fatalf("fixture %s is missing and REQUIRE_TEST_DEMO is set", fixtureDemoPath)
+		}
 		t.Skipf("fixture %s not present, run `make download-test-demo` to fetch it", fixtureDemoPath)
 	}
 	if err != nil {
@@ -72,39 +78,59 @@ func TestProcessDemoGolden(t *testing.T) {
 	}
 }
 
-// diffLines reports the lines where want and got differ, with line numbers,
-// so a stat drift points straight at the changed fields. Returns "" when
-// the inputs are identical.
+// diffLines reports the lines where want and got differ, in the style of
+// `diff`: "-" for golden-only lines, "+" for lines the parser produced.
+// The alignment comes from a longest-common-subsequence walk, so adding or
+// removing a field shows up as that one insertion instead of shifting every
+// later line into a false mismatch. Returns "" when the inputs are equal.
 func diffLines(want, got string) string {
 	if want == got {
 		return ""
 	}
 	const maxReported = 25
-	wantLines := strings.Split(want, "\n")
-	gotLines := strings.Split(got, "\n")
+	a := strings.Split(want, "\n")
+	b := strings.Split(got, "\n")
 
-	var b strings.Builder
-	reported := 0
-	for i := 0; i < len(wantLines) || i < len(gotLines); i++ {
-		var w, g string
-		if i < len(wantLines) {
-			w = wantLines[i]
-		}
-		if i < len(gotLines) {
-			g = gotLines[i]
-		}
-		if w == g {
-			continue
-		}
-		if reported == maxReported {
-			b.WriteString("  ... more lines differ, truncated\n")
-			break
-		}
-		fmt.Fprintf(&b, "  line %d:\n    golden: %s\n    got:    %s\n", i+1, w, g)
-		reported++
+	// lcs[i][j] is the length of the longest common subsequence of a[i:]
+	// and b[j:], which is what lets the walk below prefer real matches.
+	lcs := make([][]int, len(a)+1)
+	for i := range lcs {
+		lcs[i] = make([]int, len(b)+1)
 	}
-	if len(wantLines) != len(gotLines) {
-		fmt.Fprintf(&b, "  line count: golden %d, got %d\n", len(wantLines), len(gotLines))
+	for i := len(a) - 1; i >= 0; i-- {
+		for j := len(b) - 1; j >= 0; j-- {
+			if a[i] == b[j] {
+				lcs[i][j] = lcs[i+1][j+1] + 1
+			} else {
+				lcs[i][j] = max(lcs[i+1][j], lcs[i][j+1])
+			}
+		}
 	}
-	return b.String()
+
+	var out strings.Builder
+	var reported, total int
+	report := func(format string, args ...any) {
+		total++
+		if reported < maxReported {
+			fmt.Fprintf(&out, format, args...)
+			reported++
+		}
+	}
+	for i, j := 0, 0; i < len(a) || j < len(b); {
+		switch {
+		case i < len(a) && j < len(b) && a[i] == b[j]:
+			i++
+			j++
+		case j == len(b) || (i < len(a) && lcs[i+1][j] >= lcs[i][j+1]):
+			report("  - golden:%d: %s\n", i+1, a[i])
+			i++
+		default:
+			report("  + got:%d:    %s\n", j+1, b[j])
+			j++
+		}
+	}
+	if total > reported {
+		fmt.Fprintf(&out, "  ... %d more differing lines\n", total-reported)
+	}
+	return out.String()
 }
