@@ -41,11 +41,12 @@ func (p matchParticipants) Playing() []*common.Player { return p.playing }
 
 func liveAnalyser(playing ...*common.Player) *analyser {
 	return &analyser{
-		parser:     &matchParser{playing: playing},
-		players:    make(map[uint64]*DemoPlayer),
-		tracker:    newRoundTracker(),
-		kastRounds: make(map[uint64]int),
-		lastHealth: make(map[uint64]int),
+		parser:      &matchParser{playing: playing},
+		players:     make(map[uint64]*DemoPlayer),
+		tracker:     newRoundTracker(),
+		kastRounds:  make(map[uint64]int),
+		openingWins: make(map[uint64]int),
+		lastHealth:  make(map[uint64]int),
 	}
 }
 
@@ -170,6 +171,29 @@ func TestPostRoundDeathBeforeOfficialEndCancelsKast(t *testing.T) {
 	// finalized at all rather than the whole outcome being dropped.
 	if got := a.kastRounds[shooterID]; got != 1 {
 		t.Errorf("shooter kast rounds = %d, want 1", got)
+	}
+}
+
+// The opening duel of the round has to land on both players' stats: an
+// opening kill on the killer's side, an opening death on the victim's side,
+// and a win counted towards the killer's opening success rate.
+func TestOpeningDuelIsCredited(t *testing.T) {
+	a, shooter, victim := liveRound()
+
+	a.onKill(events.Kill{Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47}})
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	kills := a.players[shooterID].OpeningDuelStats.OpeningKills
+	if kills.Total != 1 || kills.T != 1 || kills.CT != 0 {
+		t.Errorf("shooter opening kills = %+v, want one on the T side", kills)
+	}
+	deaths := a.players[victimID].OpeningDuelStats.OpeningDeaths
+	if deaths.Total != 1 || deaths.CT != 1 || deaths.T != 0 {
+		t.Errorf("victim opening deaths = %+v, want one on the CT side", deaths)
+	}
+	if got := a.openingWins[shooterID]; got != 1 {
+		t.Errorf("shooter opening wins = %d, want 1: their team won the round", got)
 	}
 }
 

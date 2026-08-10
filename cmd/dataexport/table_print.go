@@ -18,10 +18,15 @@ func kdRatio(kills, deaths int) string {
 	return fmt.Sprintf("%.3f", float64(kills)/float64(deaths))
 }
 
+// entryScore formats opening duels as kills:deaths, e.g. "5:3".
+func entryScore(opening demoparser.OpeningDuelStats) string {
+	return fmt.Sprintf("%d:%d", opening.OpeningKills.Total, opening.OpeningDeaths.Total)
+}
+
 func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, mapData *demoparser.MapData, gameMode string) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "ADR", "KAST (%)", "Precision (%)", "Best Weapon"})
+	t.AppendHeader(table.Row{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "ADR", "KAST (%)", "Entry", "Precision (%)", "Best Weapon"})
 	for _, player := range playerToAnalyse {
 		playerBestWeapon := demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills)
 		t.AppendRow(table.Row{
@@ -33,6 +38,7 @@ func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, mapDat
 			player.AssistStats.Total,
 			fmt.Sprintf("%.1f", player.AssistStats.ADR),
 			fmt.Sprintf("%.1f", player.PlayerMapStats.KAST),
+			entryScore(player.OpeningDuelStats),
 			fmt.Sprintf("%.1f", player.KillStats.Precision*100),
 			playerBestWeapon,
 		})

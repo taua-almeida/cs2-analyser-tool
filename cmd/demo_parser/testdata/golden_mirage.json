@@ -29,6 +29,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 100
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 2,
+          "ct": 0,
+          "t": 2
+        },
+        "opening_deaths": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_success": 100
       }
     },
     "76561198073049527": {
@@ -59,6 +72,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 70
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 2,
+          "ct": 2,
+          "t": 0
+        },
+        "opening_success": 0
       }
     },
     "76561198118803912": {
@@ -88,6 +114,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 80
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 1,
+          "ct": 0,
+          "t": 1
+        },
+        "opening_success": 0
       }
     },
     "76561198194694750": {
@@ -120,6 +159,19 @@
         "aces": 0,
         "clutches_won": 1,
         "kast": 50
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 2,
+          "ct": 2,
+          "t": 0
+        },
+        "opening_success": 0
       }
     },
     "76561198202353993": {
@@ -150,6 +202,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 90
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_success": 0
       }
     },
     "76561198244754626": {
@@ -180,6 +245,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 90
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 5,
+          "ct": 0,
+          "t": 5
+        },
+        "opening_deaths": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_success": 80
       }
     },
     "76561198258044111": {
@@ -210,6 +288,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 60
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_success": 0
       }
     },
     "76561198265366770": {
@@ -239,6 +330,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 100
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 1,
+          "ct": 0,
+          "t": 1
+        },
+        "opening_deaths": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_success": 100
       }
     },
     "76561198280975787": {
@@ -269,6 +373,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 30
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 1,
+          "ct": 1,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 1,
+          "ct": 1,
+          "t": 0
+        },
+        "opening_success": 100
       }
     },
     "76561198324843075": {
@@ -298,6 +415,19 @@
         "aces": 0,
         "clutches_won": 0,
         "kast": 70
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 3,
+          "ct": 3,
+          "t": 0
+        },
+        "opening_success": 0
       }
     }
   },

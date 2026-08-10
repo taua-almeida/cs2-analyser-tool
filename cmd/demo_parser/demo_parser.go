@@ -15,13 +15,14 @@ import (
 // analyser accumulates player stats while the demo is parsed. Round-scoped
 // bookkeeping (clutches, aces, trades, KAST) is delegated to roundTracker.
 type analyser struct {
-	parser     demoinfocs.Parser
-	players    map[uint64]*DemoPlayer
-	tracker    *roundTracker
-	kastRounds map[uint64]int
-	lastHealth map[uint64]int
-	mapData    MapData
-	gameMode   string
+	parser      demoinfocs.Parser
+	players     map[uint64]*DemoPlayer
+	tracker     *roundTracker
+	kastRounds  map[uint64]int
+	openingWins map[uint64]int // rounds won after taking the opening kill
+	lastHealth  map[uint64]int
+	mapData     MapData
+	gameMode    string
 }
 
 func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
@@ -32,11 +33,12 @@ func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
 	defer file.Close()
 
 	a := &analyser{
-		parser:     demoinfocs.NewParser(file),
-		players:    make(map[uint64]*DemoPlayer),
-		tracker:    newRoundTracker(),
-		kastRounds: make(map[uint64]int),
-		lastHealth: make(map[uint64]int),
+		parser:      demoinfocs.NewParser(file),
+		players:     make(map[uint64]*DemoPlayer),
+		tracker:     newRoundTracker(),
+		kastRounds:  make(map[uint64]int),
+		openingWins: make(map[uint64]int),
+		lastHealth:  make(map[uint64]int),
 	}
 	defer a.parser.Close()
 
@@ -248,6 +250,17 @@ func (a *analyser) onRoundEndOfficial(e events.RoundEndOfficial) {
 	a.applyRoundOutcome(a.tracker.finalize())
 }
 
+// count records one round on the side the player was playing.
+func (s *SideCount) count(side common.Team) {
+	s.Total++
+	switch side {
+	case common.TeamCounterTerrorists:
+		s.CT++
+	case common.TeamTerrorists:
+		s.T++
+	}
+}
+
 func (a *analyser) applyRoundOutcome(outcome roundOutcome) {
 	if !outcome.played {
 		return
@@ -259,6 +272,15 @@ func (a *analyser) applyRoundOutcome(outcome roundOutcome) {
 	}
 	if p := a.players[outcome.clutcher]; p != nil {
 		p.PlayerMapStats.ClutchesWon++
+	}
+	if p := a.players[outcome.opening.killer]; p != nil {
+		p.OpeningDuelStats.OpeningKills.count(outcome.opening.killerTeam)
+		if outcome.openingWon {
+			a.openingWins[outcome.opening.killer]++
+		}
+	}
+	if p := a.players[outcome.opening.victim]; p != nil {
+		p.OpeningDuelStats.OpeningDeaths.count(outcome.opening.victimTeam)
 	}
 	for id := range outcome.participants {
 		if _, isHuman := a.players[id]; !isHuman {
@@ -302,6 +324,9 @@ func (a *analyser) finalise() {
 		if a.mapData.TotalRounds > 0 {
 			p.AssistStats.ADR = float64(p.AssistStats.DamageGiven) / float64(a.mapData.TotalRounds)
 			p.PlayerMapStats.KAST = 100 * float64(a.kastRounds[id]) / float64(a.mapData.TotalRounds)
+		}
+		if kills := p.OpeningDuelStats.OpeningKills.Total; kills > 0 {
+			p.OpeningDuelStats.OpeningSuccess = 100 * float64(a.openingWins[id]) / float64(kills)
 		}
 	}
 }

@@ -42,6 +42,16 @@ The `--save` flag writes every analysed player to a file. JSON contains all fiel
 | ClutchesWon | `clutches_won` | Rounds won after being the last player alive on the team against at least one enemy (1v1 counts). Winning by defuse or time counts — no kills required. |
 | KAST | `kast` | Percentage of the match's rounds with a Kill, Assist, Survival or Traded death (a teammate killed your killer within 5 seconds). Dying before the round officially ends cancels survival — including exit frags and the bomb going off after the whistle (HLTV convention). Match-end cleanup kills do not count. |
 
+### Opening duel stats (`opening_duel_stats`)
+
+The opening duel is the first enemy kill of a round. Teamkills, suicides and world deaths never open a round, and neither does a kill landing after the round is already decided. The table shows opening kills and deaths as the `Entry` column, e.g. `5:3`.
+
+| Field | JSON key | Description |
+| --- | --- | --- |
+| OpeningKills | `opening_kills` | Rounds opened by a kill from this player: `{total, ct, t}`, split by the side the player was on. |
+| OpeningDeaths | `opening_deaths` | Rounds opened by this player's death, with the same side split. |
+| OpeningSuccess | `opening_success` | Percentage of the player's opening kills whose round their team went on to win. 0 without any opening kills. |
+
 ## Match data
 
 The JSON table output also carries match-level data:

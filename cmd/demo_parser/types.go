@@ -23,14 +23,28 @@ type PlayerMapStats struct {
 	KAST        float64 `json:"kast"`
 }
 
+// SideCount is a per-round counter split by the side the player was on.
+type SideCount struct {
+	Total int `json:"total"`
+	CT    int `json:"ct"`
+	T     int `json:"t"`
+}
+
+type OpeningDuelStats struct {
+	OpeningKills   SideCount `json:"opening_kills"`
+	OpeningDeaths  SideCount `json:"opening_deaths"`
+	OpeningSuccess float64   `json:"opening_success"`
+}
+
 type DemoPlayer struct {
-	SteamID        uint64         `json:"steam_id"`
-	Name           string         `json:"name"`
-	UserID         int            `json:"user_id"`
-	Deaths         int            `json:"deaths"`
-	KillStats      KillStats      `json:"kill_stats"`
-	AssistStats    AssistStats    `json:"assist_stats"`
-	PlayerMapStats PlayerMapStats `json:"player_map_stats"`
+	SteamID          uint64           `json:"steam_id"`
+	Name             string           `json:"name"`
+	UserID           int              `json:"user_id"`
+	Deaths           int              `json:"deaths"`
+	KillStats        KillStats        `json:"kill_stats"`
+	AssistStats      AssistStats      `json:"assist_stats"`
+	PlayerMapStats   PlayerMapStats   `json:"player_map_stats"`
+	OpeningDuelStats OpeningDuelStats `json:"opening_duel_stats"`
 }
 
 type MapData struct {
