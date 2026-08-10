@@ -85,6 +85,27 @@ func (rt *roundTracker) startRound(alive map[uint64]common.Team) {
 	rt.updateClutchCandidates()
 }
 
+// joinRound folds the players on a side when live play begins into the
+// round. Picking a side during freeze time happens after startRound took
+// its snapshot, and those players play the round like anyone else. Someone
+// who left in the meantime is not brought back to life.
+func (rt *roundTracker) joinRound(alive map[uint64]common.Team) {
+	if !rt.live {
+		return
+	}
+	for id, team := range alive {
+		_, started := rt.startAlive[id]
+		_, stillAlive := rt.alive[id]
+		// A player who swapped sides during freeze time plays the round on
+		// the side they start it on, the one their kills count towards.
+		rt.startAlive[id] = team
+		if !started || stillAlive {
+			rt.alive[id] = team
+		}
+	}
+	rt.updateClutchCandidates()
+}
+
 // kill records a death in the current round. killer and assister are 0 for
 // world deaths and suicides; byWorld marks deaths with no real cause (falls,
 // match-end cleanup kills), as opposed to the bomb or an enemy. It reports

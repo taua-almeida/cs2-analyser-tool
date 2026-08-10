@@ -319,6 +319,36 @@ func TestSideAdrAndKastDivideByRoundsOnThatSide(t *testing.T) {
 	}
 }
 
+// Freeze time runs after RoundStart has snapshotted the roster, and a
+// player who picks a side inside that window still plays the whole round.
+// Their damage and KAST are attributed to that side, so the side's round
+// count has to move with them or the rates divide by nothing.
+func TestFreezeTimeJoinerPlaysTheRound(t *testing.T) {
+	holder := player(shooterID, "holder", common.TeamCounterTerrorists)
+	joiner := player(victimID, "joiner", common.TeamSpectators)
+	a := liveAnalyser(holder, joiner)
+
+	a.onRoundStart(events.RoundStart{})
+	joiner.Team = common.TeamTerrorists
+	a.onRoundFreezetimeEnd(events.RoundFreezetimeEnd{})
+	hurtBy(a, joiner, holder, 40)
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	a.derive(1)
+
+	p := a.players[victimID]
+	if want := (SideCount{Total: 1, T: 1}); p.SideStats.Rounds != want {
+		t.Fatalf("joiner rounds = %+v, want %+v", p.SideStats.Rounds, want)
+	}
+	if got := p.SideStats.ADR.T; !closeTo(got, 40) {
+		t.Errorf("joiner T-side ADR = %v, want 40: 40 damage over the one round they played", got)
+	}
+	if got := p.SideStats.KAST.T; !closeTo(got, 100) {
+		t.Errorf("joiner T-side KAST = %v, want 100: they survived the round they joined", got)
+	}
+}
+
 // Bots all report SteamID64 0, so a kill between two different bots must
 // not be misread as one bot suiciding on itself (both sides comparing
 // equal). Getting that wrong drops the bot kill as a killerless event,

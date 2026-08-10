@@ -82,13 +82,21 @@ The same core stats split by the side the player was on. Players swap sides at h
 
 | Field | JSON key | Description |
 | --- | --- | --- |
-| Rounds | `rounds` | Rounds the player was in, `{total, ct, t}`. Counted from the players on a side at the round start, so a spectator who joins mid-round is not in it. |
+| Rounds | `rounds` | Rounds the player was in, `{total, ct, t}`. Counted from the players on a side when live play begins, so picking a side during freeze time counts as playing the round. See [who plays a round](#who-plays-a-round). |
 | Kills | `kills` | Enemy kills with the same side split. Teamkills are excluded, exactly as in `kill_stats.total`. |
 | Deaths | `deaths` | Deaths with the same side split, suicides and world deaths included, exactly as in the top-level `deaths`. |
 | ADR | `adr` | Damage per round on each side: `{ct, t}`. See [side denominators](#side-denominators). |
 | KAST | `kast` | KAST percentage on each side: `{ct, t}`, same rule as the match-wide `kast`. |
 
 `kills` and `deaths` always add back up to their match-wide counterparts, so `kills.ct + kills.t == kill_stats.total`.
+
+#### Who plays a round
+
+The roster is read twice: once at the round start, and again when freeze time ends. Freeze time runs after the round has already started, and a player who picks a side inside that window spawns and plays the round like everyone else, so the second read folds them in. Someone who swapped sides in that window plays the round on the side they end freeze time on, which is the side their kills count towards.
+
+The second read never revives anyone. A player who disconnected during freeze time stays counted as having played the round, without survival credit, exactly as a mid-round disconnect is treated.
+
+This also feeds the match-wide `kast`, which is why a freeze-time joiner's KAST rounds are no longer dropped either.
 
 #### Side denominators
 

@@ -72,6 +72,7 @@ func (a *analyser) registerHandlers() {
 		}
 	})
 	a.parser.RegisterEventHandler(a.onRoundStart)
+	a.parser.RegisterEventHandler(a.onRoundFreezetimeEnd)
 	a.parser.RegisterEventHandler(a.onKill)
 	a.parser.RegisterEventHandler(a.onPlayerHurt)
 	a.parser.RegisterEventHandler(a.onRoundMVP)
@@ -119,23 +120,40 @@ func (a *analyser) inWarmup() bool {
 	return a.parser.GameState().IsWarmupPeriod()
 }
 
+// playingRoster reads the players currently on a side into the shape the
+// round tracker takes, registering anyone seen for the first time and
+// seeding the health their damage is measured against.
+func (a *analyser) playingRoster() map[uint64]common.Team {
+	roster := make(map[uint64]common.Team)
+	for _, p := range a.parser.GameState().Participants().Playing() {
+		if p.Team != common.TeamTerrorists && p.Team != common.TeamCounterTerrorists {
+			continue
+		}
+		roster[trackerID(p)] = p.Team
+		a.lastHealth[trackerID(p)] = p.Health()
+		a.ensurePlayer(p)
+	}
+	return roster
+}
+
 func (a *analyser) onRoundStart(e events.RoundStart) {
 	if a.inWarmup() {
 		return
 	}
 	// Close the previous round in case its official end was never seen.
 	a.applyRoundOutcome(a.tracker.finalize())
+	a.tracker.startRound(a.playingRoster())
+}
 
-	alive := make(map[uint64]common.Team)
-	for _, p := range a.parser.GameState().Participants().Playing() {
-		if p.Team != common.TeamTerrorists && p.Team != common.TeamCounterTerrorists {
-			continue
-		}
-		alive[trackerID(p)] = p.Team
-		a.lastHealth[trackerID(p)] = p.Health()
-		a.ensurePlayer(p)
+// onRoundFreezetimeEnd folds the players who picked a side during freeze
+// time into the round. RoundStart snapshots the roster before that window
+// opens, so without this they play a round that counts them nowhere: their
+// kills, deaths and damage land on a side whose round count never moved.
+func (a *analyser) onRoundFreezetimeEnd(e events.RoundFreezetimeEnd) {
+	if a.inWarmup() {
+		return
 	}
-	a.tracker.startRound(alive)
+	a.tracker.joinRound(a.playingRoster())
 }
 
 func (a *analyser) onKill(e events.Kill) {
