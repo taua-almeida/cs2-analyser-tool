@@ -71,6 +71,39 @@ func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, mapDat
 // each in its own narrow table. Only shown with --details.
 func PrintCLIDetailTables(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
 	printMultiKillTable(playerToAnalyse)
+	printSideSplitTable(playerToAnalyse)
+}
+
+// countSplit formats a side-split count as "ct / t".
+func countSplit(count demoparser.SideCount) string {
+	return fmt.Sprintf("%d / %d", count.CT, count.T)
+}
+
+// rateSplit formats a side-split rate as "ct / t".
+func rateSplit(rate demoparser.SideRate) string {
+	return fmt.Sprintf("%.1f / %.1f", rate.CT, rate.T)
+}
+
+// printSideSplitTable lists the core stats split by side. Rounds are in
+// there because per-side ADR and KAST are divided by them, which makes a
+// lopsided split worth seeing next to the rates it produced.
+func printSideSplitTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.SetTitle("Side splits (CT / T)")
+	t.AppendHeader(table.Row{"Name", "Rounds", "Kills", "Deaths", "ADR", "KAST (%)"})
+	for _, player := range sortedByKills(playerToAnalyse) {
+		side := player.SideStats
+		t.AppendRow(table.Row{
+			player.Name,
+			countSplit(side.Rounds),
+			countSplit(side.Kills),
+			countSplit(side.Deaths),
+			rateSplit(side.ADR),
+			rateSplit(side.KAST),
+		})
+	}
+	t.Render()
 }
 
 // printMultiKillTable lists the multi-kill rounds per player. The buckets

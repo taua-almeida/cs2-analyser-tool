@@ -41,6 +41,31 @@ type SideCount struct {
 	T     int `json:"t"`
 }
 
+// SideRate is a per-side average or percentage. It carries no total: the
+// match-wide value keeps its own field, AssistStats.ADR or
+// PlayerMapStats.KAST.
+type SideRate struct {
+	CT float64 `json:"ct"`
+	T  float64 `json:"t"`
+}
+
+// SideStats splits the core stats by the side the player was on. Sides swap
+// at halftime, so every split is attributed round by round and never from
+// the team the player finished the match on.
+//
+// ADR and KAST are divided by Rounds.CT and Rounds.T, the rounds the player
+// was actually in on that side, which is the only denominator that exists
+// per player. The match-wide ADR and KAST instead divide by the rounds of
+// the whole match, so the two only reconcile for a player who was there for
+// all of them.
+type SideStats struct {
+	Rounds SideCount `json:"rounds"`
+	Kills  SideCount `json:"kills"`
+	Deaths SideCount `json:"deaths"`
+	ADR    SideRate  `json:"adr"`
+	KAST   SideRate  `json:"kast"`
+}
+
 // OpeningDuelStats counts the rounds a player opened or was opened on.
 // OpeningSuccessRate is a percentage rather than a count, and is named apart
 // from the counts because other trackers use "opening success" for the
@@ -60,6 +85,7 @@ type DemoPlayer struct {
 	AssistStats      AssistStats      `json:"assist_stats"`
 	PlayerMapStats   PlayerMapStats   `json:"player_map_stats"`
 	OpeningDuelStats OpeningDuelStats `json:"opening_duel_stats"`
+	SideStats        SideStats        `json:"side_stats"`
 }
 
 type MapData struct {

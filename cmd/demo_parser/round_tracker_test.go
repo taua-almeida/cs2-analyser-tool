@@ -175,6 +175,33 @@ func TestMultiKillCountsPostRoundKills(t *testing.T) {
 	}
 }
 
+func TestFreezeTimeJoinKeepsSideAndDoesNotRevive(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+	rt.disconnect(5)
+
+	// Player 16 picks a side during freeze time and player 1 swaps to CT,
+	// while player 5 is already gone. The refresh still lists all of them.
+	roster := fiveVsFive()
+	roster[16] = common.TeamCounterTerrorists
+	roster[1] = common.TeamCounterTerrorists
+	rt.joinRound(roster)
+
+	outcome := endRound(rt, common.TeamCounterTerrorists)
+	if outcome.participants[16] != common.TeamCounterTerrorists {
+		t.Errorf("player 16 joined during freeze time and must play the round on CT, got %v", outcome.participants[16])
+	}
+	if !outcome.kast[16] {
+		t.Error("player 16 survived the round they joined and must have KAST")
+	}
+	if outcome.participants[1] != common.TeamCounterTerrorists {
+		t.Errorf("player 1 swapped sides during freeze time, got %v", outcome.participants[1])
+	}
+	if outcome.kast[5] {
+		t.Error("player 5 left during freeze time and must not be revived into a survival")
+	}
+}
+
 func TestClutchWon(t *testing.T) {
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())

@@ -76,6 +76,38 @@ The opening duel is the first enemy kill of a round. Teamkills, suicides and wor
 | OpeningDeaths | `opening_deaths` | Rounds opened by this player's death, with the same side split. |
 | OpeningSuccessRate | `opening_success_rate` | Percentage of the player's opening kills whose round their team went on to win. 0 without any opening kills. This is a rate, not a count — some trackers use "opening success" to mean the opening-kill tally instead. |
 
+### Side split stats (`side_stats`)
+
+The same core stats split by the side the player was on. Players swap sides at halftime, so the split is attributed round by round: a kill counts on the side the player held when they got it, never on the team they finished the match on.
+
+| Field | JSON key | Description |
+| --- | --- | --- |
+| Rounds | `rounds` | Rounds the player was in, `{total, ct, t}`. Counted from the players on a side when live play begins, so picking a side during freeze time counts as playing the round. See [who plays a round](#who-plays-a-round). |
+| Kills | `kills` | Enemy kills with the same side split. Teamkills are excluded, exactly as in `kill_stats.total`. |
+| Deaths | `deaths` | Deaths with the same side split, suicides and world deaths included, exactly as in the top-level `deaths`. |
+| ADR | `adr` | Damage per round on each side: `{ct, t}`. See [side denominators](#side-denominators). |
+| KAST | `kast` | KAST percentage on each side: `{ct, t}`, same rule as the match-wide `kast`. |
+
+`kills` and `deaths` always add back up to their match-wide counterparts, so `kills.ct + kills.t == kill_stats.total`.
+
+#### Who plays a round
+
+The roster is read twice: once at the round start, and again when freeze time ends. Freeze time runs after the round has already started, and a player who picks a side inside that window spawns and plays the round like everyone else, so the second read folds them in. Someone who swapped sides in that window plays the round on the side they end freeze time on, which is the side their kills count towards.
+
+The second read never revives anyone. A player who disconnected during freeze time stays counted as having played the round, without survival credit, exactly as a mid-round disconnect is treated.
+
+This also feeds the match-wide `kast`, which is why a freeze-time joiner's KAST rounds are no longer dropped either.
+
+#### Side denominators
+
+`adr` and `kast` are divided by `rounds.ct` and `rounds.t` — the rounds that player actually spent on that side. There is no alternative: sides swap at halftime, so no single match-wide CT round count applies to every player, and a substitute or a late connect plays a different number of rounds than the match has.
+
+The match-wide `assist_stats.adr` and `player_map_stats.kast` keep dividing by the rounds of the whole match, following HLTV convention. **The two only reconcile for a player who was there for every round.** For anyone else, the per-side numbers are the higher, more flattering ones, because they are not diluted by the rounds the player missed. One of the test fixtures has a player who joined for the last 3 of 8 rounds: their match ADR is 59.6 and their T-side ADR is 159.0, and both are correct under their own rule.
+
+`adr` and `kast` are 0 for a side the player never played, not null — a `rounds.ct` of 0 gives an `adr.ct` of 0.
+
+Unlike the counts, these two are rates and so have no `total` field. The match-wide value is the existing `assist_stats.adr` / `player_map_stats.kast`.
+
 ## Match data
 
 The JSON table output also carries match-level data:

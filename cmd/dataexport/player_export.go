@@ -21,7 +21,7 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 		defer csvFile.Close()
 
 		csvRecords := [][]string{
-			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Best Weapon"},
+			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon"},
 		}
 		for _, player := range sortedByKills(players) {
 			csvRecords = append(csvRecords, []string{
@@ -47,6 +47,16 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 				fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K4),
 				fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K5),
 				fmt.Sprintf("%d", player.PlayerMapStats.ClutchesWon),
+				fmt.Sprintf("%d", player.SideStats.Rounds.CT),
+				fmt.Sprintf("%d", player.SideStats.Rounds.T),
+				fmt.Sprintf("%d", player.SideStats.Kills.CT),
+				fmt.Sprintf("%d", player.SideStats.Kills.T),
+				fmt.Sprintf("%d", player.SideStats.Deaths.CT),
+				fmt.Sprintf("%d", player.SideStats.Deaths.T),
+				fmt.Sprintf("%.1f", player.SideStats.ADR.CT),
+				fmt.Sprintf("%.1f", player.SideStats.ADR.T),
+				fmt.Sprintf("%.1f", player.SideStats.KAST.CT),
+				fmt.Sprintf("%.1f", player.SideStats.KAST.T),
 				demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills),
 			})
 		}

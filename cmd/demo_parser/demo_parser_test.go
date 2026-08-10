@@ -1,6 +1,7 @@
 package demoparser
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -44,7 +45,8 @@ func liveAnalyser(playing ...*common.Player) *analyser {
 		parser:      &matchParser{playing: playing},
 		players:     make(map[uint64]*DemoPlayer),
 		tracker:     newRoundTracker(),
-		kastRounds:  make(map[uint64]int),
+		kastRounds:  make(map[uint64]SideCount),
+		sideDamage:  make(map[uint64]SideCount),
 		openingWins: make(map[uint64]int),
 		lastHealth:  make(map[uint64]int),
 	}
@@ -155,7 +157,7 @@ func TestSurvivorsGetKastWhenTheRoundEndsOfficially(t *testing.T) {
 	a.onRoundEnd(events.RoundEnd{Winner: common.TeamCounterTerrorists})
 	a.onRoundEndOfficial(events.RoundEndOfficial{})
 
-	if got := a.kastRounds[victimID]; got != 1 {
+	if got := a.kastRounds[victimID].Total; got != 1 {
 		t.Errorf("victim kast rounds = %d, want 1: nobody died all round", got)
 	}
 }
@@ -169,12 +171,12 @@ func TestPostRoundDeathBeforeOfficialEndCancelsKast(t *testing.T) {
 	a.onKill(events.Kill{Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47}})
 	a.onRoundEndOfficial(events.RoundEndOfficial{})
 
-	if got := a.kastRounds[victimID]; got != 0 {
+	if got := a.kastRounds[victimID].Total; got != 0 {
 		t.Errorf("victim kast rounds = %d, want 0: they were killed before the official round end", got)
 	}
 	// The shooter keeps their survival, which also proves the round was
 	// finalized at all rather than the whole outcome being dropped.
-	if got := a.kastRounds[shooterID]; got != 1 {
+	if got := a.kastRounds[shooterID].Total; got != 1 {
 		t.Errorf("shooter kast rounds = %d, want 1", got)
 	}
 }
@@ -199,6 +201,151 @@ func TestOpeningDuelIsCredited(t *testing.T) {
 	}
 	if got := a.openingWins[shooterID]; got != 1 {
 		t.Errorf("shooter opening wins = %d, want 1: their team won the round", got)
+	}
+}
+
+// playRound runs a whole round through the handlers, with the kills that
+// happened in it.
+func playRound(a *analyser, winner common.Team, kills ...events.Kill) {
+	a.onRoundStart(events.RoundStart{})
+	for _, kill := range kills {
+		a.onKill(kill)
+	}
+	a.onRoundEnd(events.RoundEnd{Winner: winner})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+}
+
+// hurtBy lands one hit for the given damage, starting the victim from full
+// health. Stub players report no health of their own, so the round start
+// leaves them on 0 and the double-counting cap would swallow the hit.
+func hurtBy(a *analyser, attacker, victim *common.Player, damage int) {
+	a.lastHealth[trackerID(victim)] = 100
+	a.onPlayerHurt(events.PlayerHurt{
+		Player:            victim,
+		Attacker:          attacker,
+		Weapon:            &common.Equipment{Type: common.EqAK47},
+		HealthDamageTaken: damage,
+		Health:            100 - damage,
+	})
+}
+
+// closeTo compares rates, which come out of a division that rarely lands on
+// an exact float.
+func closeTo(got, want float64) bool {
+	return math.Abs(got-want) < 1e-9
+}
+
+// Sides swap at halftime, so a kill has to land on the side the player was
+// on when they got it, never on the one they finish the match on.
+func TestSideStatsFollowTheHalftimeSwap(t *testing.T) {
+	first := player(shooterID, "first", common.TeamTerrorists)
+	second := player(victimID, "second", common.TeamCounterTerrorists)
+	a := liveAnalyser(first, second)
+
+	playRound(a, common.TeamTerrorists, events.Kill{
+		Killer: first, Victim: second, Weapon: &common.Equipment{Type: common.EqAK47},
+	})
+
+	// Halftime. Both change ends, and the one who died takes revenge.
+	first.Team, second.Team = common.TeamCounterTerrorists, common.TeamTerrorists
+	playRound(a, common.TeamTerrorists, events.Kill{
+		Killer: second, Victim: first, Weapon: &common.Equipment{Type: common.EqAK47},
+	})
+
+	// Both players did the same thing on the same sides, one half apart, so
+	// they end on identical splits however they finished the match.
+	for _, id := range []uint64{shooterID, victimID} {
+		side := a.players[id].SideStats
+		if want := (SideCount{Total: 2, CT: 1, T: 1}); side.Rounds != want {
+			t.Errorf("player %d rounds = %+v, want %+v", id, side.Rounds, want)
+		}
+		if want := (SideCount{Total: 1, T: 1}); side.Kills != want {
+			t.Errorf("player %d kills = %+v, want %+v: they fragged on the T side", id, side.Kills, want)
+		}
+		if want := (SideCount{Total: 1, CT: 1}); side.Deaths != want {
+			t.Errorf("player %d deaths = %+v, want %+v: they died on the CT side", id, side.Deaths, want)
+		}
+	}
+}
+
+// Per-side ADR and KAST divide by the rounds the player spent on that side,
+// the only denominator there is once sides swap. The match-wide pair keeps
+// dividing by the rounds of the whole match, so the three differ.
+func TestSideAdrAndKastDivideByRoundsOnThatSide(t *testing.T) {
+	shooter := player(shooterID, "shooter", common.TeamTerrorists)
+	victim := player(victimID, "victim", common.TeamCounterTerrorists)
+	a := liveAnalyser(shooter, victim)
+
+	// Three rounds as T: 30 damage in each, surviving the first two and
+	// dying in the third with no kill, assist or trade to keep KAST.
+	for round := range 3 {
+		a.onRoundStart(events.RoundStart{})
+		hurtBy(a, shooter, victim, 30)
+		if round == 2 {
+			a.onKill(events.Kill{Killer: victim, Victim: shooter, Weapon: &common.Equipment{Type: common.EqAK47}})
+		}
+		a.onRoundEnd(events.RoundEnd{Winner: common.TeamCounterTerrorists})
+		a.onRoundEndOfficial(events.RoundEndOfficial{})
+	}
+
+	// Halftime, then a single round on CT with 60 damage and a survival.
+	shooter.Team, victim.Team = common.TeamCounterTerrorists, common.TeamTerrorists
+	a.onRoundStart(events.RoundStart{})
+	hurtBy(a, shooter, victim, 60)
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamCounterTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	a.derive(4)
+
+	p := a.players[shooterID]
+	if want := (SideCount{Total: 4, CT: 1, T: 3}); p.SideStats.Rounds != want {
+		t.Fatalf("rounds = %+v, want %+v", p.SideStats.Rounds, want)
+	}
+	// 90 damage over three T rounds, 60 over the one CT round.
+	if got := p.SideStats.ADR; !closeTo(got.T, 30) || !closeTo(got.CT, 60) {
+		t.Errorf("side ADR = %+v, want {CT: 60, T: 30}", got)
+	}
+	// KAST in two of the three T rounds, and in the only CT one.
+	if got := p.SideStats.KAST; !closeTo(got.T, 100*2.0/3) || !closeTo(got.CT, 100) {
+		t.Errorf("side KAST = %+v, want {CT: 100, T: 66.67}", got)
+	}
+	// The match-wide pair divides 150 damage and 3 KAST rounds by all four
+	// rounds instead, landing between the two sides.
+	if got := p.AssistStats.ADR; !closeTo(got, 37.5) {
+		t.Errorf("match ADR = %v, want 37.5", got)
+	}
+	if got := p.PlayerMapStats.KAST; !closeTo(got, 75) {
+		t.Errorf("match KAST = %v, want 75", got)
+	}
+}
+
+// Freeze time runs after RoundStart has snapshotted the roster, and a
+// player who picks a side inside that window still plays the whole round.
+// Their damage and KAST are attributed to that side, so the side's round
+// count has to move with them or the rates divide by nothing.
+func TestFreezeTimeJoinerPlaysTheRound(t *testing.T) {
+	holder := player(shooterID, "holder", common.TeamCounterTerrorists)
+	joiner := player(victimID, "joiner", common.TeamSpectators)
+	a := liveAnalyser(holder, joiner)
+
+	a.onRoundStart(events.RoundStart{})
+	joiner.Team = common.TeamTerrorists
+	a.onRoundFreezetimeEnd(events.RoundFreezetimeEnd{})
+	hurtBy(a, joiner, holder, 40)
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	a.derive(1)
+
+	p := a.players[victimID]
+	if want := (SideCount{Total: 1, T: 1}); p.SideStats.Rounds != want {
+		t.Fatalf("joiner rounds = %+v, want %+v", p.SideStats.Rounds, want)
+	}
+	if got := p.SideStats.ADR.T; !closeTo(got, 40) {
+		t.Errorf("joiner T-side ADR = %v, want 40: 40 damage over the one round they played", got)
+	}
+	if got := p.SideStats.KAST.T; !closeTo(got, 100) {
+		t.Errorf("joiner T-side KAST = %v, want 100: they survived the round they joined", got)
 	}
 }
 
