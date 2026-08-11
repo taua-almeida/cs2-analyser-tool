@@ -1,15 +1,17 @@
 # Integration test fixtures
 
-The golden files here are checked in; the `.dem` demos they were generated
-from are not, because they are tens of megabytes. Fetch them with:
+The golden files here are checked in. Mirage and Ancient are downloaded from
+their public sources; Inferno is stored with Git LFS. Restore all three with:
 
 ```sh
 make download-test-demos
 ```
 
-Both demos are pinned by SHA-256 in the `Makefile` and in
-`integration_test.go`, so the bytes cannot change underneath the goldens.
-Without them `go test ./...` skips the integration test.
+[Install Git LFS](https://git-lfs.com/) before running the target.
+
+All demos are pinned by SHA-256 in `integration_test.go`; checksums for the
+two downloaded fixtures are repeated in the `Makefile`. Without the demo
+bytes, `go test ./...` skips the affected integration subtest.
 
 ## mirage.dem
 
@@ -32,6 +34,20 @@ where MVP counts can only come from the scoreboard entity property.
 - DOI: [10.6084/m9.figshare.28440473.v1](https://doi.org/10.6084/m9.figshare.28440473.v1)
 - License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 - SHA-256: `b29a9cb537a181deef97b15cfed10ee722a37999644a27bb2226fdd77a1337fc`
+
+## inferno-shotgun.dem
+
+A 20-round Valve Premier match on de_inferno. It contains 29 XM1014
+`PlayerHurt` events, including four where the per-event damage cap removes
+overlapping pellet damage. It also crosses halftime and contains one player
+joining a side between `RoundStart` and the end of freeze time.
+
+- Original Valve replay: `match730_003835545804819398890_1582373632_202`
+- Source: tracked in this repository with Git LFS
+- Redistribution: approved by the repository owner, including the player
+  names and Steam IDs present in the replay and golden output
+- Size: 288,711,083 bytes
+- SHA-256: `095625b47c2cc6ace12414a6bbc987ea254904d969ae39fb95c7d54e085f7f93`
 
 ## Regenerating the goldens
 

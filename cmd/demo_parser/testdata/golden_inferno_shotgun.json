@@ -1,0 +1,1035 @@
+{
+  "players": {
+    "76561197995625385": {
+      "steam_id": 76561197995625385,
+      "name": "Xiscu",
+      "user_id": 0,
+      "deaths": 12,
+      "deaths_traded": {
+        "total": 1,
+        "ct": 0,
+        "t": 1
+      },
+      "kill_stats": {
+        "total": 18,
+        "headshots": 5,
+        "precision": 0.2777777777777778,
+        "weapons_kills": {
+          "AK-47": 4,
+          "AWP": 7,
+          "Galil AR": 1,
+          "Glock-18": 2,
+          "SSG 08": 1,
+          "USP-S": 3
+        },
+        "trade_kills": 3,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 7,
+        "flashed_enemies": 0,
+        "damage_given": 2018,
+        "adr": 100.9
+      },
+      "player_map_stats": {
+        "mvps": 2,
+        "aces": 0,
+        "multi_kills": {
+          "k2": 5,
+          "k3": 1,
+          "k4": 0,
+          "k5": 0
+        },
+        "clutches_won": 0,
+        "kast": 75
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 4,
+          "ct": 3,
+          "t": 1
+        },
+        "opening_deaths": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_success_rate": 25
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 20,
+          "ct": 12,
+          "t": 8
+        },
+        "kills": {
+          "total": 18,
+          "ct": 12,
+          "t": 6
+        },
+        "deaths": {
+          "total": 12,
+          "ct": 5,
+          "t": 7
+        },
+        "adr": {
+          "ct": 100.83333333333333,
+          "t": 101
+        },
+        "kast": {
+          "ct": 83.33333333333334,
+          "t": 62.5
+        }
+      },
+      "utility_stats": {
+        "enemies_flashed": 7,
+        "friends_flashed": 4,
+        "enemy_flash_time_seconds": 11.542995615999999,
+        "average_enemy_flash_time_seconds": 1.6489993737142856,
+        "utility_damage": {
+          "total": 235,
+          "he": 165,
+          "fire": 70
+        },
+        "grenades_thrown": {
+          "total": 48,
+          "flash": 13,
+          "smoke": 13,
+          "he": 12,
+          "molotov": 4,
+          "incendiary": 6,
+          "decoy": 0
+        },
+        "unused_utility_value": 700
+      }
+    },
+    "76561198038237426": {
+      "steam_id": 76561198038237426,
+      "name": "Calitaz",
+      "user_id": 2,
+      "deaths": 12,
+      "deaths_traded": {
+        "total": 3,
+        "ct": 2,
+        "t": 1
+      },
+      "kill_stats": {
+        "total": 17,
+        "headshots": 6,
+        "precision": 0.35294117647058826,
+        "weapons_kills": {
+          "AK-47": 10,
+          "M4A1": 3,
+          "M4A4": 1,
+          "MP7": 2,
+          "Tec-9": 1
+        },
+        "trade_kills": 3,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 1,
+        "flashed_enemies": 1,
+        "damage_given": 1677,
+        "adr": 83.85
+      },
+      "player_map_stats": {
+        "mvps": 2,
+        "aces": 0,
+        "multi_kills": {
+          "k2": 1,
+          "k3": 3,
+          "k4": 0,
+          "k5": 0
+        },
+        "clutches_won": 0,
+        "kast": 70
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 1,
+          "ct": 1,
+          "t": 0
+        },
+        "opening_success_rate": 0
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 20,
+          "ct": 12,
+          "t": 8
+        },
+        "kills": {
+          "total": 17,
+          "ct": 5,
+          "t": 12
+        },
+        "deaths": {
+          "total": 12,
+          "ct": 7,
+          "t": 5
+        },
+        "adr": {
+          "ct": 56.25,
+          "t": 125.25
+        },
+        "kast": {
+          "ct": 75,
+          "t": 62.5
+        }
+      },
+      "utility_stats": {
+        "enemies_flashed": 16,
+        "friends_flashed": 6,
+        "enemy_flash_time_seconds": 28.335118335999997,
+        "average_enemy_flash_time_seconds": 1.7709448959999998,
+        "utility_damage": {
+          "total": 118,
+          "he": 86,
+          "fire": 32
+        },
+        "grenades_thrown": {
+          "total": 42,
+          "flash": 12,
+          "smoke": 9,
+          "he": 11,
+          "molotov": 6,
+          "incendiary": 4,
+          "decoy": 0
+        },
+        "unused_utility_value": 4400
+      }
+    },
+    "76561198171714151": {
+      "steam_id": 76561198171714151,
+      "name": "Perre",
+      "user_id": 1,
+      "deaths": 14,
+      "deaths_traded": {
+        "total": 2,
+        "ct": 1,
+        "t": 1
+      },
+      "kill_stats": {
+        "total": 11,
+        "headshots": 8,
+        "precision": 0.7272727272727273,
+        "weapons_kills": {
+          "AK-47": 4,
+          "Glock-18": 1,
+          "M4A1": 3,
+          "MP9": 3
+        },
+        "trade_kills": 2,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 8,
+        "flashed_enemies": 1,
+        "damage_given": 1553,
+        "adr": 77.65
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "multi_kills": {
+          "k2": 2,
+          "k3": 0,
+          "k4": 0,
+          "k5": 0
+        },
+        "clutches_won": 0,
+        "kast": 75
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 1,
+          "ct": 0,
+          "t": 1
+        },
+        "opening_deaths": {
+          "total": 4,
+          "ct": 3,
+          "t": 1
+        },
+        "opening_success_rate": 100
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 20,
+          "ct": 12,
+          "t": 8
+        },
+        "kills": {
+          "total": 11,
+          "ct": 7,
+          "t": 4
+        },
+        "deaths": {
+          "total": 14,
+          "ct": 8,
+          "t": 6
+        },
+        "adr": {
+          "ct": 81.91666666666667,
+          "t": 71.25
+        },
+        "kast": {
+          "ct": 75,
+          "t": 75
+        }
+      },
+      "utility_stats": {
+        "enemies_flashed": 6,
+        "friends_flashed": 3,
+        "enemy_flash_time_seconds": 17.144447168,
+        "average_enemy_flash_time_seconds": 2.8574078613333334,
+        "utility_damage": {
+          "total": 295,
+          "he": 288,
+          "fire": 7
+        },
+        "grenades_thrown": {
+          "total": 38,
+          "flash": 5,
+          "smoke": 12,
+          "he": 11,
+          "molotov": 8,
+          "incendiary": 2,
+          "decoy": 0
+        },
+        "unused_utility_value": 5100
+      }
+    },
+    "76561198195312910": {
+      "steam_id": 76561198195312910,
+      "name": "sem habilidade",
+      "user_id": 3,
+      "deaths": 16,
+      "deaths_traded": {
+        "total": 1,
+        "ct": 0,
+        "t": 1
+      },
+      "kill_stats": {
+        "total": 16,
+        "headshots": 8,
+        "precision": 0.5,
+        "weapons_kills": {
+          "AK-47": 4,
+          "AWP": 2,
+          "Five-SeveN": 2,
+          "HE Grenade": 1,
+          "M4A4": 2,
+          "MP7": 3,
+          "MP9": 2
+        },
+        "trade_kills": 1,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 3,
+        "flashed_enemies": 0,
+        "damage_given": 1358,
+        "adr": 67.9
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "multi_kills": {
+          "k2": 7,
+          "k3": 0,
+          "k4": 0,
+          "k5": 0
+        },
+        "clutches_won": 0,
+        "kast": 60
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 4,
+          "ct": 3,
+          "t": 1
+        },
+        "opening_deaths": {
+          "total": 3,
+          "ct": 1,
+          "t": 2
+        },
+        "opening_success_rate": 75
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 20,
+          "ct": 12,
+          "t": 8
+        },
+        "kills": {
+          "total": 16,
+          "ct": 12,
+          "t": 4
+        },
+        "deaths": {
+          "total": 16,
+          "ct": 10,
+          "t": 6
+        },
+        "adr": {
+          "ct": 85.5,
+          "t": 41.5
+        },
+        "kast": {
+          "ct": 66.66666666666666,
+          "t": 50
+        }
+      },
+      "utility_stats": {
+        "enemies_flashed": 6,
+        "friends_flashed": 2,
+        "enemy_flash_time_seconds": 25.510659840000002,
+        "average_enemy_flash_time_seconds": 4.25177664,
+        "utility_damage": {
+          "total": 296,
+          "he": 292,
+          "fire": 4
+        },
+        "grenades_thrown": {
+          "total": 41,
+          "flash": 8,
+          "smoke": 7,
+          "he": 13,
+          "molotov": 6,
+          "incendiary": 7,
+          "decoy": 0
+        },
+        "unused_utility_value": 5000
+      }
+    },
+    "76561198283132505": {
+      "steam_id": 76561198283132505,
+      "name": "blunt1™",
+      "user_id": 4,
+      "deaths": 18,
+      "deaths_traded": {
+        "total": 2,
+        "ct": 1,
+        "t": 1
+      },
+      "kill_stats": {
+        "total": 9,
+        "headshots": 4,
+        "precision": 0.4444444444444444,
+        "weapons_kills": {
+          "AK-47": 1,
+          "Five-SeveN": 1,
+          "Glock-18": 2,
+          "M4A1": 1,
+          "MP9": 2,
+          "P2000": 2
+        },
+        "trade_kills": 0,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 6,
+        "flashed_enemies": 0,
+        "damage_given": 1198,
+        "adr": 59.9
+      },
+      "player_map_stats": {
+        "mvps": 1,
+        "aces": 0,
+        "multi_kills": {
+          "k2": 3,
+          "k3": 0,
+          "k4": 0,
+          "k5": 0
+        },
+        "clutches_won": 0,
+        "kast": 60
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 3,
+          "ct": 1,
+          "t": 2
+        },
+        "opening_success_rate": 0
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 20,
+          "ct": 12,
+          "t": 8
+        },
+        "kills": {
+          "total": 9,
+          "ct": 7,
+          "t": 2
+        },
+        "deaths": {
+          "total": 18,
+          "ct": 12,
+          "t": 6
+        },
+        "adr": {
+          "ct": 75.08333333333333,
+          "t": 37.125
+        },
+        "kast": {
+          "ct": 66.66666666666666,
+          "t": 50
+        }
+      },
+      "utility_stats": {
+        "enemies_flashed": 14,
+        "friends_flashed": 2,
+        "enemy_flash_time_seconds": 25.790435392000003,
+        "average_enemy_flash_time_seconds": 1.8421739565714288,
+        "utility_damage": {
+          "total": 240,
+          "he": 158,
+          "fire": 82
+        },
+        "grenades_thrown": {
+          "total": 41,
+          "flash": 9,
+          "smoke": 10,
+          "he": 12,
+          "molotov": 2,
+          "incendiary": 8,
+          "decoy": 0
+        },
+        "unused_utility_value": 4400
+      }
+    },
+    "76561199013033607": {
+      "steam_id": 76561199013033607,
+      "name": "S1lent",
+      "user_id": 7,
+      "deaths": 15,
+      "deaths_traded": {
+        "total": 3,
+        "ct": 0,
+        "t": 3
+      },
+      "kill_stats": {
+        "total": 10,
+        "headshots": 6,
+        "precision": 0.6,
+        "weapons_kills": {
+          "AK-47": 3,
+          "Glock-18": 1,
+          "M4A4": 5,
+          "MP9": 1
+        },
+        "trade_kills": 4,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 4,
+        "flashed_enemies": 0,
+        "damage_given": 1095,
+        "adr": 54.75
+      },
+      "player_map_stats": {
+        "mvps": 2,
+        "aces": 0,
+        "multi_kills": {
+          "k2": 0,
+          "k3": 0,
+          "k4": 1,
+          "k5": 0
+        },
+        "clutches_won": 1,
+        "kast": 70
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 1,
+          "ct": 0,
+          "t": 1
+        },
+        "opening_deaths": {
+          "total": 3,
+          "ct": 1,
+          "t": 2
+        },
+        "opening_success_rate": 0
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 20,
+          "ct": 8,
+          "t": 12
+        },
+        "kills": {
+          "total": 10,
+          "ct": 6,
+          "t": 4
+        },
+        "deaths": {
+          "total": 15,
+          "ct": 5,
+          "t": 10
+        },
+        "adr": {
+          "ct": 80.25,
+          "t": 37.75
+        },
+        "kast": {
+          "ct": 75,
+          "t": 66.66666666666666
+        }
+      },
+      "utility_stats": {
+        "enemies_flashed": 3,
+        "friends_flashed": 1,
+        "enemy_flash_time_seconds": 1.5583544319999998,
+        "average_enemy_flash_time_seconds": 0.5194514773333333,
+        "utility_damage": {
+          "total": 61,
+          "he": 55,
+          "fire": 6
+        },
+        "grenades_thrown": {
+          "total": 33,
+          "flash": 6,
+          "smoke": 9,
+          "he": 10,
+          "molotov": 5,
+          "incendiary": 3,
+          "decoy": 0
+        },
+        "unused_utility_value": 3200
+      }
+    },
+    "76561199064030155": {
+      "steam_id": 76561199064030155,
+      "name": "Biel Mexânico",
+      "user_id": 5,
+      "deaths": 14,
+      "deaths_traded": {
+        "total": 4,
+        "ct": 3,
+        "t": 1
+      },
+      "kill_stats": {
+        "total": 14,
+        "headshots": 8,
+        "precision": 0.5714285714285714,
+        "weapons_kills": {
+          "AK-47": 10,
+          "Glock-18": 1,
+          "M4A1": 1,
+          "XM1014": 2
+        },
+        "trade_kills": 2,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 5,
+        "flashed_enemies": 0,
+        "damage_given": 1244,
+        "adr": 62.2
+      },
+      "player_map_stats": {
+        "mvps": 2,
+        "aces": 0,
+        "multi_kills": {
+          "k2": 3,
+          "k3": 0,
+          "k4": 0,
+          "k5": 0
+        },
+        "clutches_won": 1,
+        "kast": 80
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 3,
+          "ct": 1,
+          "t": 2
+        },
+        "opening_deaths": {
+          "total": 2,
+          "ct": 2,
+          "t": 0
+        },
+        "opening_success_rate": 100
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 20,
+          "ct": 8,
+          "t": 12
+        },
+        "kills": {
+          "total": 14,
+          "ct": 3,
+          "t": 11
+        },
+        "deaths": {
+          "total": 14,
+          "ct": 7,
+          "t": 7
+        },
+        "adr": {
+          "ct": 27.625,
+          "t": 85.25
+        },
+        "kast": {
+          "ct": 75,
+          "t": 83.33333333333334
+        }
+      },
+      "utility_stats": {
+        "enemies_flashed": 2,
+        "friends_flashed": 1,
+        "enemy_flash_time_seconds": 1.7221928320000002,
+        "average_enemy_flash_time_seconds": 0.8610964160000001,
+        "utility_damage": {
+          "total": 33,
+          "he": 33,
+          "fire": 0
+        },
+        "grenades_thrown": {
+          "total": 30,
+          "flash": 3,
+          "smoke": 12,
+          "he": 7,
+          "molotov": 8,
+          "incendiary": 0,
+          "decoy": 0
+        },
+        "unused_utility_value": 3700
+      }
+    },
+    "76561199353626993": {
+      "steam_id": 76561199353626993,
+      "name": ":ppp",
+      "user_id": 9,
+      "deaths": 16,
+      "deaths_traded": {
+        "total": 1,
+        "ct": 0,
+        "t": 1
+      },
+      "kill_stats": {
+        "total": 11,
+        "headshots": 5,
+        "precision": 0.45454545454545453,
+        "weapons_kills": {
+          "AK-47": 3,
+          "Desert Eagle": 1,
+          "M4A1": 3,
+          "M4A4": 1,
+          "XM1014": 3
+        },
+        "trade_kills": 1,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 10,
+        "flashed_enemies": 1,
+        "damage_given": 1577,
+        "adr": 78.85
+      },
+      "player_map_stats": {
+        "mvps": 3,
+        "aces": 0,
+        "multi_kills": {
+          "k2": 2,
+          "k3": 1,
+          "k4": 0,
+          "k5": 0
+        },
+        "clutches_won": 1,
+        "kast": 70
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 2,
+          "ct": 2,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 1,
+          "ct": 0,
+          "t": 1
+        },
+        "opening_success_rate": 100
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 20,
+          "ct": 8,
+          "t": 12
+        },
+        "kills": {
+          "total": 11,
+          "ct": 7,
+          "t": 4
+        },
+        "deaths": {
+          "total": 16,
+          "ct": 6,
+          "t": 10
+        },
+        "adr": {
+          "ct": 114.625,
+          "t": 55
+        },
+        "kast": {
+          "ct": 50,
+          "t": 83.33333333333334
+        }
+      },
+      "utility_stats": {
+        "enemies_flashed": 10,
+        "friends_flashed": 7,
+        "enemy_flash_time_seconds": 31.505674176000003,
+        "average_enemy_flash_time_seconds": 3.1505674176000005,
+        "utility_damage": {
+          "total": 296,
+          "he": 271,
+          "fire": 25
+        },
+        "grenades_thrown": {
+          "total": 29,
+          "flash": 10,
+          "smoke": 4,
+          "he": 7,
+          "molotov": 5,
+          "incendiary": 3,
+          "decoy": 0
+        },
+        "unused_utility_value": 2500
+      }
+    },
+    "76561199575273990": {
+      "steam_id": 76561199575273990,
+      "name": "S1nner",
+      "user_id": 6,
+      "deaths": 15,
+      "deaths_traded": {
+        "total": 2,
+        "ct": 0,
+        "t": 2
+      },
+      "kill_stats": {
+        "total": 18,
+        "headshots": 7,
+        "precision": 0.3888888888888889,
+        "weapons_kills": {
+          "AK-47": 8,
+          "AWP": 2,
+          "HE Grenade": 1,
+          "M4A1": 2,
+          "M4A4": 1,
+          "USP-S": 4
+        },
+        "trade_kills": 2,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 5,
+        "flashed_enemies": 1,
+        "damage_given": 1921,
+        "adr": 96.05
+      },
+      "player_map_stats": {
+        "mvps": 3,
+        "aces": 0,
+        "multi_kills": {
+          "k2": 3,
+          "k3": 1,
+          "k4": 1,
+          "k5": 0
+        },
+        "clutches_won": 2,
+        "kast": 65
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 5,
+          "ct": 2,
+          "t": 3
+        },
+        "opening_deaths": {
+          "total": 3,
+          "ct": 0,
+          "t": 3
+        },
+        "opening_success_rate": 80
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 20,
+          "ct": 8,
+          "t": 12
+        },
+        "kills": {
+          "total": 18,
+          "ct": 8,
+          "t": 10
+        },
+        "deaths": {
+          "total": 15,
+          "ct": 6,
+          "t": 9
+        },
+        "adr": {
+          "ct": 112.375,
+          "t": 85.16666666666667
+        },
+        "kast": {
+          "ct": 62.5,
+          "t": 66.66666666666666
+        }
+      },
+      "utility_stats": {
+        "enemies_flashed": 6,
+        "friends_flashed": 9,
+        "enemy_flash_time_seconds": 8.885401520000002,
+        "average_enemy_flash_time_seconds": 1.4809002533333337,
+        "utility_damage": {
+          "total": 184,
+          "he": 135,
+          "fire": 49
+        },
+        "grenades_thrown": {
+          "total": 32,
+          "flash": 8,
+          "smoke": 9,
+          "he": 7,
+          "molotov": 7,
+          "incendiary": 1,
+          "decoy": 0
+        },
+        "unused_utility_value": 2600
+      }
+    },
+    "76561199680390775": {
+      "steam_id": 76561199680390775,
+      "name": "-wLL",
+      "user_id": 8,
+      "deaths": 17,
+      "deaths_traded": {
+        "total": 5,
+        "ct": 2,
+        "t": 3
+      },
+      "kill_stats": {
+        "total": 18,
+        "headshots": 8,
+        "precision": 0.4444444444444444,
+        "weapons_kills": {
+          "AK-47": 11,
+          "Glock-18": 1,
+          "M4A4": 2,
+          "MP9": 1,
+          "Molotov": 1,
+          "SSG 08": 1,
+          "USP-S": 1
+        },
+        "trade_kills": 3,
+        "team_kills": 0
+      },
+      "assist_stats": {
+        "total": 7,
+        "flashed_enemies": 0,
+        "damage_given": 1854,
+        "adr": 92.7
+      },
+      "player_map_stats": {
+        "mvps": 3,
+        "aces": 0,
+        "multi_kills": {
+          "k2": 4,
+          "k3": 1,
+          "k4": 0,
+          "k5": 0
+        },
+        "clutches_won": 1,
+        "kast": 85
+      },
+      "opening_duel_stats": {
+        "opening_kills": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_deaths": {
+          "total": 0,
+          "ct": 0,
+          "t": 0
+        },
+        "opening_success_rate": 0
+      },
+      "side_stats": {
+        "rounds": {
+          "total": 20,
+          "ct": 8,
+          "t": 12
+        },
+        "kills": {
+          "total": 18,
+          "ct": 5,
+          "t": 13
+        },
+        "deaths": {
+          "total": 17,
+          "ct": 8,
+          "t": 9
+        },
+        "adr": {
+          "ct": 85.875,
+          "t": 97.25
+        },
+        "kast": {
+          "ct": 75,
+          "t": 91.66666666666666
+        }
+      },
+      "utility_stats": {
+        "enemies_flashed": 9,
+        "friends_flashed": 9,
+        "enemy_flash_time_seconds": 13.060732832,
+        "average_enemy_flash_time_seconds": 1.4511925368888887,
+        "utility_damage": {
+          "total": 288,
+          "he": 251,
+          "fire": 37
+        },
+        "grenades_thrown": {
+          "total": 44,
+          "flash": 9,
+          "smoke": 14,
+          "he": 12,
+          "molotov": 5,
+          "incendiary": 4,
+          "decoy": 0
+        },
+        "unused_utility_value": 3500
+      }
+    }
+  },
+  "map_data": {
+    "map_name": "de_inferno",
+    "total_rounds": 20,
+    "rounds_won_ct": 13,
+    "rounds_won_t": 7
+  },
+  "game_mode": "premier"
+}
