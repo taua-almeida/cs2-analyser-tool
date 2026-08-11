@@ -282,7 +282,7 @@ func TestUnusedUtilityValueUsesInventoryQuantity(t *testing.T) {
 	}
 }
 
-func TestUnusedUtilityCountsEveryQualifyingDeathCause(t *testing.T) {
+func TestDeathsAndUnusedUtilityCountEveryQualifyingDeathCause(t *testing.T) {
 	tests := []struct {
 		name string
 		kill events.Kill
@@ -305,8 +305,15 @@ func TestUnusedUtilityCountsEveryQualifyingDeathCause(t *testing.T) {
 
 			a.onKill(tt.kill)
 
-			if got := a.players[victimID].UtilityStats.UnusedUtilityValue; got != 50 {
-				t.Errorf("unused utility value = %d, want 50", got)
+			got := a.players[victimID]
+			if got.Deaths != 1 {
+				t.Errorf("deaths = %d, want 1", got.Deaths)
+			}
+			if want := (SideCount{Total: 1, CT: 1}); got.SideStats.Deaths != want {
+				t.Errorf("side deaths = %+v, want %+v", got.SideStats.Deaths, want)
+			}
+			if got.UtilityStats.UnusedUtilityValue != 50 {
+				t.Errorf("unused utility value = %d, want 50", got.UtilityStats.UnusedUtilityValue)
 			}
 		})
 	}
@@ -319,6 +326,7 @@ func TestUnusedUtilityCountsRepeatedAndPostRoundCombatDeaths(t *testing.T) {
 
 	a.onKill(combatDeath)
 	a.onKill(combatDeath)
+	a.parser.(*matchParser).gamePhase = common.GamePhaseGameEnded
 	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
 	a.onKill(combatDeath)
 	a.onKill(events.Kill{Killer: victim, Victim: victim, Weapon: &common.Equipment{Type: common.EqWorld}})
@@ -328,10 +336,45 @@ func TestUnusedUtilityCountsRepeatedAndPostRoundCombatDeaths(t *testing.T) {
 	a.onKill(events.Kill{Killer: victim, Victim: victim, Weapon: &common.Equipment{Type: common.EqWorld}})
 
 	got := a.players[victimID]
-	if got.Deaths != 5 {
-		t.Errorf("deaths = %d, want 5", got.Deaths)
+	if got.Deaths != 3 {
+		t.Errorf("deaths = %d, want 3", got.Deaths)
+	}
+	if want := (SideCount{Total: 3, CT: 3}); got.SideStats.Deaths != want {
+		t.Errorf("side deaths = %+v, want %+v", got.SideStats.Deaths, want)
 	}
 	if got.UtilityStats.UnusedUtilityValue != 900 {
 		t.Errorf("unused utility value = %d, want 900", got.UtilityStats.UnusedUtilityValue)
+	}
+}
+
+func TestMatchEndWorldCleanupDoesNotCountDeath(t *testing.T) {
+	a, _, victim := liveRound()
+	a.parser.(*matchParser).gamePhase = common.GamePhaseGameEnded
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+
+	a.onKill(events.Kill{Killer: victim, Victim: victim, Weapon: &common.Equipment{Type: common.EqWorld}})
+
+	got := a.players[victimID]
+	if got.Deaths != 0 {
+		t.Errorf("deaths = %d, want 0", got.Deaths)
+	}
+	if got.SideStats.Deaths != (SideCount{}) {
+		t.Errorf("side deaths = %+v, want none", got.SideStats.Deaths)
+	}
+}
+
+func TestPostRoundWorldDeathCountsBeforeMatchEnd(t *testing.T) {
+	a, _, victim := liveRound()
+	a.parser.(*matchParser).gamePhase = common.GamePhaseStartGamePhase
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+
+	a.onKill(events.Kill{Killer: victim, Victim: victim, Weapon: &common.Equipment{Type: common.EqWorld}})
+
+	got := a.players[victimID]
+	if got.Deaths != 1 {
+		t.Errorf("deaths = %d, want 1", got.Deaths)
+	}
+	if want := (SideCount{Total: 1, CT: 1}); got.SideStats.Deaths != want {
+		t.Errorf("side deaths = %+v, want %+v", got.SideStats.Deaths, want)
 	}
 }

@@ -232,14 +232,18 @@ func (a *analyser) onKill(e events.Kill) {
 	// state to distinguish cleanup from World deaths that still count. Bomb
 	// kills stay separate from both.
 	byWorld := (e.Killer == nil || suicide) && (e.Weapon == nil || e.Weapon.Type == common.EqWorld)
+	postRoundWorld := a.tracker.isPostRoundWorldCleanup(byWorld)
+	matchEndWorldCleanup := postRoundWorld &&
+		a.parser.GameState().GamePhase() == common.GamePhaseGameEnded
 
 	if victim := a.ensurePlayer(e.Victim); victim != nil {
-		victim.Deaths++
-		victim.SideStats.Deaths.count(e.Victim.Team)
-		// A World cleanup after the round is decided is not a player's
-		// decision to die with utility. Combat, suicide, fall, bomb and other
-		// post-round deaths still contribute.
-		if !a.tracker.isPostRoundWorldCleanup(byWorld) {
+		// Only a World event after the full game ended is engine cleanup.
+		// Ordinary post-round falls and World suicides remain real deaths.
+		if !matchEndWorldCleanup {
+			victim.Deaths++
+			victim.SideStats.Deaths.count(e.Victim.Team)
+		}
+		if !postRoundWorld {
 			victim.UtilityStats.UnusedUtilityValue += unusedUtilityValue(e.Victim.Inventory)
 		}
 	}

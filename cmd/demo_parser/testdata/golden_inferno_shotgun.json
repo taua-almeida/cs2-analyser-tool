@@ -672,7 +672,7 @@
       "steam_id": 76561199064030155,
       "name": "Biel Mexânico",
       "user_id": 5,
-      "deaths": 14,
+      "deaths": 13,
       "deaths_traded": {
         "total": 4,
         "ct": 3,
@@ -734,8 +734,8 @@
           "t": 11
         },
         "deaths": {
-          "total": 14,
-          "ct": 7,
+          "total": 13,
+          "ct": 6,
           "t": 7
         },
         "adr": {
@@ -893,7 +893,7 @@
       "steam_id": 76561199575273990,
       "name": "S1nner",
       "user_id": 6,
-      "deaths": 15,
+      "deaths": 14,
       "deaths_traded": {
         "total": 2,
         "ct": 0,
@@ -957,8 +957,8 @@
           "t": 10
         },
         "deaths": {
-          "total": 15,
-          "ct": 6,
+          "total": 14,
+          "ct": 5,
           "t": 9
         },
         "adr": {
