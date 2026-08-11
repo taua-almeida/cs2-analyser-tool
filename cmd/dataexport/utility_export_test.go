@@ -83,13 +83,42 @@ func TestCSVAppendsStableUtilityColumns(t *testing.T) {
 
 	legacyHeader := []string{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Deaths Traded", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "Deaths Traded CT", "Deaths Traded T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon"}
 	utilityHeader := []string{"Enemies Flashed", "Friends Flashed", "Enemy Flash Time (s)", "Average Enemy Flash Time (s)", "Utility Damage Total", "HE Utility Damage", "Fire Utility Damage", "Grenades Thrown Total", "Flashbangs Thrown", "Smokes Thrown", "HE Grenades Thrown", "Molotovs Thrown", "Incendiaries Thrown", "Decoys Thrown", "Unused Utility Value"}
-	wantHeader := append(append([]string{}, legacyHeader...), utilityHeader...)
+	ratingHeader := []string{"Rating", "Rating Kills", "Rating Damage", "Rating Survival", "Rating KAST", "Rating Multi-kill", "Rating Round Swing"}
+	wantHeader := append(append(append([]string{}, legacyHeader...), utilityHeader...), ratingHeader...)
 	if !reflect.DeepEqual(records[0], wantHeader) {
 		t.Errorf("CSV header = %q, want %q", records[0], wantHeader)
 	}
 	wantUtilityValues := []string{"3", "4", "5.2", "1.8", "60", "40", "20", "21", "1", "2", "3", "4", "5", "6", "700"}
-	if got := records[1][len(legacyHeader):]; !reflect.DeepEqual(got, wantUtilityValues) {
-		t.Errorf("CSV utility values = %q, want %q", got, wantUtilityValues)
+	utilityValues := records[1][len(legacyHeader) : len(legacyHeader)+len(utilityHeader)]
+	if !reflect.DeepEqual(utilityValues, wantUtilityValues) {
+		t.Errorf("CSV utility values = %q, want %q", utilityValues, wantUtilityValues)
+	}
+}
+
+func TestCSVAppendsRatingColumns(t *testing.T) {
+	t.Chdir(t.TempDir())
+	player := utilityPlayer()
+	player.Rating = demoparser.RatingStats{
+		Value: 1.234, Kills: 1.1, Damage: 0.9, Survival: 1, KAST: 1.05, MultiKill: 0.5, RoundSwing: 1.2,
+	}
+
+	fileName, err := WritePlayersToFile(map[uint64]*demoparser.DemoPlayer{player.SteamID: player}, "csv")
+	if err != nil {
+		t.Fatalf("writing CSV: %v", err)
+	}
+	f, err := os.Open(fileName)
+	if err != nil {
+		t.Fatalf("opening CSV: %v", err)
+	}
+	defer f.Close()
+	records, err := csv.NewReader(f).ReadAll()
+	if err != nil {
+		t.Fatalf("reading CSV: %v", err)
+	}
+
+	wantRatingValues := []string{"1.23", "1.10", "0.90", "1.00", "1.05", "0.50", "1.20"}
+	if got := records[1][len(records[1])-len(wantRatingValues):]; !reflect.DeepEqual(got, wantRatingValues) {
+		t.Errorf("CSV rating values = %q, want %q", got, wantRatingValues)
 	}
 }
 
@@ -111,6 +140,20 @@ func TestUtilityDetailTables(t *testing.T) {
 	for _, text := range []string{"Grenades thrown", "Flash", "Smoke", "Incendiary", "Decoy", "utility-player"} {
 		if !strings.Contains(strings.ToLower(throws.String()), strings.ToLower(text)) {
 			t.Errorf("grenades thrown table missing %q:\n%s", text, throws.String())
+		}
+	}
+}
+
+func TestRatingDetailTable(t *testing.T) {
+	player := utilityPlayer()
+	player.Rating = demoparser.RatingStats{Value: 1.23, Kills: 1.1}
+	sorted := sortedByKills(map[uint64]*demoparser.DemoPlayer{player.SteamID: player})
+
+	var breakdown strings.Builder
+	printRatingTable(sorted, &breakdown)
+	for _, text := range []string{"Rating breakdown", "Round swing", "1.23", "utility-player"} {
+		if !strings.Contains(strings.ToLower(breakdown.String()), strings.ToLower(text)) {
+			t.Errorf("rating table missing %q:\n%s", text, breakdown.String())
 		}
 	}
 }
