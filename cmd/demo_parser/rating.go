@@ -190,3 +190,74 @@ func shiftLogit(p, delta float64) float64 {
 	odds := p / (1 - p) * math.Exp(delta)
 	return odds / (1 + odds)
 }
+
+// The baselines are what an average player produces per round on each axis.
+// Dividing by them normalizes every sub-rating to 1.0 for that average
+// player. The values were measured over the calibration set in
+// _docs/PLAYER_DATA.MD; update them together with those numbers.
+const (
+	baselineKillPoints = 0.68 // eco-adjusted kill points per round
+	baselineEcoDamage  = 78.0 // eco-adjusted damage per round
+	baselineSurvival   = 0.30 // eco-weighted rounds survived per round
+	baselineKast       = 0.70 // eco-weighted rating-KAST rounds per round
+	baselineMultiKill  = 0.27 // multi-kill points per round
+)
+
+// swingScale converts average round swing, which is zero for the average
+// player by construction, into a sub-rating around 1.0. With 2.5, a player
+// who single-handedly moves 4% of win probability per round rates 1.10 on
+// this axis, roughly the spread the other sub-ratings show between an
+// average and a strong player.
+const swingScale = 2.5
+
+// Blend weights of the six sub-ratings, summing to 1. HLTV does not publish
+// theirs; these follow the emphasis of their Rating 3.0 write-up, with
+// kills, damage and round swing carrying most of the rating and survival
+// and multi-kills acting as smaller correctives.
+const (
+	weightKills     = 0.25
+	weightDamage    = 0.20
+	weightSurvival  = 0.10
+	weightKast      = 0.15
+	weightMultiKill = 0.10
+	weightSwing     = 0.20
+)
+
+// multiKillPoints rewards the rounds a player killed several enemies in,
+// escalating faster than linearly because each further kill in one round is
+// rarer and harder than the last.
+func multiKillPoints(m MultiKillRounds) float64 {
+	return float64(m.K2)*1 + float64(m.K3)*2 + float64(m.K4)*4 + float64(m.K5)*7
+}
+
+// ratingRound holds a player's per-round averages on the six axes, ready to
+// be measured against the baselines.
+type ratingRound struct {
+	killPoints float64
+	ecoDamage  float64
+	survival   float64
+	kast       float64
+	multiKill  float64
+	swing      float64
+}
+
+// blendRating turns per-round averages into the six sub-ratings and their
+// weighted blend. Swing is the one axis that can go negative, so it is
+// floored at 0 like every other sub-rating's natural floor.
+func blendRating(r ratingRound) RatingStats {
+	s := RatingStats{
+		Kills:      r.killPoints / baselineKillPoints,
+		Damage:     r.ecoDamage / baselineEcoDamage,
+		Survival:   r.survival / baselineSurvival,
+		KAST:       r.kast / baselineKast,
+		MultiKill:  r.multiKill / baselineMultiKill,
+		RoundSwing: max(0, 1+r.swing*swingScale),
+	}
+	s.Value = weightKills*s.Kills +
+		weightDamage*s.Damage +
+		weightSurvival*s.Survival +
+		weightKast*s.KAST +
+		weightMultiKill*s.MultiKill +
+		weightSwing*s.RoundSwing
+	return s
+}

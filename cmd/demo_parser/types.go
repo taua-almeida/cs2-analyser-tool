@@ -109,6 +109,21 @@ type UtilityStats struct {
 	UnusedUtilityValue           int                 `json:"unused_utility_value"`
 }
 
+// RatingStats is an HLTV Rating 3.0-style rating. HLTV's formula is
+// proprietary, so this is an approximation, calibrated so an average player
+// lands near 1.00; see _docs/PLAYER_DATA.MD for the method and its limits.
+// Value blends the six sub-ratings, each of which is normalized so that 1.0
+// is an average performance on that axis.
+type RatingStats struct {
+	Value      float64 `json:"value"`
+	Kills      float64 `json:"kills"`
+	Damage     float64 `json:"damage"`
+	Survival   float64 `json:"survival"`
+	KAST       float64 `json:"kast"`
+	MultiKill  float64 `json:"multi_kill"`
+	RoundSwing float64 `json:"round_swing"`
+}
+
 type DemoPlayer struct {
 	SteamID          uint64           `json:"steam_id"`
 	Name             string           `json:"name"`
@@ -121,6 +136,7 @@ type DemoPlayer struct {
 	OpeningDuelStats OpeningDuelStats `json:"opening_duel_stats"`
 	SideStats        SideStats        `json:"side_stats"`
 	UtilityStats     UtilityStats     `json:"utility_stats"`
+	Rating           RatingStats      `json:"rating"`
 }
 
 type MapData struct {

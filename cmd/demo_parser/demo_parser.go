@@ -24,6 +24,11 @@ type analyser struct {
 	openingWins map[uint64]int       // rounds won after taking the opening kill
 	lastHealth  map[uint64]int
 	flashEnds   map[uint64]time.Duration // latest known end of each player's blind interval
+	ecoKills    map[uint64]float64       // eco-adjusted kill points
+	ecoDamage   map[uint64]float64       // eco-adjusted damage given
+	roundSwing  map[uint64]float64       // summed round-win-probability swing
+	ecoSurvival map[uint64]float64       // eco-weighted rounds survived
+	ecoKast     map[uint64]float64       // eco-weighted rounds with rating KAST credit
 	mapData     MapData
 	gameMode    string
 }
@@ -38,6 +43,11 @@ func newAnalyser(parser demoinfocs.Parser) *analyser {
 		openingWins: make(map[uint64]int),
 		lastHealth:  make(map[uint64]int),
 		flashEnds:   make(map[uint64]time.Duration),
+		ecoKills:    make(map[uint64]float64),
+		ecoDamage:   make(map[uint64]float64),
+		roundSwing:  make(map[uint64]float64),
+		ecoSurvival: make(map[uint64]float64),
+		ecoKast:     make(map[uint64]float64),
 	}
 }
 
@@ -80,6 +90,7 @@ func (a *analyser) registerHandlers() {
 	})
 	a.parser.RegisterEventHandler(a.onRoundStart)
 	a.parser.RegisterEventHandler(a.onRoundFreezetimeEnd)
+	a.parser.RegisterEventHandler(a.onBombPlanted)
 	a.parser.RegisterEventHandler(a.onKill)
 	a.parser.RegisterEventHandler(a.onPlayerHurt)
 	a.parser.RegisterEventHandler(a.onPlayerFlashed)
@@ -152,6 +163,7 @@ func (a *analyser) onRoundStart(e events.RoundStart) {
 	// Close the previous round in case its official end was never seen.
 	a.applyRoundOutcome(a.tracker.finalize())
 	a.tracker.startRound(a.playingRoster())
+	a.captureTiers()
 }
 
 // onRoundFreezetimeEnd folds the players who picked a side during freeze
@@ -163,6 +175,29 @@ func (a *analyser) onRoundFreezetimeEnd(e events.RoundFreezetimeEnd) {
 		return
 	}
 	a.tracker.joinRound(a.playingRoster())
+	a.captureTiers()
+}
+
+// captureTiers snapshots every playing player's loadout tier into the round
+// tracker. It runs after the tracker opens or rejoins a round, because
+// startRound clears the previous round's tiers, and again when freeze time
+// ends so the tier reflects what was actually bought.
+func (a *analyser) captureTiers() {
+	for _, p := range a.parser.GameState().Participants().Playing() {
+		if p.Team != common.TeamTerrorists && p.Team != common.TeamCounterTerrorists {
+			continue
+		}
+		a.tracker.setTier(trackerID(p), playerTier(p.Inventory))
+	}
+}
+
+// onBombPlanted feeds the round tracker the bomb state its round-swing
+// win-probability model conditions on.
+func (a *analyser) onBombPlanted(e events.BombPlanted) {
+	if a.inWarmup() {
+		return
+	}
+	a.tracker.plantBomb()
 }
 
 func (a *analyser) onKill(e events.Kill) {
@@ -212,6 +247,10 @@ func (a *analyser) onKill(e events.Kill) {
 			if e.Weapon != nil && e.Weapon.Type != common.EqWorld {
 				killer.KillStats.WeaponsKills[e.Weapon.String()]++
 			}
+			// The duel is priced loadout against loadout at kill time; the
+			// victim's inventory is still their pre-death one during Kill,
+			// which TestProcessDemoGolden pins for unused utility.
+			a.ecoKills[killerID] += killPoints(playerTier(e.Killer.Inventory), playerTier(e.Victim.Inventory))
 		}
 	}
 
@@ -269,6 +308,9 @@ func (a *analyser) onPlayerHurt(e events.PlayerHurt) {
 		if e.Weapon != nil {
 			attacker.UtilityStats.UtilityDamage.add(e.Weapon.Type, realDamage)
 		}
+		a.ecoDamage[attacker.SteamID] += float64(realDamage) *
+			ecoDuelFactor(playerTier(e.Attacker.Inventory), playerTier(e.Player.Inventory))
+		a.tracker.damage(trackerID(e.Attacker), victimID, realDamage)
 	}
 }
 
@@ -413,6 +455,15 @@ func (a *analyser) applyRoundOutcome(outcome roundOutcome) {
 			addSide(a.kastRounds, id, side, 1)
 		}
 	}
+	for id, delta := range outcome.swing {
+		a.roundSwing[id] += delta
+	}
+	for id, weight := range outcome.ecoSurvival {
+		a.ecoSurvival[id] += weight
+	}
+	for id, weight := range outcome.ratingKast {
+		a.ecoKast[id] += weight
+	}
 }
 
 // syncScoreboardMVPs mirrors the scoreboard MVP counter into the player
@@ -460,10 +511,21 @@ func (a *analyser) derive(totalRounds int) {
 			p.KillStats.Precision = float64(p.KillStats.HeadShots) / float64(p.KillStats.Total)
 		}
 		// The match-wide ADR and KAST both use the match's round count,
-		// following the convention of HLTV-style stat sites.
+		// following the convention of HLTV-style stat sites. The rating's
+		// per-round averages share that denominator, so a late joiner is
+		// diluted here exactly as their ADR is.
 		if totalRounds > 0 {
 			p.AssistStats.ADR = perRound(p.AssistStats.DamageGiven, totalRounds)
 			p.PlayerMapStats.KAST = 100 * perRound(a.kastRounds[id].Total, totalRounds)
+			rounds := float64(totalRounds)
+			p.Rating = blendRating(ratingRound{
+				killPoints: a.ecoKills[id] / rounds,
+				ecoDamage:  a.ecoDamage[id] / rounds,
+				survival:   a.ecoSurvival[id] / rounds,
+				kast:       a.ecoKast[id] / rounds,
+				multiKill:  multiKillPoints(p.PlayerMapStats.MultiKills) / rounds,
+				swing:      a.roundSwing[id] / rounds,
+			})
 		}
 		// Their side splits cannot: sides swap at halftime, so there is no
 		// match-wide CT or T round count that holds for every player. Each

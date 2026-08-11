@@ -134,6 +134,55 @@ func TestTeamWinProbabilitiesSumToOne(t *testing.T) {
 	}
 }
 
+// TestBlendRatingOfBaselineAveragesIsOne is the calibration contract: a
+// player who produces exactly the baseline on every axis is the definition
+// of average and must rate exactly 1.00, which also proves the blend
+// weights sum to 1.
+func TestBlendRatingOfBaselineAveragesIsOne(t *testing.T) {
+	got := blendRating(ratingRound{
+		killPoints: baselineKillPoints,
+		ecoDamage:  baselineEcoDamage,
+		survival:   baselineSurvival,
+		kast:       baselineKast,
+		multiKill:  baselineMultiKill,
+		swing:      0,
+	})
+	for name, sub := range map[string]float64{
+		"kills": got.Kills, "damage": got.Damage, "survival": got.Survival,
+		"kast": got.KAST, "multi_kill": got.MultiKill, "round_swing": got.RoundSwing,
+	} {
+		if math.Abs(sub-1) > 1e-9 {
+			t.Errorf("baseline %s sub-rating = %v, want 1", name, sub)
+		}
+	}
+	if math.Abs(got.Value-1) > 1e-9 {
+		t.Errorf("baseline rating = %v, want exactly 1.00", got.Value)
+	}
+}
+
+func TestBlendRatingFloorsSwingAtZero(t *testing.T) {
+	got := blendRating(ratingRound{swing: -10})
+	if got.RoundSwing != 0 {
+		t.Errorf("hopeless swing gives sub-rating %v, want the 0 floor", got.RoundSwing)
+	}
+}
+
+func TestDeriveDividesRatingInputsByMatchRounds(t *testing.T) {
+	a := liveAnalyser()
+	a.players[1] = &DemoPlayer{SteamID: 1}
+	// Two matches' worth of kill points in half the rounds is twice average.
+	a.ecoKills[1] = baselineKillPoints * 8
+
+	a.derive(4)
+
+	if got := a.players[1].Rating.Kills; math.Abs(got-2) > 1e-9 {
+		t.Errorf("kills sub-rating = %v, want 2", got)
+	}
+	if a.players[1].Rating.Value <= 0 {
+		t.Error("rating value should be positive once any axis contributes")
+	}
+}
+
 func TestEcoRoundWeight(t *testing.T) {
 	if w := ecoRoundWeight(tierRifle1); w != 1 {
 		t.Errorf("tier-1 rifle round weighs %v, want exactly 1", w)
