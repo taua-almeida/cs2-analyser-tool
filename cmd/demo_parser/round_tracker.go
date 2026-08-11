@@ -186,20 +186,21 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 		}
 	}
 
-	// Any death settles the 40-damage assists on the victim, whatever caused
-	// it: enemy damage into a player finished by the bomb or a fall still
-	// helped. The killer's own damage is their kill, not an assist.
-	for attacker, hp := range rt.damageTo[victim] {
-		if attacker != killer && hp >= ratingAssistDamage {
-			rt.damageAssists[attacker] = true
-		}
-	}
-
 	rt.deaths = append(rt.deaths, deathRecord{killer: killer, victim: victim, victimTeam: victimTeam, at: at})
 	// Dying before the round officially ends cancels survival, including to
 	// the post-round bomb explosion (HLTV convention). Only match-end world
-	// cleanup kills are ignored once the round is decided.
+	// cleanup kills are ignored once the round is decided — and because
+	// their victim keeps survival, they settle no 40-damage assists either:
+	// damage into a survivor is no assist. Every real death settles them,
+	// whatever caused it; enemy damage into a player finished by the bomb or
+	// a fall still helped. The killer's own damage is their kill, not an
+	// assist.
 	if !rt.isPostRoundWorldCleanup(byWorld) {
+		for attacker, hp := range rt.damageTo[victim] {
+			if attacker != killer && hp >= ratingAssistDamage {
+				rt.damageAssists[attacker] = true
+			}
+		}
 		rt.remove(victim)
 	}
 	return isTrade

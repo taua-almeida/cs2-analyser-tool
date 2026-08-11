@@ -128,6 +128,29 @@ func TestDamageOnASurvivorIsNoRatingAssist(t *testing.T) {
 	}
 }
 
+// TestPostRoundCleanupDeathSettlesNoDamageAssist pins the pairing of the
+// cleanup rule with the assist rule: a match-end world cleanup kill leaves
+// its victim a survivor, and damage into a survivor is no assist.
+func TestPostRoundCleanupDeathSettlesNoDamageAssist(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+
+	// Player 2 softens 11 past the threshold and then dies with no other
+	// KAST path; after the whistle, engine cleanup kills 11.
+	rt.damage(2, 11, ratingAssistDamage)
+	rt.kill(11, 2, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	rt.markEnd(common.TeamCounterTerrorists)
+	rt.kill(0, 11, common.TeamUnassigned, common.TeamCounterTerrorists, 0, true, at(70))
+
+	outcome := rt.finalize()
+	if !outcome.survived[11] {
+		t.Fatal("the cleanup kill must not cancel player 11's survival")
+	}
+	if outcome.ratingKast[2] {
+		t.Error("damage into the cleanup survivor counted as a rating assist")
+	}
+}
+
 func TestKillerDamageIsNotAlsoAnAssist(t *testing.T) {
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())

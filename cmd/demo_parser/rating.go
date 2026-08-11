@@ -162,14 +162,20 @@ var tWinProbBombNoTs = [6]float64{0, 0.15, 0.08, 0.05, 0.03, 0.02}
 func tWinProbability(tAlive, ctAlive int, bombPlanted bool) float64 {
 	t := min(max(tAlive, 0), 5)
 	ct := min(max(ctAlive, 0), 5)
-	if bombPlanted && t == 0 && ct > 0 {
-		return tWinProbBombNoTs[ct]
-	}
-	p := tWinProbBase[t][ct]
 	if bombPlanted {
-		p = shiftLogit(p, bombLogitShift)
+		// The planted bomb settles the empty-side cases on its own: with no
+		// CT left to defuse it the bomb always explodes — even when no T is
+		// alive either, as after a post-mortem grenade kill — and with only
+		// CTs left the round is the defuse race of tWinProbBombNoTs.
+		if ct == 0 {
+			return 1
+		}
+		if t == 0 {
+			return tWinProbBombNoTs[ct]
+		}
+		return shiftLogit(tWinProbBase[t][ct], bombLogitShift)
 	}
-	return p
+	return tWinProbBase[t][ct]
 }
 
 // teamWinProbability is tWinProbability seen from one side's perspective.

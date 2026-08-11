@@ -87,6 +87,7 @@ func TestTWinProbabilityAnchors(t *testing.T) {
 		{"no CTs left is a T win", 3, 0, false, 1, 0},
 		{"no Ts and no bomb is a T loss", 0, 3, false, 0, 0},
 		{"no Ts with the bomb down still leans CT", 0, 3, true, 0.05, 0},
+		{"bomb down with nobody alive explodes for the Ts", 0, 0, true, 1, 0},
 		{"even 5v5 leans slightly CT", 5, 5, false, 0.48, 0.001},
 		{"post-plant 5v5 leans T", 5, 5, true, 0.69, 0.01},
 		{"oversized counts clamp to the 5v5 table", 8, 7, false, 0.48, 0.001},
