@@ -21,7 +21,7 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 		defer csvFile.Close()
 
 		csvRecords := [][]string{
-			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Deaths Traded", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "Deaths Traded CT", "Deaths Traded T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon"},
+			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Deaths Traded", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "Deaths Traded CT", "Deaths Traded T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon", "Enemies Flashed", "Friends Flashed", "Enemy Flash Time (s)", "Average Enemy Flash Time (s)", "Utility Damage Total", "HE Utility Damage", "Fire Utility Damage", "Grenades Thrown Total", "Flashbangs Thrown", "Smokes Thrown", "HE Grenades Thrown", "Molotovs Thrown", "Incendiaries Thrown", "Decoys Thrown", "Unused Utility Value"},
 		}
 		for _, player := range sortedByKills(players) {
 			csvRecords = append(csvRecords, []string{
@@ -61,6 +61,21 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 				fmt.Sprintf("%.1f", player.SideStats.KAST.CT),
 				fmt.Sprintf("%.1f", player.SideStats.KAST.T),
 				demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills),
+				fmt.Sprintf("%d", player.UtilityStats.EnemiesFlashed),
+				fmt.Sprintf("%d", player.UtilityStats.FriendsFlashed),
+				fmt.Sprintf("%.1f", player.UtilityStats.EnemyFlashTimeSeconds),
+				fmt.Sprintf("%.1f", player.UtilityStats.AverageEnemyFlashTimeSeconds),
+				fmt.Sprintf("%d", player.UtilityStats.UtilityDamage.Total),
+				fmt.Sprintf("%d", player.UtilityStats.UtilityDamage.HE),
+				fmt.Sprintf("%d", player.UtilityStats.UtilityDamage.Fire),
+				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Total),
+				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Flash),
+				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Smoke),
+				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.HE),
+				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Molotov),
+				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Incendiary),
+				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Decoy),
+				fmt.Sprintf("%d", player.UtilityStats.UnusedUtilityValue),
 			})
 		}
 

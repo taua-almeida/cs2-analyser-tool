@@ -15,19 +15,24 @@ import (
 // three questions and leave the embedded interfaces nil.
 type matchParser struct {
 	demoinfocs.Parser
-	playing []*common.Player
+	playing     []*common.Player
+	warmup      bool
+	currentTime time.Duration
 }
 
-func (p *matchParser) GameState() demoinfocs.GameState { return matchGameState{playing: p.playing} }
+func (p *matchParser) GameState() demoinfocs.GameState {
+	return matchGameState{playing: p.playing, warmup: p.warmup}
+}
 
-func (*matchParser) CurrentTime() time.Duration { return 0 }
+func (p *matchParser) CurrentTime() time.Duration { return p.currentTime }
 
 type matchGameState struct {
 	demoinfocs.GameState
 	playing []*common.Player
+	warmup  bool
 }
 
-func (matchGameState) IsWarmupPeriod() bool { return false }
+func (g matchGameState) IsWarmupPeriod() bool { return g.warmup }
 
 func (g matchGameState) Participants() demoinfocs.Participants {
 	return matchParticipants{playing: g.playing}
@@ -49,6 +54,7 @@ func liveAnalyser(playing ...*common.Player) *analyser {
 		sideDamage:  make(map[uint64]SideCount),
 		openingWins: make(map[uint64]int),
 		lastHealth:  make(map[uint64]int),
+		flashEnds:   make(map[uint64]time.Duration),
 	}
 }
 

@@ -51,7 +51,7 @@ type roundOutcome struct {
 // drive it without a demo file.
 type roundTracker struct {
 	live       bool
-	ending     bool
+	decided    bool
 	winner     common.Team
 	startAlive map[uint64]common.Team
 	alive      map[uint64]common.Team
@@ -69,7 +69,7 @@ func newRoundTracker() *roundTracker {
 
 func (rt *roundTracker) startRound(alive map[uint64]common.Team) {
 	rt.live = true
-	rt.ending = false
+	rt.decided = false
 	rt.winner = common.TeamUnassigned
 	rt.startAlive = make(map[uint64]common.Team, len(alive))
 	rt.alive = make(map[uint64]common.Team, len(alive))
@@ -122,14 +122,14 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 		// suicides and world deaths never open a round, and once the round
 		// is decided nothing can (a bomb explosion or exit frag in an
 		// otherwise killless round is not an entry).
-		if rt.opening.killer == 0 && !rt.ending {
+		if rt.opening.killer == 0 && !rt.decided {
 			rt.opening = openingDuel{killer: killer, victim: victim, killerTeam: killerTeam, victimTeam: victimTeam}
 		}
 		rt.enemyKills[killer]++
 		if assister != 0 {
 			rt.assists[assister] = true
 		}
-		// Deliberately no rt.ending guard: deaths and revenge kills stay
+		// Deliberately no rt.decided guard: deaths and revenge kills stay
 		// eligible until finalize, so a post-round death can still be
 		// avenged inside the window.
 		for _, d := range rt.deaths {
@@ -144,17 +144,24 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 	// Dying before the round officially ends cancels survival, including to
 	// the post-round bomb explosion (HLTV convention). Only match-end world
 	// cleanup kills are ignored once the round is decided.
-	if !(rt.ending && byWorld) {
+	if !rt.isPostRoundWorldCleanup(byWorld) {
 		rt.remove(victim)
 	}
 	return isTrade
+}
+
+// isPostRoundWorldCleanup identifies engine cleanup deaths after the round
+// result is known. The decision remains available after finalize because CS2
+// can dispatch cleanup kills after RoundEndOfficial; startRound clears it.
+func (rt *roundTracker) isPostRoundWorldCleanup(byWorld bool) bool {
+	return rt.decided && byWorld
 }
 
 // disconnect handles a player leaving mid-round: they count as dead for
 // the round, unless the round is already decided (players leaving after
 // the final whistle keep their survival).
 func (rt *roundTracker) disconnect(player uint64) {
-	if rt.ending {
+	if rt.decided {
 		return
 	}
 	rt.remove(player)
@@ -174,7 +181,7 @@ func (rt *roundTracker) remove(player uint64) {
 // one enemy. The candidacy sticks for the rest of the round. Once the round
 // is decided, post-round deaths cannot start a clutch anymore.
 func (rt *roundTracker) updateClutchCandidates() {
-	if rt.ending {
+	if rt.decided {
 		return
 	}
 	for _, team := range bothTeams {
@@ -213,7 +220,7 @@ func (rt *roundTracker) markEnd(winner common.Team) {
 	if !rt.live {
 		return
 	}
-	rt.ending = true
+	rt.decided = true
 	rt.winner = winner
 }
 
@@ -224,7 +231,6 @@ func (rt *roundTracker) finalize() roundOutcome {
 		return roundOutcome{}
 	}
 	rt.live = false
-	rt.ending = false
 
 	outcome := roundOutcome{
 		played:       true,

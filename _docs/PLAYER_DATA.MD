@@ -49,6 +49,58 @@ The count is in JSON, in CSV as `Deaths Traded` plus its CT/T columns, and in th
 | DamageGiven | `damage_given` | Health damage dealt to enemies. Team damage, self damage and bomb damage never count (HLTV convention). |
 | ADR | `adr` | Average damage per round: `damage_given / total rounds of the match`. |
 
+### Utility stats (`utility_stats`)
+
+Match-wide use and effectiveness of the six standard purchasable grenades: flashbang, smoke, HE, molotov, incendiary and decoy. Game-mode equipment such as snowballs, breach charges and bump mines is excluded. The first version has no CT/T split, per-round rate or self-flash field.
+
+| Field | JSON key | Description |
+| --- | --- | --- |
+| EnemiesFlashed | `enemies_flashed` | Enemy `PlayerFlashed` events attributed to this player. This counts events, so flashing the same enemy twice adds two. |
+| FriendsFlashed | `friends_flashed` | Teammate `PlayerFlashed` events attributed to this player. Self-flashes are excluded. |
+| EnemyFlashTimeSeconds | `enemy_flash_time_seconds` | Sum of new blind time added by enemy flash events, in seconds. When a blinded player is re-flashed, already-covered time is not counted twice. |
+| AverageEnemyFlashTimeSeconds | `average_enemy_flash_time_seconds` | `enemy_flash_time_seconds / enemies_flashed`, or 0 when no enemy was flashed. It is derived after parsing so the count and total duration remain the source values. |
+| UtilityDamage | `utility_damage` | Actual enemy health removed by damaging utility: `{total, he, fire}`. See [utility damage](#utility-damage). |
+| GrenadesThrown | `grenades_thrown` | Uses of standard grenades: `{total, flash, smoke, he, molotov, incendiary, decoy}`. See [grenades thrown](#grenades-thrown). |
+| UnusedUtilityValue | `unused_utility_value` | Cumulative purchase value of standard grenades carried at qualifying deaths. See [unused utility value](#unused-utility-value). |
+
+Flash assists remain at `assist_stats.flashed_enemies`; `utility_stats` does not duplicate them. The `Utility effectiveness` table shown by `--details` places that existing count beside the new flash, damage and unused-value fields.
+
+#### Utility damage
+
+Utility damage reuses the same per-event real-health cap as `assist_stats.damage_given`. It never exceeds either the damage reported for the event or the victim's actual health drop. Self damage, team damage and bomb damage are excluded from both totals.
+
+- `he` counts HE grenade damage.
+- `fire` combines molotov and incendiary damage. Inferno hurt events do not reliably identify which fire grenade created the flames, although their throw counts remain separate.
+- `total` is `he + fire`.
+- Gun damage and direct projectile chip damage from otherwise non-damaging grenades do not count.
+
+Smoke and decoy therefore have use counts but no invented effectiveness value.
+
+#### Grenades thrown
+
+Each `GrenadeProjectileThrow` adds one use. `WeaponFire` is not counted, and warmup events are ignored. `total` is the sum of the six named counts. If demoinfocs cannot resolve a projectile model, the analyser recovers the type from the thrower's active inventory item when possible. Smoke and decoy are represented by throws only.
+
+#### Unused utility value
+
+This is a cumulative value across deaths, not an average and not the largest inventory seen at one death. Every qualifying death contributes, including repeated deaths in respawn modes, suicides, bomb and fall deaths, and combat deaths after the round result. Automatic World cleanup after the round has already been decided is excluded.
+
+Only standard grenade inventory is valued. Weapons, armour and game-mode equipment do not contribute. Quantity is `AmmoInMagazine + AmmoReserve`, which counts a second flashbang stored as reserve ammo. The pinned Mirage case in `TestProcessDemoGolden` explicitly verifies that the demoinfocs version used by this project still exposes the victim's pre-death inventory during `Kill`, without parsing the fixture a second time.
+
+`Equipment` has no price API, so `cmd/demo_parser/utility.go` owns one explicit price table. It uses normal Competitive buy-menu prices from the August 2026 CS2 economy:
+
+| Grenade | Price |
+| --- | ---: |
+| Flashbang | $200 |
+| Smoke | $300 |
+| HE | $300 |
+| Molotov | $400 |
+| Incendiary | $500 |
+| Decoy | $50 |
+
+Every entry is unit-tested. Update the table and this convention together if Valve changes the economy.
+
+All utility scalars are appended to CSV after the existing columns. `--details` adds `Utility effectiveness` and `Grenades thrown` tables; the 11-column main table is unchanged.
+
 ### Map stats (`player_map_stats`)
 
 | Field | JSON key | Description |
