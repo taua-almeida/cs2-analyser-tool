@@ -17,6 +17,11 @@ const aceKills = 5
 // multi-kill round, the smallest bucket being the 2k.
 const multiKillMin = 2
 
+// ratingAssistDamage is the damage a player must have dealt to a dying
+// enemy for the kill to count as an assist in the rating's KAST. Rating 3.0
+// raised it from the 25 that Rating 2.0 used.
+const ratingAssistDamage = 40
+
 var bothTeams = []common.Team{common.TeamTerrorists, common.TeamCounterTerrorists}
 
 type deathRecord struct {
@@ -42,25 +47,33 @@ type roundOutcome struct {
 	opening      openingDuel
 	openingWon   bool // the opening killer's team won the round
 	participants map[uint64]common.Team
-	deathsTraded map[uint64]bool // players with a death avenged inside the trade window
-	kast         map[uint64]bool // players that got a Kill, Assist, Survived or were Traded
+	deathsTraded map[uint64]bool    // players with a death avenged inside the trade window
+	kast         map[uint64]bool    // players that got a Kill, Assist, Survived or were Traded
+	swing        map[uint64]float64 // per-player round-win-probability swing, zero-sum per round
+	ecoSurvival  map[uint64]float64 // eco round weight of the players that survived
+	ratingKast   map[uint64]float64 // eco round weight of the players with rating KAST credit
 }
 
 // roundTracker keeps the per-round state needed for clutches, aces, trades
 // and KAST. It is fed plain values instead of parser types so tests can
 // drive it without a demo file.
 type roundTracker struct {
-	live       bool
-	decided    bool
-	winner     common.Team
-	startAlive map[uint64]common.Team
-	alive      map[uint64]common.Team
-	enemyKills map[uint64]int
-	assists    map[uint64]bool
-	traded     map[uint64]bool
-	deaths     []deathRecord
-	clutchers  map[common.Team]uint64
-	opening    openingDuel
+	live          bool
+	decided       bool
+	winner        common.Team
+	bombPlanted   bool
+	startAlive    map[uint64]common.Team
+	alive         map[uint64]common.Team
+	enemyKills    map[uint64]int
+	assists       map[uint64]bool
+	traded        map[uint64]bool
+	deaths        []deathRecord
+	clutchers     map[common.Team]uint64
+	opening       openingDuel
+	tiers         map[uint64]equipTier      // loadout tier per player this round
+	damageTo      map[uint64]map[uint64]int // enemy damage this round, by victim then attacker
+	damageAssists map[uint64]bool           // players with ratingAssistDamage on an enemy that died
+	swing         map[uint64]float64        // round-win-probability swing per player
 }
 
 func newRoundTracker() *roundTracker {
@@ -83,7 +96,44 @@ func (rt *roundTracker) startRound(alive map[uint64]common.Team) {
 	rt.deaths = nil
 	rt.clutchers = make(map[common.Team]uint64)
 	rt.opening = openingDuel{}
+	rt.bombPlanted = false
+	rt.tiers = make(map[uint64]equipTier)
+	rt.damageTo = make(map[uint64]map[uint64]int)
+	rt.damageAssists = make(map[uint64]bool)
+	rt.swing = make(map[uint64]float64)
 	rt.updateClutchCandidates()
+}
+
+// plantBomb records the bomb going down, which shifts the win probability
+// behind round swing towards the T side for the rest of the round.
+func (rt *roundTracker) plantBomb() {
+	if !rt.live {
+		return
+	}
+	rt.bombPlanted = true
+}
+
+// setTier records the loadout tier a player carries this round. It weighs
+// their survival and KAST credit at finalize, so it should reflect the buy:
+// the analyser calls it at round start and again when freeze time ends.
+func (rt *roundTracker) setTier(id uint64, tier equipTier) {
+	if !rt.live {
+		return
+	}
+	rt.tiers[id] = tier
+}
+
+// damage accumulates enemy damage for the rating's 40-damage assist rule.
+// The caller is responsible for filtering out team, self and bomb damage,
+// which the analyser's hurt handler already does for damage given.
+func (rt *roundTracker) damage(attacker, victim uint64, hp int) {
+	if !rt.live || attacker == 0 {
+		return
+	}
+	if rt.damageTo[victim] == nil {
+		rt.damageTo[victim] = make(map[uint64]int)
+	}
+	rt.damageTo[victim][attacker] += hp
 }
 
 // joinRound folds the players on a side when live play begins into the
@@ -129,6 +179,12 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 		if assister != 0 {
 			rt.assists[assister] = true
 		}
+		// Post-round kills swing nothing: the probability table has no
+		// notion of a decided round, so without this guard an exit frag
+		// would read as swinging a settled outcome.
+		if !rt.decided {
+			rt.recordSwing(killer, victim, killerTeam, victimTeam)
+		}
 		// Deliberately no rt.decided guard: deaths and revenge kills stay
 		// eligible until finalize, so a post-round death can still be
 		// avenged inside the window.
@@ -140,6 +196,15 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 		}
 	}
 
+	// Any death settles the 40-damage assists on the victim, whatever caused
+	// it: enemy damage into a player finished by the bomb or a fall still
+	// helped. The killer's own damage is their kill, not an assist.
+	for attacker, hp := range rt.damageTo[victim] {
+		if attacker != killer && hp >= ratingAssistDamage {
+			rt.damageAssists[attacker] = true
+		}
+	}
+
 	rt.deaths = append(rt.deaths, deathRecord{killer: killer, victim: victim, victimTeam: victimTeam, at: at})
 	// Dying before the round officially ends cancels survival, including to
 	// the post-round bomb explosion (HLTV convention). Only match-end world
@@ -148,6 +213,39 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 		rt.remove(victim)
 	}
 	return isTrade
+}
+
+// recordSwing credits the killer with the round-win-probability gain of the
+// victim's death and debits the victim the same amount, so swing sums to
+// zero across each round: what one player earns, an opponent paid for.
+// Suicides, teamkills and world deaths reach this through no path, which
+// means they move no swing in this first version.
+func (rt *roundTracker) recordSwing(killer, victim uint64, killerTeam, victimTeam common.Team) {
+	if _, isAlive := rt.alive[victim]; !isAlive {
+		return
+	}
+	tAlive, ctAlive := rt.aliveCounts()
+	before := teamWinProbability(killerTeam, tAlive, ctAlive, rt.bombPlanted)
+	if victimTeam == common.TeamTerrorists {
+		tAlive--
+	} else {
+		ctAlive--
+	}
+	after := teamWinProbability(killerTeam, tAlive, ctAlive, rt.bombPlanted)
+	rt.swing[killer] += after - before
+	rt.swing[victim] -= after - before
+}
+
+func (rt *roundTracker) aliveCounts() (tAlive, ctAlive int) {
+	for _, team := range rt.alive {
+		switch team {
+		case common.TeamTerrorists:
+			tAlive++
+		case common.TeamCounterTerrorists:
+			ctAlive++
+		}
+	}
+	return tAlive, ctAlive
 }
 
 // isPostRoundWorldCleanup identifies engine cleanup deaths after the round
@@ -241,6 +339,9 @@ func (rt *roundTracker) finalize() roundOutcome {
 		participants: rt.startAlive,
 		deathsTraded: make(map[uint64]bool),
 		kast:         make(map[uint64]bool),
+		swing:        rt.swing,
+		ecoSurvival:  make(map[uint64]float64),
+		ratingKast:   make(map[uint64]float64),
 	}
 	for id, kills := range rt.enemyKills {
 		if kills >= aceKills {
@@ -257,6 +358,17 @@ func (rt *roundTracker) finalize() roundOutcome {
 		}
 		if survived || rt.enemyKills[id] > 0 || rt.assists[id] || rt.traded[id] {
 			outcome.kast[id] = true
+		}
+		// The rating's KAST differs from the classic one in its assist rule:
+		// the demo's assist events stay in (they carry flash assists), and
+		// the 40-damage rule adds contributors those events missed. A player
+		// with no tier recorded weighs the neutral 1.
+		weight := ecoRoundWeight(rt.tiers[id])
+		if survived {
+			outcome.ecoSurvival[id] = weight
+		}
+		if outcome.kast[id] || rt.damageAssists[id] {
+			outcome.ratingKast[id] = weight
 		}
 	}
 	return outcome
