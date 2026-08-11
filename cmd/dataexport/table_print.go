@@ -42,7 +42,7 @@ func entryScore(opening demoparser.OpeningDuelStats) string {
 func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, mapData *demoparser.MapData, gameMode string) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "ADR", "KAST (%)", "Entry", "Precision (%)", "Best Weapon"})
+	t.AppendHeader(table.Row{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "ADR", "KAST (%)", "Rating", "Entry", "Precision (%)", "Best Weapon"})
 	for _, player := range playerToAnalyse {
 		playerBestWeapon := demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills)
 		t.AppendRow(table.Row{
@@ -54,6 +54,7 @@ func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, mapDat
 			player.AssistStats.Total,
 			fmt.Sprintf("%.1f", player.AssistStats.ADR),
 			fmt.Sprintf("%.1f", player.PlayerMapStats.KAST),
+			fmt.Sprintf("%.2f", player.Rating.Value),
 			entryScore(player.OpeningDuelStats),
 			fmt.Sprintf("%.1f", player.KillStats.Precision*100),
 			playerBestWeapon,
@@ -72,11 +73,35 @@ func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, mapDat
 // each in its own narrow table. Only shown with --details.
 func PrintCLIDetailTables(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
 	players := sortedByKills(playerToAnalyse)
+	printRatingTable(players, os.Stdout)
 	printMultiKillTable(players, os.Stdout)
 	printTradeTable(players, os.Stdout)
 	printSideSplitTable(players, os.Stdout)
 	printUtilityEffectivenessTable(players, os.Stdout)
 	printGrenadesThrownTable(players, os.Stdout)
+}
+
+// printRatingTable breaks the rating into its six sub-ratings, each
+// normalized so 1.00 is an average performance on that axis.
+func printRatingTable(players []*demoparser.DemoPlayer, output io.Writer) {
+	t := table.NewWriter()
+	t.SetOutputMirror(output)
+	t.SetTitle("Rating breakdown (1.00 = average)")
+	t.AppendHeader(table.Row{"Name", "Rating", "Kills", "Damage", "Survival", "KAST", "Multi-kill", "Round swing"})
+	for _, player := range players {
+		rating := player.Rating
+		t.AppendRow(table.Row{
+			player.Name,
+			fmt.Sprintf("%.2f", rating.Value),
+			fmt.Sprintf("%.2f", rating.Kills),
+			fmt.Sprintf("%.2f", rating.Damage),
+			fmt.Sprintf("%.2f", rating.Survival),
+			fmt.Sprintf("%.2f", rating.KAST),
+			fmt.Sprintf("%.2f", rating.MultiKill),
+			fmt.Sprintf("%.2f", rating.RoundSwing),
+		})
+	}
+	t.Render()
 }
 
 // countSplit formats a side-split count as "ct / t".
