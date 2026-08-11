@@ -28,15 +28,9 @@ type analyser struct {
 	gameMode    string
 }
 
-func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
-	file, err := os.Open(demoPath)
-	if err != nil {
-		return nil, fmt.Errorf("opening demo file: %w", err)
-	}
-	defer file.Close()
-
-	a := &analyser{
-		parser:      demoinfocs.NewParser(file),
+func newAnalyser(parser demoinfocs.Parser) *analyser {
+	return &analyser{
+		parser:      parser,
 		players:     make(map[uint64]*DemoPlayer),
 		tracker:     newRoundTracker(),
 		kastRounds:  make(map[uint64]SideCount),
@@ -45,6 +39,16 @@ func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
 		lastHealth:  make(map[uint64]int),
 		flashEnds:   make(map[uint64]time.Duration),
 	}
+}
+
+func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
+	file, err := os.Open(demoPath)
+	if err != nil {
+		return nil, fmt.Errorf("opening demo file: %w", err)
+	}
+	defer file.Close()
+
+	a := newAnalyser(demoinfocs.NewParser(file))
 	defer a.parser.Close()
 
 	a.registerHandlers()

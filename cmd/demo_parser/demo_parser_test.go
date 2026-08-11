@@ -46,16 +46,7 @@ type matchParticipants struct {
 func (p matchParticipants) Playing() []*common.Player { return p.playing }
 
 func liveAnalyser(playing ...*common.Player) *analyser {
-	return &analyser{
-		parser:      &matchParser{playing: playing},
-		players:     make(map[uint64]*DemoPlayer),
-		tracker:     newRoundTracker(),
-		kastRounds:  make(map[uint64]SideCount),
-		sideDamage:  make(map[uint64]SideCount),
-		openingWins: make(map[uint64]int),
-		lastHealth:  make(map[uint64]int),
-		flashEnds:   make(map[uint64]time.Duration),
-	}
+	return newAnalyser(&matchParser{playing: playing})
 }
 
 const (
