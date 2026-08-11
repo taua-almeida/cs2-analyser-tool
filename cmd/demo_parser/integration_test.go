@@ -12,14 +12,15 @@ import (
 )
 
 // demoFixture is a real CS2 demo the parser is run against. The demos are
-// not committed to the repo (they are tens of megabytes); fetch them with
-// `make download-test-demos`. Each is pinned by SHA-256 so the bytes cannot
-// change underneath the golden files.
+// not committed to the repo. Public fixtures can be fetched with
+// `make download-test-demos`; Inferno must be supplied locally. Each is pinned
+// by SHA-256 so the bytes cannot change underneath the golden files.
 type demoFixture struct {
 	name                 string
 	demo                 string
 	sha256               string
 	golden               string
+	requiredInCI         bool
 	expectsUnusedUtility bool
 	expectsSideSwap      bool
 }
@@ -44,13 +45,15 @@ var demoFixtures = []demoFixture{
 		demo:                 "testdata/mirage.dem",
 		sha256:               "84a1a4191302bdd2a3bbb5a727842093744b1fb1a228aeec630369e44b622cb2",
 		golden:               "testdata/golden_mirage.json",
+		requiredInCI:         true,
 		expectsUnusedUtility: true,
 	},
 	{
-		name:   "ancient_scoreboard_mvps",
-		demo:   "testdata/ancient.dem",
-		sha256: "b29a9cb537a181deef97b15cfed10ee722a37999644a27bb2226fdd77a1337fc",
-		golden: "testdata/golden_ancient.json",
+		name:         "ancient_scoreboard_mvps",
+		demo:         "testdata/ancient.dem",
+		sha256:       "b29a9cb537a181deef97b15cfed10ee722a37999644a27bb2226fdd77a1337fc",
+		golden:       "testdata/golden_ancient.json",
+		requiredInCI: true,
 	},
 	{
 		name:            "inferno_shotgun_halftime_and_freeze_join",
@@ -80,24 +83,17 @@ func TestProcessDemoGolden(t *testing.T) {
 				// fails to land in the expected place is a red build
 				// rather than a skip that leaves the integration test
 				// unrun and unnoticed.
-				if os.Getenv("REQUIRE_TEST_DEMO") != "" {
+				if f.requiredInCI && os.Getenv("REQUIRE_TEST_DEMO") != "" {
 					t.Fatalf("fixture %s is missing and REQUIRE_TEST_DEMO is set", f.demo)
 				}
-				t.Skipf("fixture %s not present, run `make download-test-demos` to fetch it", f.demo)
+				t.Skipf("fixture %s not present; see testdata/README.md", f.demo)
 			}
 			if err != nil {
 				t.Fatalf("reading fixture: %v", err)
 			}
-			if len(demoBytes) < 1024 &&
-				strings.HasPrefix(string(demoBytes), "version https://git-lfs.github.com/spec/v1\n") {
-				if os.Getenv("REQUIRE_TEST_DEMO") != "" {
-					t.Fatalf("fixture %s is still a Git LFS pointer; run `make download-test-demos`", f.demo)
-				}
-				t.Skipf("fixture %s is still a Git LFS pointer, run `make download-test-demos`", f.demo)
-			}
 			sum := sha256.Sum256(demoBytes)
 			if got := hex.EncodeToString(sum[:]); got != f.sha256 {
-				t.Fatalf("fixture %s has sha256 %s, want %s; delete it and run `make download-test-demos` again",
+				t.Fatalf("fixture %s has sha256 %s, want %s; replace it with the expected demo",
 					f.demo, got, f.sha256)
 			}
 
