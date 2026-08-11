@@ -196,11 +196,11 @@ func shiftLogit(p, delta float64) float64 {
 // player. The values were measured over the calibration set in
 // _docs/PLAYER_DATA.MD; update them together with those numbers.
 const (
-	baselineKillPoints = 0.68 // eco-adjusted kill points per round
-	baselineEcoDamage  = 78.0 // eco-adjusted damage per round
-	baselineSurvival   = 0.30 // eco-weighted rounds survived per round
-	baselineKast       = 0.70 // eco-weighted rating-KAST rounds per round
-	baselineMultiKill  = 0.27 // multi-kill points per round
+	baselineKillPoints = 0.69 // eco-adjusted kill points per round
+	baselineEcoDamage  = 70.0 // eco-adjusted damage per round
+	baselineSurvival   = 0.37 // eco-weighted rounds survived per round
+	baselineKast       = 0.79 // eco-weighted rating-KAST rounds per round
+	baselineMultiKill  = 0.22 // multi-kill points per round
 )
 
 // swingScale converts average round swing, which is zero for the average
