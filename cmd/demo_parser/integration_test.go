@@ -16,10 +16,11 @@ import (
 // `make download-test-demos`. Each is pinned by SHA-256 so the bytes cannot
 // change underneath the golden files.
 type demoFixture struct {
-	name   string
-	demo   string
-	sha256 string
-	golden string
+	name                 string
+	demo                 string
+	sha256               string
+	golden               string
+	expectsUnusedUtility bool
 }
 
 // The two fixtures cover the two ways a CS2 demo reports round MVPs, which
@@ -42,10 +43,11 @@ type demoFixture struct {
 //     is TestSideStatsFollowTheHalftimeSwap's job.
 var demoFixtures = []demoFixture{
 	{
-		name:   "mirage_round_mvp_events",
-		demo:   "testdata/mirage.dem",
-		sha256: "84a1a4191302bdd2a3bbb5a727842093744b1fb1a228aeec630369e44b622cb2",
-		golden: "testdata/golden_mirage.json",
+		name:                 "mirage_round_mvp_events",
+		demo:                 "testdata/mirage.dem",
+		sha256:               "84a1a4191302bdd2a3bbb5a727842093744b1fb1a228aeec630369e44b622cb2",
+		golden:               "testdata/golden_mirage.json",
+		expectsUnusedUtility: true,
 	},
 	{
 		name:   "ancient_scoreboard_mvps",
@@ -91,6 +93,21 @@ func TestProcessDemoGolden(t *testing.T) {
 			result, err := ProcessDemo(f.demo)
 			if err != nil {
 				t.Fatalf("ProcessDemo: %v", err)
+			}
+			if f.expectsUnusedUtility {
+				// A positive aggregate proves Kill still exposes pre-death
+				// grenade inventory. The golden below pins every exact value;
+				// this assertion documents the prerequisite independently.
+				observed := false
+				for _, player := range result.Players {
+					if player.UtilityStats.UnusedUtilityValue > 0 {
+						observed = true
+						break
+					}
+				}
+				if !observed {
+					t.Fatal("fixture produced no unused utility; Kill may no longer expose pre-death inventory")
+				}
 			}
 
 			got, err := json.MarshalIndent(result, "", "  ")

@@ -76,6 +76,39 @@ type OpeningDuelStats struct {
 	OpeningSuccessRate float64   `json:"opening_success_rate"`
 }
 
+// UtilityDamageStats counts real enemy health removed by standard damaging
+// grenades. Fire combines molotov and incendiary damage because the originating
+// grenade cannot be recovered reliably from inferno hurt events.
+type UtilityDamageStats struct {
+	Total int `json:"total"`
+	HE    int `json:"he"`
+	Fire  int `json:"fire"`
+}
+
+// GrenadesThrownStats counts one use per standard grenade projectile created.
+// Total is maintained with the six mutually exclusive type counters.
+type GrenadesThrownStats struct {
+	Total      int `json:"total"`
+	Flash      int `json:"flash"`
+	Smoke      int `json:"smoke"`
+	HE         int `json:"he"`
+	Molotov    int `json:"molotov"`
+	Incendiary int `json:"incendiary"`
+	Decoy      int `json:"decoy"`
+}
+
+// UtilityStats holds match-wide flash, damage, usage, and unused-inventory
+// measurements. Flash counts are events rather than unique affected players.
+type UtilityStats struct {
+	EnemiesFlashed               int                 `json:"enemies_flashed"`
+	FriendsFlashed               int                 `json:"friends_flashed"`
+	EnemyFlashTimeSeconds        float64             `json:"enemy_flash_time_seconds"`
+	AverageEnemyFlashTimeSeconds float64             `json:"average_enemy_flash_time_seconds"`
+	UtilityDamage                UtilityDamageStats  `json:"utility_damage"`
+	GrenadesThrown               GrenadesThrownStats `json:"grenades_thrown"`
+	UnusedUtilityValue           int                 `json:"unused_utility_value"`
+}
+
 type DemoPlayer struct {
 	SteamID          uint64           `json:"steam_id"`
 	Name             string           `json:"name"`
@@ -87,6 +120,7 @@ type DemoPlayer struct {
 	PlayerMapStats   PlayerMapStats   `json:"player_map_stats"`
 	OpeningDuelStats OpeningDuelStats `json:"opening_duel_stats"`
 	SideStats        SideStats        `json:"side_stats"`
+	UtilityStats     UtilityStats     `json:"utility_stats"`
 }
 
 type MapData struct {

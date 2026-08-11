@@ -76,6 +76,27 @@
           "ct": 87.5,
           "t": 0
         }
+      },
+      "utility_stats": {
+        "enemies_flashed": 0,
+        "friends_flashed": 0,
+        "enemy_flash_time_seconds": 0,
+        "average_enemy_flash_time_seconds": 0,
+        "utility_damage": {
+          "total": 12,
+          "he": 12,
+          "fire": 0
+        },
+        "grenades_thrown": {
+          "total": 10,
+          "flash": 1,
+          "smoke": 2,
+          "he": 3,
+          "molotov": 0,
+          "incendiary": 4,
+          "decoy": 0
+        },
+        "unused_utility_value": 500
       }
     },
     "76561198071075349": {
@@ -155,6 +176,27 @@
           "ct": 100,
           "t": 0
         }
+      },
+      "utility_stats": {
+        "enemies_flashed": 1,
+        "friends_flashed": 2,
+        "enemy_flash_time_seconds": 4.592928256,
+        "average_enemy_flash_time_seconds": 4.592928256,
+        "utility_damage": {
+          "total": 38,
+          "he": 6,
+          "fire": 32
+        },
+        "grenades_thrown": {
+          "total": 12,
+          "flash": 2,
+          "smoke": 1,
+          "he": 4,
+          "molotov": 0,
+          "incendiary": 5,
+          "decoy": 0
+        },
+        "unused_utility_value": 800
       }
     },
     "76561198307159112": {
@@ -232,6 +274,27 @@
           "ct": 0,
           "t": 37.5
         }
+      },
+      "utility_stats": {
+        "enemies_flashed": 0,
+        "friends_flashed": 0,
+        "enemy_flash_time_seconds": 0,
+        "average_enemy_flash_time_seconds": 0,
+        "utility_damage": {
+          "total": 0,
+          "he": 0,
+          "fire": 0
+        },
+        "grenades_thrown": {
+          "total": 1,
+          "flash": 0,
+          "smoke": 0,
+          "he": 1,
+          "molotov": 0,
+          "incendiary": 0,
+          "decoy": 0
+        },
+        "unused_utility_value": 200
       }
     },
     "76561198387460920": {
@@ -307,6 +370,27 @@
           "ct": 87.5,
           "t": 0
         }
+      },
+      "utility_stats": {
+        "enemies_flashed": 0,
+        "friends_flashed": 1,
+        "enemy_flash_time_seconds": 0,
+        "average_enemy_flash_time_seconds": 0,
+        "utility_damage": {
+          "total": 31,
+          "he": 17,
+          "fire": 14
+        },
+        "grenades_thrown": {
+          "total": 11,
+          "flash": 1,
+          "smoke": 2,
+          "he": 4,
+          "molotov": 0,
+          "incendiary": 4,
+          "decoy": 0
+        },
+        "unused_utility_value": 1000
       }
     },
     "76561198826243397": {
@@ -385,6 +469,27 @@
           "ct": 75,
           "t": 0
         }
+      },
+      "utility_stats": {
+        "enemies_flashed": 0,
+        "friends_flashed": 0,
+        "enemy_flash_time_seconds": 0,
+        "average_enemy_flash_time_seconds": 0,
+        "utility_damage": {
+          "total": 0,
+          "he": 0,
+          "fire": 0
+        },
+        "grenades_thrown": {
+          "total": 10,
+          "flash": 3,
+          "smoke": 4,
+          "he": 2,
+          "molotov": 0,
+          "incendiary": 1,
+          "decoy": 0
+        },
+        "unused_utility_value": 800
       }
     },
     "76561198966281369": {
@@ -466,6 +571,27 @@
           "ct": 100,
           "t": 0
         }
+      },
+      "utility_stats": {
+        "enemies_flashed": 2,
+        "friends_flashed": 1,
+        "enemy_flash_time_seconds": 0.77198016,
+        "average_enemy_flash_time_seconds": 0.38599008,
+        "utility_damage": {
+          "total": 106,
+          "he": 64,
+          "fire": 42
+        },
+        "grenades_thrown": {
+          "total": 17,
+          "flash": 2,
+          "smoke": 5,
+          "he": 5,
+          "molotov": 0,
+          "incendiary": 4,
+          "decoy": 1
+        },
+        "unused_utility_value": 1100
       }
     },
     "76561199102419525": {
@@ -545,6 +671,27 @@
           "ct": 0,
           "t": 62.5
         }
+      },
+      "utility_stats": {
+        "enemies_flashed": 3,
+        "friends_flashed": 2,
+        "enemy_flash_time_seconds": 9.445946880000001,
+        "average_enemy_flash_time_seconds": 3.1486489600000005,
+        "utility_damage": {
+          "total": 1,
+          "he": 0,
+          "fire": 1
+        },
+        "grenades_thrown": {
+          "total": 5,
+          "flash": 1,
+          "smoke": 2,
+          "he": 0,
+          "molotov": 2,
+          "incendiary": 0,
+          "decoy": 0
+        },
+        "unused_utility_value": 1400
       }
     },
     "76561199271102802": {
@@ -622,6 +769,27 @@
           "ct": 0,
           "t": 25
         }
+      },
+      "utility_stats": {
+        "enemies_flashed": 9,
+        "friends_flashed": 2,
+        "enemy_flash_time_seconds": 19.08780096,
+        "average_enemy_flash_time_seconds": 2.1208667733333333,
+        "utility_damage": {
+          "total": 0,
+          "he": 0,
+          "fire": 0
+        },
+        "grenades_thrown": {
+          "total": 6,
+          "flash": 6,
+          "smoke": 0,
+          "he": 0,
+          "molotov": 0,
+          "incendiary": 0,
+          "decoy": 0
+        },
+        "unused_utility_value": 1300
       }
     },
     "76561199311359933": {
@@ -700,6 +868,27 @@
           "ct": 0,
           "t": 66.66666666666666
         }
+      },
+      "utility_stats": {
+        "enemies_flashed": 0,
+        "friends_flashed": 0,
+        "enemy_flash_time_seconds": 0,
+        "average_enemy_flash_time_seconds": 0,
+        "utility_damage": {
+          "total": 11,
+          "he": 11,
+          "fire": 0
+        },
+        "grenades_thrown": {
+          "total": 1,
+          "flash": 0,
+          "smoke": 0,
+          "he": 1,
+          "molotov": 0,
+          "incendiary": 0,
+          "decoy": 0
+        },
+        "unused_utility_value": 800
       }
     },
     "76561199558715190": {
@@ -778,6 +967,27 @@
           "ct": 0,
           "t": 62.5
         }
+      },
+      "utility_stats": {
+        "enemies_flashed": 4,
+        "friends_flashed": 1,
+        "enemy_flash_time_seconds": 8.175325088000001,
+        "average_enemy_flash_time_seconds": 2.0438312720000003,
+        "utility_damage": {
+          "total": 0,
+          "he": 0,
+          "fire": 0
+        },
+        "grenades_thrown": {
+          "total": 2,
+          "flash": 2,
+          "smoke": 0,
+          "he": 0,
+          "molotov": 0,
+          "incendiary": 0,
+          "decoy": 0
+        },
+        "unused_utility_value": 2400
       }
     }
   },

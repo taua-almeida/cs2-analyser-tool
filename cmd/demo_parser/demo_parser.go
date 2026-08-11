@@ -5,6 +5,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	demoinfocs "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs"
 	common "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
@@ -22,6 +23,7 @@ type analyser struct {
 	sideDamage  map[uint64]SideCount // damage given, total and per side
 	openingWins map[uint64]int       // rounds won after taking the opening kill
 	lastHealth  map[uint64]int
+	flashEnds   map[uint64]time.Duration // latest known end of each player's blind interval
 	mapData     MapData
 	gameMode    string
 }
@@ -41,6 +43,7 @@ func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
 		sideDamage:  make(map[uint64]SideCount),
 		openingWins: make(map[uint64]int),
 		lastHealth:  make(map[uint64]int),
+		flashEnds:   make(map[uint64]time.Duration),
 	}
 	defer a.parser.Close()
 
@@ -75,6 +78,8 @@ func (a *analyser) registerHandlers() {
 	a.parser.RegisterEventHandler(a.onRoundFreezetimeEnd)
 	a.parser.RegisterEventHandler(a.onKill)
 	a.parser.RegisterEventHandler(a.onPlayerHurt)
+	a.parser.RegisterEventHandler(a.onPlayerFlashed)
+	a.parser.RegisterEventHandler(a.onGrenadeProjectileThrow)
 	a.parser.RegisterEventHandler(a.onRoundMVP)
 	a.parser.RegisterEventHandler(a.onRoundEnd)
 	a.parser.RegisterEventHandler(a.onRoundEndOfficial)
@@ -161,16 +166,28 @@ func (a *analyser) onKill(e events.Kill) {
 		return
 	}
 
-	if victim := a.ensurePlayer(e.Victim); victim != nil {
-		victim.Deaths++
-		victim.SideStats.Deaths.count(e.Victim.Team)
-	}
-
 	// Suicides and world deaths (fall damage, C4) have no killer to credit.
 	// Bots all report SteamID64 0, so identity has to go through trackerID
 	// (which gives each bot a distinct ID) or two different bots trading
 	// kills would misread as one bot suiciding on itself.
 	suicide := e.Killer != nil && trackerID(e.Killer) == trackerID(e.Victim)
+	// World kills can carry the victim as their own killer in CS2 demos
+	// (mid-round disconnects, match-end cleanup). The tracker uses the round
+	// state to distinguish cleanup from World deaths that still count. Bomb
+	// kills stay separate from both.
+	byWorld := (e.Killer == nil || suicide) && (e.Weapon == nil || e.Weapon.Type == common.EqWorld)
+
+	if victim := a.ensurePlayer(e.Victim); victim != nil {
+		victim.Deaths++
+		victim.SideStats.Deaths.count(e.Victim.Team)
+		// A World cleanup after the round is decided is not a player's
+		// decision to die with utility. Combat, suicide, fall, bomb and other
+		// post-round deaths still contribute.
+		if !a.tracker.isPostRoundWorldCleanup(byWorld) {
+			victim.UtilityStats.UnusedUtilityValue += unusedUtilityValue(e.Victim.Inventory)
+		}
+	}
+
 	var killerID uint64
 	var killerTeam common.Team
 	if e.Killer != nil && !suicide {
@@ -205,10 +222,6 @@ func (a *analyser) onKill(e events.Kill) {
 		}
 	}
 
-	// World kills carry the victim as their own killer in CS2 demos
-	// (mid-round disconnects, match-end cleanup), so suicides by World
-	// count as artificial deaths too. Bomb kills stay real deaths.
-	byWorld := (e.Killer == nil || suicide) && (e.Weapon == nil || e.Weapon.Type == common.EqWorld)
 	isTrade := a.tracker.kill(killerID, trackerID(e.Victim), killerTeam, e.Victim.Team, assisterID, byWorld, a.parser.CurrentTime())
 	if isTrade && !teamkill {
 		if killer := a.ensurePlayer(e.Killer); killer != nil {
@@ -249,6 +262,42 @@ func (a *analyser) onPlayerHurt(e events.PlayerHurt) {
 	if attacker := a.ensurePlayer(e.Attacker); attacker != nil {
 		attacker.AssistStats.DamageGiven += realDamage
 		addSide(a.sideDamage, attacker.SteamID, e.Attacker.Team, realDamage)
+		if e.Weapon != nil {
+			attacker.UtilityStats.UtilityDamage.add(e.Weapon.Type, realDamage)
+		}
+	}
+}
+
+func (a *analyser) onPlayerFlashed(e events.PlayerFlashed) {
+	if a.inWarmup() || e.Player == nil {
+		return
+	}
+	addedBlindTime := a.addedFlashTime(e.Player, e.FlashDuration())
+	if e.Attacker == nil {
+		return
+	}
+	if trackerID(e.Player) == trackerID(e.Attacker) {
+		return
+	}
+
+	attacker := a.ensurePlayer(e.Attacker)
+	if attacker == nil {
+		return
+	}
+	if e.Player.Team == e.Attacker.Team {
+		attacker.UtilityStats.FriendsFlashed++
+		return
+	}
+	attacker.UtilityStats.EnemiesFlashed++
+	attacker.UtilityStats.EnemyFlashTimeSeconds += addedBlindTime.Seconds()
+}
+
+func (a *analyser) onGrenadeProjectileThrow(e events.GrenadeProjectileThrow) {
+	if a.inWarmup() || e.Projectile == nil {
+		return
+	}
+	if thrower := a.ensurePlayer(e.Projectile.Thrower); thrower != nil {
+		thrower.UtilityStats.GrenadesThrown.add(projectileGrenadeType(e.Projectile))
 	}
 }
 
@@ -398,8 +447,9 @@ func perRound(value, rounds int) float64 {
 }
 
 // derive computes the per-player stats that need the finished match:
-// precision, ADR, KAST and the side splits of the last two. It is separate
-// from finalise so tests can drive it with a round count instead of a demo.
+// precision, ADR, KAST, average enemy flash time and the side splits of ADR
+// and KAST. It is separate from finalise so tests can drive it with a round
+// count instead of a demo.
 func (a *analyser) derive(totalRounds int) {
 	for id, p := range a.players {
 		if p.KillStats.Total > 0 {
@@ -427,6 +477,9 @@ func (a *analyser) derive(totalRounds int) {
 		}
 		if kills := p.OpeningDuelStats.OpeningKills.Total; kills > 0 {
 			p.OpeningDuelStats.OpeningSuccessRate = 100 * float64(a.openingWins[id]) / float64(kills)
+		}
+		if flashes := p.UtilityStats.EnemiesFlashed; flashes > 0 {
+			p.UtilityStats.AverageEnemyFlashTimeSeconds = p.UtilityStats.EnemyFlashTimeSeconds / float64(flashes)
 		}
 	}
 }

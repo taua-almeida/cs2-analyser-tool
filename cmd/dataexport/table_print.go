@@ -3,6 +3,7 @@ package dataexport
 import (
 	"cmp"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"slices"
@@ -70,9 +71,12 @@ func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, mapDat
 // PrintCLIDetailTables prints the stats that do not fit the main table,
 // each in its own narrow table. Only shown with --details.
 func PrintCLIDetailTables(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
-	printMultiKillTable(playerToAnalyse)
-	printTradeTable(playerToAnalyse)
-	printSideSplitTable(playerToAnalyse)
+	players := sortedByKills(playerToAnalyse)
+	printMultiKillTable(players, os.Stdout)
+	printTradeTable(players, os.Stdout)
+	printSideSplitTable(players, os.Stdout)
+	printUtilityEffectivenessTable(players, os.Stdout)
+	printGrenadesThrownTable(players, os.Stdout)
 }
 
 // countSplit formats a side-split count as "ct / t".
@@ -88,12 +92,12 @@ func rateSplit(rate demoparser.SideRate) string {
 // printTradeTable puts the two sides of a trade next to each other: the
 // kill that avenged a teammate and the player's own deaths that were
 // avenged. One kill can trade more than one death, so the totals may differ.
-func printTradeTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
+func printTradeTable(players []*demoparser.DemoPlayer, output io.Writer) {
 	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
+	t.SetOutputMirror(output)
 	t.SetTitle("Trade stats")
 	t.AppendHeader(table.Row{"Name", "Trade kills", "Deaths traded", "Deaths traded (CT / T)"})
-	for _, player := range sortedByKills(playerToAnalyse) {
+	for _, player := range players {
 		t.AppendRow(table.Row{
 			player.Name,
 			player.KillStats.TradeKills,
@@ -107,12 +111,12 @@ func printTradeTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
 // printSideSplitTable lists the core stats split by side. Rounds are in
 // there because per-side ADR and KAST are divided by them, which makes a
 // lopsided split worth seeing next to the rates it produced.
-func printSideSplitTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
+func printSideSplitTable(players []*demoparser.DemoPlayer, output io.Writer) {
 	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
+	t.SetOutputMirror(output)
 	t.SetTitle("Side splits (CT / T)")
 	t.AppendHeader(table.Row{"Name", "Rounds", "Kills", "Deaths", "ADR", "KAST (%)"})
-	for _, player := range sortedByKills(playerToAnalyse) {
+	for _, player := range players {
 		side := player.SideStats
 		t.AppendRow(table.Row{
 			player.Name,
@@ -128,14 +132,58 @@ func printSideSplitTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
 
 // printMultiKillTable lists the multi-kill rounds per player. The buckets
 // are exclusive, so each round shows up in exactly one column.
-func printMultiKillTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
+func printMultiKillTable(players []*demoparser.DemoPlayer, output io.Writer) {
 	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
+	t.SetOutputMirror(output)
 	t.SetTitle("Multi-kill rounds")
 	t.AppendHeader(table.Row{"Name", "2K", "3K", "4K", "5K"})
-	for _, player := range sortedByKills(playerToAnalyse) {
+	for _, player := range players {
 		multiKills := player.PlayerMapStats.MultiKills
 		t.AppendRow(table.Row{player.Name, multiKills.K2, multiKills.K3, multiKills.K4, multiKills.K5})
+	}
+	t.Render()
+}
+
+func printUtilityEffectivenessTable(players []*demoparser.DemoPlayer, output io.Writer) {
+	t := table.NewWriter()
+	t.SetOutputMirror(output)
+	t.SetTitle("Utility effectiveness")
+	t.AppendHeader(table.Row{"Name", "Flash assists", "Enemies flashed", "Friends flashed", "Enemy time (s)", "Avg enemy time (s)", "Damage", "HE", "Fire", "Unused value"})
+	for _, player := range players {
+		utility := player.UtilityStats
+		t.AppendRow(table.Row{
+			player.Name,
+			player.AssistStats.FlashedEnemies,
+			utility.EnemiesFlashed,
+			utility.FriendsFlashed,
+			fmt.Sprintf("%.2f", utility.EnemyFlashTimeSeconds),
+			fmt.Sprintf("%.2f", utility.AverageEnemyFlashTimeSeconds),
+			utility.UtilityDamage.Total,
+			utility.UtilityDamage.HE,
+			utility.UtilityDamage.Fire,
+			utility.UnusedUtilityValue,
+		})
+	}
+	t.Render()
+}
+
+func printGrenadesThrownTable(players []*demoparser.DemoPlayer, output io.Writer) {
+	t := table.NewWriter()
+	t.SetOutputMirror(output)
+	t.SetTitle("Grenades thrown")
+	t.AppendHeader(table.Row{"Name", "Total", "Flash", "Smoke", "HE", "Molotov", "Incendiary", "Decoy"})
+	for _, player := range players {
+		grenades := player.UtilityStats.GrenadesThrown
+		t.AppendRow(table.Row{
+			player.Name,
+			grenades.Total,
+			grenades.Flash,
+			grenades.Smoke,
+			grenades.HE,
+			grenades.Molotov,
+			grenades.Incendiary,
+			grenades.Decoy,
+		})
 	}
 	t.Render()
 }
