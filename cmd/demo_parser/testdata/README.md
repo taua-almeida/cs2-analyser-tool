@@ -1,17 +1,14 @@
 # Integration test fixtures
 
-The golden files here are checked in. Mirage and Ancient are downloaded from
-their public sources; Inferno is stored with Git LFS. Restore all three with:
+The golden files here are checked in. Restore the two public demo fixtures with:
 
 ```sh
 make download-test-demos
 ```
 
-[Install Git LFS](https://git-lfs.com/) before running the target.
-
-All demos are pinned by SHA-256 in `integration_test.go`; checksums for the
-two downloaded fixtures are repeated in the `Makefile`. Without the demo
-bytes, `go test ./...` skips the affected integration subtest.
+All demos are pinned by SHA-256 in `integration_test.go`; checksums for the two
+downloaded fixtures are repeated in the `Makefile`. Without the demo bytes,
+`go test ./...` skips the affected integration subtest.
 
 ## mirage.dem
 
@@ -43,9 +40,10 @@ overlapping pellet damage. It also crosses halftime and contains one player
 joining a side between `RoundStart` and the end of freeze time.
 
 - Original Valve replay: `match730_003835545804819398890_1582373632_202`
-- Source: tracked in this repository with Git LFS
-- Redistribution: approved by the repository owner, including the player
-  names and Steam IDs present in the replay and golden output
+- Source: optional local fixture; the repository does not distribute the demo
+- Setup: place the exact replay at `cmd/demo_parser/testdata/inferno-shotgun.dem`
+- Golden output redistribution is approved by the repository owner, including
+  the player names and Steam IDs it contains
 - Size: 288,711,083 bytes
 - SHA-256: `095625b47c2cc6ace12414a6bbc987ea254904d969ae39fb95c7d54e085f7f93`
 

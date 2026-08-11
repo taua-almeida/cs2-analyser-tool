@@ -24,7 +24,6 @@ go.work.sum
 # Build output (see Makefile BUILD_DIR)
 build/
 
-# Ignore downloaded demos; Inferno is the Git LFS-backed exception.
-# See `make download-test-demos`.
+# Ignore downloaded and locally supplied demo fixtures.
+# See cmd/demo_parser/testdata/README.md.
 *.dem
-!cmd/demo_parser/testdata/inferno-shotgun.dem

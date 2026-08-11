@@ -20,10 +20,9 @@ jobs:
           path: |
             cmd/demo_parser/testdata/mirage.dem
             cmd/demo_parser/testdata/ancient.dem
-            cmd/demo_parser/testdata/inferno-shotgun.dem
           # Keyed on all fixture checksums, so changing any demo rolls
           # the cache instead of restoring a stale one.
-          key: test-demos-84a1a4191302bdd2a3bbb5a727842093744b1fb1a228aeec630369e44b622cb2-b29a9cb537a181deef97b15cfed10ee722a37999644a27bb2226fdd77a1337fc-095625b47c2cc6ace12414a6bbc987ea254904d969ae39fb95c7d54e085f7f93
+          key: test-demos-84a1a4191302bdd2a3bbb5a727842093744b1fb1a228aeec630369e44b622cb2-b29a9cb537a181deef97b15cfed10ee722a37999644a27bb2226fdd77a1337fc
       - name: Download test demo fixtures
         if: steps.demo-cache.outputs.cache-hit != 'true'
         run: make download-test-demos
@@ -31,5 +30,5 @@ jobs:
       - run: go build ./...
       - run: go test ./...
         env:
-          # Fail rather than skip if the fixture never made it into place.
+          # Fail rather than skip if a public fixture never made it into place.
           REQUIRE_TEST_DEMO: "1"

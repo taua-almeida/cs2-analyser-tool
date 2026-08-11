@@ -18,10 +18,8 @@ GOTEST := $(GOCMD) test
 PLATFORMS := windows linux darwin
 os = $(word 1, $@)
 
-# Integration test fixtures. All are real CS2 demos pinned by SHA-256.
-# Mirage and Ancient come from public upstream sources; Inferno is tracked
-# with Git LFS. Sources, licenses and attribution are in
-# cmd/demo_parser/testdata/README.md.
+# Public integration test fixtures. Both are real CS2 demos pinned by SHA-256.
+# Sources, licenses and attribution are in cmd/demo_parser/testdata/README.md.
 TESTDATA_DIR := cmd/demo_parser/testdata
 
 MIRAGE_DEMO_URL := https://raw.githubusercontent.com/LaihoE/demoparser/4131a4fc02fda291b22421c20e1ca33f149535a7/src/parser/test_demo.dem
@@ -67,9 +65,6 @@ test:
 
 # Fetch the demos the integration test runs against.
 download-test-demos:
-	@if ! git lfs version >/dev/null 2>&1; then echo "git-lfs is required to restore the Inferno fixture" >&2; exit 1; fi
-	@git lfs install --local >/dev/null
-	@git lfs pull --include="$(TESTDATA_DIR)/inferno-shotgun.dem" --exclude=""
 	@$(call fetch_demo,$(TESTDATA_DIR)/mirage.dem,$(MIRAGE_DEMO_URL),$(MIRAGE_DEMO_SHA256))
 	@$(call fetch_demo,$(TESTDATA_DIR)/ancient.dem,$(ANCIENT_DEMO_URL),$(ANCIENT_DEMO_SHA256))
 

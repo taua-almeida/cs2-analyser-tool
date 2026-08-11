@@ -1,1 +1,0 @@
-cmd/demo_parser/testdata/inferno-shotgun.dem filter=lfs diff=lfs merge=lfs -text
