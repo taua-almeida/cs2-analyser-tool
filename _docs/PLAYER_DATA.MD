@@ -38,7 +38,7 @@ A kill is a trade when it lands on the *specific* enemy who killed a teammate, w
 
 The 5-second window is a deliberate choice, not a value read out of the demo: HLTV states 5 seconds for Rating 3.0 ("two kills within 5 seconds") and Refrag documents the same for its Trades column. Other trackers differ — Leetify builds 4-second kill chains instead — so trade counts are not comparable between tools even when the label matches. If you are forking and your league counts trades differently, the window is the `tradeWindow` constant at the top of `cmd/demo_parser/round_tracker.go`.
 
-The count is in JSON, in CSV as `Deaths Traded` plus its CT/T columns, and in the `Trade stats` table that `--details` prints. The 11-column main table stays unchanged.
+The count is in JSON, in CSV as `Deaths Traded` plus its CT/T columns, and in the `Trade stats` table that `--details` prints. The main table stays unchanged.
 
 ### Assist stats (`assist_stats`)
 
@@ -99,7 +99,7 @@ Only standard grenade inventory is valued. Weapons, armour and game-mode equipme
 
 Every entry is unit-tested. Update the table and this convention together if Valve changes the economy.
 
-All utility scalars are appended to CSV after the existing columns. `--details` adds `Utility effectiveness` and `Grenades thrown` tables; the 11-column main table is unchanged.
+All utility scalars are appended to CSV after the existing columns. `--details` adds `Utility effectiveness` and `Grenades thrown` tables; the main table is unchanged.
 
 ### Map stats (`player_map_stats`)
 
@@ -115,7 +115,7 @@ All utility scalars are appended to CSV after the existing columns. `--details` 
 
 `multi_kills` counts rounds, not kills. A round with three enemy kills adds one to `k3`, and nothing else.
 
-- **Buckets are exclusive.** A 4k is only a 4k, never also a 2k and a 3k. So `k2 + k3 + k4 + k5` is the number of rounds the player got at least two enemy kills in, and each bucket is directly usable as one of the six sub-ratings of HLTV Rating 3.0.
+- **Buckets are exclusive.** A 4k is only a 4k, never also a 2k and a 3k. So `k2 + k3 + k4 + k5` is the number of rounds the player got at least two enemy kills in, and the buckets feed the [rating](#rating-rating)'s multi-kill sub-rating directly.
 - **Enemy kills only**, the same rule ACEs use. Teamkills never count, so four enemy kills plus a teamkill is a 4k.
 - **A round with 0 or 1 kills is in no bucket.** The smallest multi-kill is the 2k.
 - **Post-round kills count**, exit frags included, again matching ACEs.
@@ -164,6 +164,46 @@ The match-wide `assist_stats.adr` and `player_map_stats.kast` keep dividing by t
 `adr` and `kast` are 0 for a side the player never played, not null — a `rounds.ct` of 0 gives an `adr.ct` of 0.
 
 Unlike the counts, these two are rates and so have no `total` field. The match-wide value is the existing `assist_stats.adr` / `player_map_stats.kast`.
+
+### Rating (`rating`)
+
+An HLTV Rating 3.0-style rating. **HLTV's exact formula is proprietary, so this is an approximation**: it follows the structure HLTV has described publicly — six sub-ratings, most of them economy-adjusted — with every constant chosen here and calibrated so an average player lands near 1.00. Do not expect it to match the number HLTV publishes for the same match.
+
+| Field | JSON key | Description |
+| --- | --- | --- |
+| Value | `value` | The blended rating. 1.00 is an average performance, ~1.30 a very strong map, below ~0.70 a poor one. |
+| Kills | `kills` | Eco-adjusted kill points per round, against the baseline. |
+| Damage | `damage` | Eco-adjusted damage per round, against the baseline. |
+| Survival | `survival` | Eco-weighted rounds survived per round, against the baseline. |
+| KAST | `kast` | Eco-weighted rating-KAST rounds per round, against the baseline. See [rating KAST](#rating-kast). |
+| MultiKill | `multi_kill` | Multi-kill points per round, against the baseline. |
+| RoundSwing | `round_swing` | Round-win-probability swing per round, scaled around 1.00. See [round swing](#round-swing). |
+
+Every sub-rating is normalized so 1.0 is average on that axis, and `value` is their weighted blend: kills 25%, damage 20%, round swing 20%, KAST 15%, survival 10%, multi-kills 10%. HLTV does not publish its weights; these follow the emphasis of their Rating 3.0 announcement. All constants named below live in `cmd/demo_parser/rating.go`.
+
+Like ADR and KAST, the per-round averages divide by the rounds of the whole match, so a player who joined late is diluted on every axis rather than rated on only the rounds they played.
+
+#### Equipment tiers and eco adjustment
+
+Every kill and damage event is priced by the duel's economic matchup. Each player's loadout is bucketed at kill or hurt time into one of six tiers by the strongest weapon they carry: sniper, tier-1 rifle (AK, M4s, AUG, SG 553), tier-2 rifle (FAMAS, Galil, SSG 08), SMG/shotgun/MG, upgraded pistol, starter pistol (Glock, USP-S, P2000). A knife-only player counts as a starter pistol. Per-tier strengths give the expected duel win rate, and points scale inversely with it: an even duel is worth 1.10 kill points — the value HLTV quotes — a tier-1 rifle kill on a starter pistol ~0.54, and the reverse upset ~1.66. Damage is scaled by the same factor. The duel is priced loadout against loadout: a rifler's knife kill is still a rifle-tier duel.
+
+Survival and KAST credit use a per-round weight from the player's own buy, captured when freeze time ends: surviving or staying useful on an eco (weight ~1.5 for a starter pistol) counts for more than doing it with a tier-1 rifle (weight 1), and slightly more than with an AWP (~0.95).
+
+#### Rating KAST
+
+The rating's KAST axis differs from the classic `player_map_stats.kast` in one rule: assists. The classic KAST takes the demo's assist events as they are. The rating additionally credits any player who dealt at least 40 damage to an enemy who died that round — Rating 3.0's threshold, raised from the 25 of Rating 2.0 — whoever or whatever finished them, while keeping the demo's assist events so flash assists still count. Kill, survival and traded-death credit are unchanged. The classic KAST field itself is untouched by this feature.
+
+#### Round swing
+
+Round swing measures how much each kill moved the round towards being won. A win-probability model — a lookup table over both sides' alive counts, with a planted bomb applied as a log-odds shift towards the T side — is evaluated before and after every kill; the killer gains the difference and the victim loses it, so swing sums to zero across each round and, per round, across each 5v5. Diminishing returns are built in: the fifth kill of a wipe moves an almost-decided round far less than an opening kill moves an even one. Post-round kills move nothing. In this first version suicides, teamkills and world deaths move no swing either, and neither does planting or defusing itself — only kills.
+
+The sub-rating is `1 + swing per round × 2.5`, floored at 0. An average player sits at exactly 1.00 by construction, because the swing they gain is swing an opponent lost.
+
+#### Calibration
+
+The per-round baselines that define "average" (0.69 kill points, 70 eco-damage, 0.37 eco-weighted survivals, 0.79 eco-weighted KAST rounds, 0.22 multi-kill points — multi-kill rounds score 1/2/4/7 points for a 2k/3k/4k/5k) were measured over five real matches: the three integration fixtures plus one HLTV pro match and one FACEIT match. Over that set the rounds-weighted mean rating is 1.000 and each sub-rating mean is within 2% of it. The set is small and skews towards standard competitive play; ratings in respawn or wingman modes are computed but not meaningful, since the swing table and the baselines assume 5v5 rounds.
+
+The rating is in JSON, in CSV as `Rating` plus one column per sub-rating, and in the main table as the `Rating` column beside KAST; `--details` prints the full breakdown in the `Rating breakdown` table.
 
 ## Match data
 
