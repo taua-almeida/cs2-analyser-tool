@@ -8,6 +8,7 @@ import (
 	demoinfocs "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs"
 	common "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
 	events "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/events"
+	st "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/sendtables"
 )
 
 // The handlers under test only ask the parser for round state, who is
@@ -62,6 +63,32 @@ func player(id uint64, name string, team common.Team) *common.Player {
 	return &common.Player{SteamID64: id, UserID: int(id), Name: name, Team: team}
 }
 
+type matchEntity struct {
+	st.Entity
+	properties map[string]st.PropertyValue
+}
+
+func (e matchEntity) PropertyValue(name string) (st.PropertyValue, bool) {
+	value, ok := e.properties[name]
+	return value, ok
+}
+
+func (e matchEntity) PropertyValueMust(name string) st.PropertyValue {
+	if value, ok := e.properties[name]; ok {
+		return value
+	}
+	panic("missing test entity property: " + name)
+}
+
+func playerWithCoachingTeam(id uint64, name string, team, coachingTeam common.Team) *common.Player {
+	p := player(id, name, team)
+	p.Entity = matchEntity{properties: map[string]st.PropertyValue{
+		"m_iCoachingTeam": {Any: int32(coachingTeam)},
+		"m_iMVPs":         {Any: int32(0)},
+	}}
+	return p
+}
+
 // botPlayer builds a bot, whose SteamID64 is always 0 like every other bot's.
 func botPlayer(userID int, name string, team common.Team) *common.Player {
 	return &common.Player{IsBot: true, UserID: userID, Name: name, Team: team}
@@ -85,6 +112,105 @@ func damageGiven(a *analyser) int {
 		return 0
 	}
 	return p.AssistStats.DamageGiven
+}
+
+func TestPlayingRosterExcludesCoachingController(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		team common.Team
+	}{
+		{name: "terrorist", team: common.TeamTerrorists},
+		{name: "counter-terrorist", team: common.TeamCounterTerrorists},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			const coachID = uint64(3)
+			competitor := player(shooterID, "competitor", common.TeamTerrorists)
+			coach := playerWithCoachingTeam(coachID, "coach", test.team, test.team)
+			a := liveAnalyser(competitor, coach)
+
+			roster := a.playingRoster()
+
+			if _, ok := roster[coachID]; ok {
+				t.Error("coaching controller was included in the round roster")
+			}
+			if _, ok := roster[shooterID]; !ok {
+				t.Error("competitor was excluded from the round roster")
+			}
+			if _, ok := a.players[coachID]; ok {
+				t.Error("coaching controller was exported as a player")
+			}
+
+			a.syncScoreboardMVPs()
+			if _, ok := a.players[coachID]; ok {
+				t.Error("scoreboard MVP sync exported the coaching controller")
+			}
+		})
+	}
+}
+
+func TestUnsetCoachingTeamKeepsPlayerEligible(t *testing.T) {
+	competitor := player(shooterID, "competitor", common.TeamTerrorists)
+	competitor.Entity = matchEntity{properties: map[string]st.PropertyValue{
+		"m_iCoachingTeam": {},
+	}}
+	a := liveAnalyser(competitor)
+
+	if a.ensurePlayer(competitor) == nil {
+		t.Error("player with an unset coaching team was excluded")
+	}
+}
+
+func TestCoachingControllerEventsDoNotAffectCompetitiveRound(t *testing.T) {
+	competitor := player(shooterID, "competitor", common.TeamTerrorists)
+	opponent := player(victimID, "opponent", common.TeamCounterTerrorists)
+	tCoach := playerWithCoachingTeam(3, "t-coach", common.TeamTerrorists, common.TeamTerrorists)
+	ctCoach := playerWithCoachingTeam(4, "ct-coach", common.TeamCounterTerrorists, common.TeamCounterTerrorists)
+	a := liveAnalyser(competitor, opponent, tCoach, ctCoach)
+	a.onRoundStart(events.RoundStart{})
+	a.lastHealth[victimID] = 100
+
+	a.onPlayerHurt(events.PlayerHurt{
+		Player: ctCoach, Attacker: competitor, Weapon: &common.Equipment{Type: common.EqAK47},
+		HealthDamageTaken: 40, Health: 60,
+	})
+	a.onPlayerHurt(events.PlayerHurt{
+		Player: opponent, Attacker: tCoach, Weapon: &common.Equipment{Type: common.EqAK47},
+		HealthDamageTaken: 40, Health: 60,
+	})
+	a.onKill(events.Kill{
+		Killer: competitor, Victim: ctCoach, Weapon: &common.Equipment{Type: common.EqAK47},
+	})
+	a.onKill(events.Kill{
+		Killer: tCoach, Victim: opponent, Weapon: &common.Equipment{Type: common.EqAK47},
+	})
+	a.onBombPlanted(events.BombPlanted{BombEvent: events.BombEvent{Player: tCoach}})
+
+	if got := a.players[shooterID].KillStats.Total; got != 0 {
+		t.Errorf("competitor kills = %d, want 0", got)
+	}
+	if got := a.players[shooterID].AssistStats.DamageGiven; got != 0 {
+		t.Errorf("competitor damage = %d, want 0", got)
+	}
+	if got := a.players[victimID].Deaths; got != 0 {
+		t.Errorf("opponent deaths = %d, want 0", got)
+	}
+	if got := a.lastHealth[victimID]; got != 100 {
+		t.Errorf("opponent tracked health = %d, want 100", got)
+	}
+	if a.tracker.bombPlanted {
+		t.Error("coach plant changed the competitive round state")
+	}
+
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+	for _, id := range []uint64{shooterID, victimID} {
+		if got := a.players[id].SideStats.Rounds.Total; got != 1 {
+			t.Errorf("player %d rounds = %d, want 1", id, got)
+		}
+		if got := a.kastRounds[id].Total; got != 1 {
+			t.Errorf("player %d KAST rounds = %d, want 1", id, got)
+		}
+	}
 }
 
 // One shotgun blast lands several pellets on the same tick, and each pellet
@@ -436,7 +562,7 @@ func TestSideAdrAndKastDivideByRoundsOnThatSide(t *testing.T) {
 // count has to move with them or the rates divide by nothing.
 func TestFreezeTimeJoinerPlaysTheRound(t *testing.T) {
 	holder := player(shooterID, "holder", common.TeamCounterTerrorists)
-	joiner := player(victimID, "joiner", common.TeamSpectators)
+	joiner := playerWithCoachingTeam(victimID, "joiner", common.TeamSpectators, common.TeamUnassigned)
 	a := liveAnalyser(holder, joiner)
 
 	a.onRoundStart(events.RoundStart{})

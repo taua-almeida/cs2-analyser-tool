@@ -103,11 +103,26 @@ func (a *analyser) registerHandlers() {
 	a.parser.RegisterEventHandler(a.onDisconnect)
 }
 
+// isCoachingController reports whether p is affiliated with a side as a
+// coach rather than as a competitor. Such controllers still have a T/CT
+// Team and a live player pawn, but m_iCoachingTeam is non-zero while they
+// are coaching.
+func isCoachingController(p *common.Player) bool {
+	if p == nil || p.Entity == nil {
+		return false
+	}
+	coachingTeam, ok := p.Entity.PropertyValue("m_iCoachingTeam")
+	// A serializer can expose the property before its value arrives. Treat
+	// that as unavailable rather than evidence that the player is a coach.
+	team, set := coachingTeam.Any.(int32)
+	return ok && set && common.Team(team) != common.TeamUnassigned
+}
+
 // ensurePlayer returns the stats entry for p, creating it on first sight.
 // Lazy creation covers demos where recording started after players
 // connected, so no PlayerConnect event is ever seen for them.
 func (a *analyser) ensurePlayer(p *common.Player) *DemoPlayer {
-	if p == nil || p.IsBot || p.SteamID64 == 0 {
+	if p == nil || p.IsBot || p.SteamID64 == 0 || isCoachingController(p) {
 		return nil
 	}
 	dp, ok := a.players[p.SteamID64]
@@ -157,9 +172,13 @@ func (a *analyser) playingRoster() map[uint64]common.Team {
 		if p.Team != common.TeamTerrorists && p.Team != common.TeamCounterTerrorists {
 			continue
 		}
-		roster[trackerID(p)] = p.Team
-		a.lastHealth[trackerID(p)] = p.Health()
-		a.roundTiers[trackerID(p)] = playerTier(p.Inventory)
+		if isCoachingController(p) {
+			continue
+		}
+		id := trackerID(p)
+		roster[id] = p.Team
+		a.lastHealth[id] = p.Health()
+		a.roundTiers[id] = playerTier(p.Inventory)
 		a.ensurePlayer(p)
 	}
 	return roster
@@ -191,14 +210,15 @@ func (a *analyser) onRoundFreezetimeEnd(e events.RoundFreezetimeEnd) {
 // onBombPlanted feeds the round tracker the bomb state its round-swing
 // win-probability model conditions on.
 func (a *analyser) onBombPlanted(e events.BombPlanted) {
-	if a.inWarmupOrPregame() {
+	if a.inWarmupOrPregame() || isCoachingController(e.Player) {
 		return
 	}
 	a.tracker.plantBomb()
 }
 
 func (a *analyser) onKill(e events.Kill) {
-	if a.inWarmupOrPregame() || e.Victim == nil {
+	if a.inWarmupOrPregame() || e.Victim == nil ||
+		isCoachingController(e.Victim) || isCoachingController(e.Killer) {
 		return
 	}
 
@@ -253,7 +273,8 @@ func (a *analyser) onKill(e events.Kill) {
 	}
 
 	var assisterID uint64
-	if !teamkill && e.Assister != nil && e.Assister.Team != e.Victim.Team {
+	if !teamkill && e.Assister != nil &&
+		e.Assister.Team != e.Victim.Team && !isCoachingController(e.Assister) {
 		assisterID = trackerID(e.Assister)
 		if assister := a.ensurePlayer(e.Assister); assister != nil {
 			assister.AssistStats.Total++
@@ -272,7 +293,8 @@ func (a *analyser) onKill(e events.Kill) {
 }
 
 func (a *analyser) onPlayerHurt(e events.PlayerHurt) {
-	if a.inWarmupOrPregame() || e.Player == nil {
+	if a.inWarmupOrPregame() || e.Player == nil ||
+		isCoachingController(e.Player) || isCoachingController(e.Attacker) {
 		return
 	}
 
@@ -318,7 +340,8 @@ func (a *analyser) onPlayerHurt(e events.PlayerHurt) {
 }
 
 func (a *analyser) onPlayerFlashed(e events.PlayerFlashed) {
-	if a.inWarmupOrPregame() || e.Player == nil {
+	if a.inWarmupOrPregame() || e.Player == nil ||
+		isCoachingController(e.Player) || isCoachingController(e.Attacker) {
 		return
 	}
 	addedBlindTime := a.addedFlashTime(e.Player, e.FlashDuration())
