@@ -76,6 +76,64 @@ func TestKillPointsMatchHLTVAnchors(t *testing.T) {
 	}
 }
 
+func TestTWinProbabilityAnchors(t *testing.T) {
+	cases := []struct {
+		name         string
+		tAlive, ct   int
+		bombPlanted  bool
+		want         float64
+		wantAbsError float64
+	}{
+		{"no CTs left is a T win", 3, 0, false, 1, 0},
+		{"no Ts and no bomb is a T loss", 0, 3, false, 0, 0},
+		{"no Ts with the bomb down still leans CT", 0, 3, true, 0.05, 0},
+		{"even 5v5 leans slightly CT", 5, 5, false, 0.48, 0.001},
+		{"post-plant 5v5 leans T", 5, 5, true, 0.69, 0.01},
+		{"oversized counts clamp to the 5v5 table", 8, 7, false, 0.48, 0.001},
+	}
+	for _, c := range cases {
+		got := tWinProbability(c.tAlive, c.ct, c.bombPlanted)
+		if math.Abs(got-c.want) > c.wantAbsError {
+			t.Errorf("%s: tWinProbability(%d,%d,%v) = %v, want %v",
+				c.name, c.tAlive, c.ct, c.bombPlanted, got, c.want)
+		}
+	}
+}
+
+// TestTWinProbabilityIsMonotonic checks the property round swing depends
+// on: a teammate dying can never help, an enemy dying can never hurt, and
+// the planted bomb never favours the CTs. Without it a kill could be worth
+// negative swing.
+func TestTWinProbabilityIsMonotonic(t *testing.T) {
+	for tAlive := 0; tAlive <= 5; tAlive++ {
+		for ct := 0; ct <= 5; ct++ {
+			for _, bomb := range []bool{false, true} {
+				p := tWinProbability(tAlive, ct, bomb)
+				if p < 0 || p > 1 {
+					t.Fatalf("tWinProbability(%d,%d,%v) = %v is not a probability", tAlive, ct, bomb, p)
+				}
+				if tAlive > 0 && tWinProbability(tAlive-1, ct, bomb) > p {
+					t.Errorf("losing a T raises the T win chance at %dv%d bomb=%v", tAlive, ct, bomb)
+				}
+				if ct > 0 && tWinProbability(tAlive, ct-1, bomb) < p {
+					t.Errorf("losing a CT lowers the T win chance at %dv%d bomb=%v", tAlive, ct, bomb)
+				}
+				if !bomb && tWinProbability(tAlive, ct, true) < p {
+					t.Errorf("planting the bomb lowers the T win chance at %dv%d", tAlive, ct)
+				}
+			}
+		}
+	}
+}
+
+func TestTeamWinProbabilitiesSumToOne(t *testing.T) {
+	pT := teamWinProbability(common.TeamTerrorists, 3, 4, true)
+	pCT := teamWinProbability(common.TeamCounterTerrorists, 3, 4, true)
+	if math.Abs(pT+pCT-1) > 1e-9 {
+		t.Errorf("perspectives sum to %v, want 1", pT+pCT)
+	}
+}
+
 func TestEcoRoundWeight(t *testing.T) {
 	if w := ecoRoundWeight(tierRifle1); w != 1 {
 		t.Errorf("tier-1 rifle round weighs %v, want exactly 1", w)

@@ -5,6 +5,8 @@
 package demoparser
 
 import (
+	"math"
+
 	common "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
 )
 
@@ -119,4 +121,72 @@ func killPoints(killer, victim equipTier) float64 {
 // so a tier-1 rifle buy weighs exactly 1.
 func ecoRoundWeight(tier equipTier) float64 {
 	return 2 * duelWinProb(tierRifle1, tier)
+}
+
+// tWinProbBase[t][ct] is the probability that the T side wins a round with
+// t terrorists and ct counter-terrorists alive and the bomb not planted.
+// The anchors are hand-set from community round-outcome statistics: even
+// counts sit at 0.48 (maps average slightly CT-sided pre-plant), a one-player
+// advantage is worth roughly 15-20 points, and lopsided counts saturate
+// towards, but never at, certainty. An empty side is certain: with no CTs
+// the Ts have won the round on elimination, and with no Ts and no bomb the
+// round cannot be won anymore. The [0][0] entry is unreachable, since a
+// round is over before both sides are empty.
+var tWinProbBase = [6][6]float64{
+	{0.50, 0.00, 0.00, 0.00, 0.00, 0.00},
+	{1.00, 0.45, 0.20, 0.08, 0.03, 0.01},
+	{1.00, 0.75, 0.48, 0.27, 0.13, 0.05},
+	{1.00, 0.90, 0.70, 0.48, 0.30, 0.16},
+	{1.00, 0.95, 0.85, 0.67, 0.48, 0.32},
+	{1.00, 0.97, 0.92, 0.80, 0.65, 0.48},
+}
+
+// bombLogitShift is how far a planted bomb moves the round in the T side's
+// favour, in log-odds. 0.9 lifts an even 5v5 from 0.48 pre-plant to 0.69
+// post-plant. Applying the shift in log-odds space rather than adding to
+// the probability keeps lopsided rounds lopsided: a 0.97 round moves to
+// 0.99, not past certainty.
+const bombLogitShift = 0.9
+
+// tWinProbBombNoTs[ct] is the T-side win probability after the bomb is
+// planted and every T is dead. The CTs still have to find and defuse it,
+// which is harder with fewer of them left. Each value sits below the
+// post-plant probability of the matching 1-T-alive round, so losing the
+// last T can never read as an improvement.
+var tWinProbBombNoTs = [6]float64{0, 0.15, 0.08, 0.05, 0.03, 0.02}
+
+// tWinProbability estimates the chance the T side wins the round from the
+// alive counts and the bomb state. This is the round-swing model: each kill
+// is worth the difference it makes here. The table stops at 5v5, so larger
+// modes clamp to it and kills beyond the fifth player move nothing.
+func tWinProbability(tAlive, ctAlive int, bombPlanted bool) float64 {
+	t := min(max(tAlive, 0), 5)
+	ct := min(max(ctAlive, 0), 5)
+	if bombPlanted && t == 0 && ct > 0 {
+		return tWinProbBombNoTs[ct]
+	}
+	p := tWinProbBase[t][ct]
+	if bombPlanted {
+		p = shiftLogit(p, bombLogitShift)
+	}
+	return p
+}
+
+// teamWinProbability is tWinProbability seen from one side's perspective.
+func teamWinProbability(team common.Team, tAlive, ctAlive int, bombPlanted bool) float64 {
+	p := tWinProbability(tAlive, ctAlive, bombPlanted)
+	if team == common.TeamCounterTerrorists {
+		return 1 - p
+	}
+	return p
+}
+
+// shiftLogit moves a probability by delta in log-odds space. The certain
+// outcomes 0 and 1 have no log-odds and stay where they are.
+func shiftLogit(p, delta float64) float64 {
+	if p <= 0 || p >= 1 {
+		return p
+	}
+	odds := p / (1 - p) * math.Exp(delta)
+	return odds / (1 + odds)
 }
