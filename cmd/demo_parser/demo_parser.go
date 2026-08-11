@@ -29,6 +29,7 @@ type analyser struct {
 	roundSwing  map[uint64]float64       // summed round-win-probability swing
 	ecoSurvival map[uint64]float64       // eco-weighted rounds survived
 	ecoKast     map[uint64]float64       // eco-weighted rounds with rating KAST credit
+	roundTiers  map[uint64]equipTier     // loadout tier per player in the current round
 	mapData     MapData
 	gameMode    string
 }
@@ -48,6 +49,7 @@ func newAnalyser(parser demoinfocs.Parser) *analyser {
 		roundSwing:  make(map[uint64]float64),
 		ecoSurvival: make(map[uint64]float64),
 		ecoKast:     make(map[uint64]float64),
+		roundTiers:  make(map[uint64]equipTier),
 	}
 }
 
@@ -141,8 +143,10 @@ func (a *analyser) inWarmup() bool {
 }
 
 // playingRoster reads the players currently on a side into the shape the
-// round tracker takes, registering anyone seen for the first time and
-// seeding the health their damage is measured against.
+// round tracker takes, registering anyone seen for the first time, seeding
+// the health their damage is measured against, and snapshotting the loadout
+// tier the round's eco weights use. The tier read at the end of freeze time
+// overwrites the round-start one, so it reflects what was actually bought.
 func (a *analyser) playingRoster() map[uint64]common.Team {
 	roster := make(map[uint64]common.Team)
 	for _, p := range a.parser.GameState().Participants().Playing() {
@@ -151,6 +155,7 @@ func (a *analyser) playingRoster() map[uint64]common.Team {
 		}
 		roster[trackerID(p)] = p.Team
 		a.lastHealth[trackerID(p)] = p.Health()
+		a.roundTiers[trackerID(p)] = playerTier(p.Inventory)
 		a.ensurePlayer(p)
 	}
 	return roster
@@ -161,9 +166,11 @@ func (a *analyser) onRoundStart(e events.RoundStart) {
 		return
 	}
 	// Close the previous round in case its official end was never seen.
+	// That outcome consumes the previous round's tier snapshot, so the
+	// reset has to fall between it and the roster read for the new round.
 	a.applyRoundOutcome(a.tracker.finalize())
+	clear(a.roundTiers)
 	a.tracker.startRound(a.playingRoster())
-	a.captureTiers()
 }
 
 // onRoundFreezetimeEnd folds the players who picked a side during freeze
@@ -175,20 +182,6 @@ func (a *analyser) onRoundFreezetimeEnd(e events.RoundFreezetimeEnd) {
 		return
 	}
 	a.tracker.joinRound(a.playingRoster())
-	a.captureTiers()
-}
-
-// captureTiers snapshots every playing player's loadout tier into the round
-// tracker. It runs after the tracker opens or rejoins a round, because
-// startRound clears the previous round's tiers, and again when freeze time
-// ends so the tier reflects what was actually bought.
-func (a *analyser) captureTiers() {
-	for _, p := range a.parser.GameState().Participants().Playing() {
-		if p.Team != common.TeamTerrorists && p.Team != common.TeamCounterTerrorists {
-			continue
-		}
-		a.tracker.setTier(trackerID(p), playerTier(p.Inventory))
-	}
 }
 
 // onBombPlanted feeds the round tracker the bomb state its round-swing
@@ -249,8 +242,9 @@ func (a *analyser) onKill(e events.Kill) {
 			}
 			// The duel is priced loadout against loadout at kill time; the
 			// victim's inventory is still their pre-death one during Kill,
-			// which TestProcessDemoGolden pins for unused utility.
-			a.ecoKills[killerID] += killPoints(playerTier(e.Killer.Inventory), playerTier(e.Victim.Inventory))
+			// which TestProcessDemoGolden pins for unused utility. Keyed by
+			// SteamID like ecoDamage, matching how derive reads both back.
+			a.ecoKills[killer.SteamID] += killPoints(playerTier(e.Killer.Inventory), playerTier(e.Victim.Inventory))
 		}
 	}
 
@@ -308,9 +302,14 @@ func (a *analyser) onPlayerHurt(e events.PlayerHurt) {
 		if e.Weapon != nil {
 			attacker.UtilityStats.UtilityDamage.add(e.Weapon.Type, realDamage)
 		}
-		a.ecoDamage[attacker.SteamID] += float64(realDamage) *
-			ecoDuelFactor(playerTier(e.Attacker.Inventory), playerTier(e.Player.Inventory))
-		a.tracker.damage(trackerID(e.Attacker), victimID, realDamage)
+		// Zero-damage events are common (overlapping shotgun pellets, fully
+		// absorbed hits) and cannot change either total, so skip pricing
+		// their duel.
+		if realDamage > 0 {
+			a.ecoDamage[attacker.SteamID] += float64(realDamage) *
+				ecoDuelFactor(playerTier(e.Attacker.Inventory), playerTier(e.Player.Inventory))
+			a.tracker.damage(trackerID(e.Attacker), victimID, realDamage)
+		}
 	}
 }
 
@@ -458,11 +457,14 @@ func (a *analyser) applyRoundOutcome(outcome roundOutcome) {
 	for id, delta := range outcome.swing {
 		a.roundSwing[id] += delta
 	}
-	for id, weight := range outcome.ecoSurvival {
-		a.ecoSurvival[id] += weight
+	// The tracker reports round facts; how much a survived or KAST round is
+	// worth on the player's buy that round is the rating model's business.
+	// A player with no tier snapshot weighs the neutral 1.
+	for id := range outcome.survived {
+		a.ecoSurvival[id] += ecoRoundWeight(a.roundTiers[id])
 	}
-	for id, weight := range outcome.ratingKast {
-		a.ecoKast[id] += weight
+	for id := range outcome.ratingKast {
+		a.ecoKast[id] += ecoRoundWeight(a.roundTiers[id])
 	}
 }
 

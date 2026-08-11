@@ -1,7 +1,6 @@
 package demoparser
 
 import (
-	"math"
 	"testing"
 
 	common "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
@@ -25,7 +24,7 @@ func TestSwingIsZeroSumAndFavoursTheKiller(t *testing.T) {
 	for _, s := range outcome.swing {
 		total += s
 	}
-	if math.Abs(total) > 1e-9 {
+	if !closeTo(total, 0) {
 		t.Errorf("swing sums to %v across the round, want 0", total)
 	}
 }
@@ -103,10 +102,10 @@ func TestFortyDamageBecomesARatingAssist(t *testing.T) {
 	}
 
 	outcome := endRound(rt, common.TeamCounterTerrorists)
-	if _, ok := outcome.ratingKast[2]; !ok {
+	if !outcome.ratingKast[2] {
 		t.Errorf("40 damage on a dead enemy earned no rating KAST: %v", outcome.ratingKast)
 	}
-	if _, ok := outcome.ratingKast[3]; ok {
+	if outcome.ratingKast[3] {
 		t.Error("39 damage earned rating KAST, the threshold is 40")
 	}
 	if outcome.kast[2] {
@@ -124,7 +123,7 @@ func TestDamageOnASurvivorIsNoRatingAssist(t *testing.T) {
 		rt.kill(11, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(20))
 	}
 
-	if outcome := endRound(rt, common.TeamCounterTerrorists); outcome.ratingKast[2] != 0 {
+	if outcome := endRound(rt, common.TeamCounterTerrorists); outcome.ratingKast[2] {
 		t.Error("damage on a player who survived counted as a rating assist")
 	}
 }
@@ -142,23 +141,26 @@ func TestKillerDamageIsNotAlsoAnAssist(t *testing.T) {
 }
 
 // TestEcoWeightsFollowTheRoundTier survives an eco player and a full-buy
-// player through the same round and expects the eco survival to weigh more.
+// player through the same round and expects the eco survival to weigh more
+// once the analyser applies the round's tier snapshot to the outcome.
 func TestEcoWeightsFollowTheRoundTier(t *testing.T) {
+	a := liveAnalyser()
+	a.roundTiers[1] = tierStarterPistol
+	a.roundTiers[2] = tierRifle1
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())
-	rt.setTier(1, tierStarterPistol)
-	rt.setTier(2, tierRifle1)
 
-	outcome := endRound(rt, common.TeamTerrorists)
-	if outcome.ecoSurvival[1] <= outcome.ecoSurvival[2] {
+	a.applyRoundOutcome(endRound(rt, common.TeamTerrorists))
+
+	if a.ecoSurvival[1] <= a.ecoSurvival[2] {
 		t.Errorf("starter pistol survival weighs %v, full buy %v; want the eco worth more",
-			outcome.ecoSurvival[1], outcome.ecoSurvival[2])
+			a.ecoSurvival[1], a.ecoSurvival[2])
 	}
-	if outcome.ecoSurvival[3] != 1 {
-		t.Errorf("survivor with no tier recorded weighs %v, want the neutral 1", outcome.ecoSurvival[3])
+	if a.ecoSurvival[3] != 1 {
+		t.Errorf("survivor with no tier snapshot weighs %v, want the neutral 1", a.ecoSurvival[3])
 	}
-	if outcome.ratingKast[1] != outcome.ecoSurvival[1] {
+	if a.ecoKast[1] != a.ecoSurvival[1] {
 		t.Errorf("rating KAST weight %v differs from the survival weight %v for the same round",
-			outcome.ratingKast[1], outcome.ecoSurvival[1])
+			a.ecoKast[1], a.ecoSurvival[1])
 	}
 }

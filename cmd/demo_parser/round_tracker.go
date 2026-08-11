@@ -50,8 +50,8 @@ type roundOutcome struct {
 	deathsTraded map[uint64]bool    // players with a death avenged inside the trade window
 	kast         map[uint64]bool    // players that got a Kill, Assist, Survived or were Traded
 	swing        map[uint64]float64 // per-player round-win-probability swing, zero-sum per round
-	ecoSurvival  map[uint64]float64 // eco round weight of the players that survived
-	ratingKast   map[uint64]float64 // eco round weight of the players with rating KAST credit
+	survived     map[uint64]bool    // players still alive when the round closed
+	ratingKast   map[uint64]bool    // players with rating KAST credit; see finalize
 }
 
 // roundTracker keeps the per-round state needed for clutches, aces, trades
@@ -70,7 +70,6 @@ type roundTracker struct {
 	deaths        []deathRecord
 	clutchers     map[common.Team]uint64
 	opening       openingDuel
-	tiers         map[uint64]equipTier      // loadout tier per player this round
 	damageTo      map[uint64]map[uint64]int // enemy damage this round, by victim then attacker
 	damageAssists map[uint64]bool           // players with ratingAssistDamage on an enemy that died
 	swing         map[uint64]float64        // round-win-probability swing per player
@@ -97,7 +96,6 @@ func (rt *roundTracker) startRound(alive map[uint64]common.Team) {
 	rt.clutchers = make(map[common.Team]uint64)
 	rt.opening = openingDuel{}
 	rt.bombPlanted = false
-	rt.tiers = make(map[uint64]equipTier)
 	rt.damageTo = make(map[uint64]map[uint64]int)
 	rt.damageAssists = make(map[uint64]bool)
 	rt.swing = make(map[uint64]float64)
@@ -113,16 +111,6 @@ func (rt *roundTracker) plantBomb() {
 	rt.bombPlanted = true
 }
 
-// setTier records the loadout tier a player carries this round. It weighs
-// their survival and KAST credit at finalize, so it should reflect the buy:
-// the analyser calls it at round start and again when freeze time ends.
-func (rt *roundTracker) setTier(id uint64, tier equipTier) {
-	if !rt.live {
-		return
-	}
-	rt.tiers[id] = tier
-}
-
 // damage accumulates enemy damage for the rating's 40-damage assist rule.
 // The caller is responsible for filtering out team, self and bomb damage,
 // which the analyser's hurt handler already does for damage given.
@@ -130,10 +118,12 @@ func (rt *roundTracker) damage(attacker, victim uint64, hp int) {
 	if !rt.live || attacker == 0 {
 		return
 	}
-	if rt.damageTo[victim] == nil {
-		rt.damageTo[victim] = make(map[uint64]int)
+	victimDamage, ok := rt.damageTo[victim]
+	if !ok {
+		victimDamage = make(map[uint64]int)
+		rt.damageTo[victim] = victimDamage
 	}
-	rt.damageTo[victim][attacker] += hp
+	victimDamage[attacker] += hp
 }
 
 // joinRound folds the players on a side when live play begins into the
@@ -232,8 +222,9 @@ func (rt *roundTracker) recordSwing(killer, victim uint64, killerTeam, victimTea
 		ctAlive--
 	}
 	after := teamWinProbability(killerTeam, tAlive, ctAlive, rt.bombPlanted)
-	rt.swing[killer] += after - before
-	rt.swing[victim] -= after - before
+	delta := after - before
+	rt.swing[killer] += delta
+	rt.swing[victim] -= delta
 }
 
 func (rt *roundTracker) aliveCounts() (tAlive, ctAlive int) {
@@ -340,8 +331,8 @@ func (rt *roundTracker) finalize() roundOutcome {
 		deathsTraded: make(map[uint64]bool),
 		kast:         make(map[uint64]bool),
 		swing:        rt.swing,
-		ecoSurvival:  make(map[uint64]float64),
-		ratingKast:   make(map[uint64]float64),
+		survived:     make(map[uint64]bool),
+		ratingKast:   make(map[uint64]bool),
 	}
 	for id, kills := range rt.enemyKills {
 		if kills >= aceKills {
@@ -359,16 +350,14 @@ func (rt *roundTracker) finalize() roundOutcome {
 		if survived || rt.enemyKills[id] > 0 || rt.assists[id] || rt.traded[id] {
 			outcome.kast[id] = true
 		}
+		if survived {
+			outcome.survived[id] = true
+		}
 		// The rating's KAST differs from the classic one in its assist rule:
 		// the demo's assist events stay in (they carry flash assists), and
-		// the 40-damage rule adds contributors those events missed. A player
-		// with no tier recorded weighs the neutral 1.
-		weight := ecoRoundWeight(rt.tiers[id])
-		if survived {
-			outcome.ecoSurvival[id] = weight
-		}
+		// the 40-damage rule adds contributors those events missed.
 		if outcome.kast[id] || rt.damageAssists[id] {
-			outcome.ratingKast[id] = weight
+			outcome.ratingKast[id] = true
 		}
 	}
 	return outcome

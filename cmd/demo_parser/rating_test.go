@@ -45,7 +45,7 @@ func TestDuelWinProbIsAProbability(t *testing.T) {
 		}
 		for _, b := range tiers {
 			pa, pb := duelWinProb(a, b), duelWinProb(b, a)
-			if math.Abs(pa+pb-1) > 1e-9 {
+			if !closeTo(pa+pb, 1) {
 				t.Errorf("duelWinProb(%v,%v)=%v and reverse=%v do not sum to 1", a, b, pa, pb)
 			}
 			if a > b && pa <= 0.5 {
@@ -64,7 +64,7 @@ func TestDuelWinProbIsAProbability(t *testing.T) {
 // chosen to hit these anchors, so a change here means recalibrating, not
 // adjusting the test.
 func TestKillPointsMatchHLTVAnchors(t *testing.T) {
-	if got := killPoints(tierRifle1, tierRifle1); math.Abs(got-1.10) > 1e-9 {
+	if got := killPoints(tierRifle1, tierRifle1); !closeTo(got, 1.10) {
 		t.Errorf("even duel kill worth %v points, want 1.10", got)
 	}
 	if got := killPoints(tierRifle1, tierStarterPistol); math.Abs(got-0.54) > 0.01 {
@@ -129,7 +129,7 @@ func TestTWinProbabilityIsMonotonic(t *testing.T) {
 func TestTeamWinProbabilitiesSumToOne(t *testing.T) {
 	pT := teamWinProbability(common.TeamTerrorists, 3, 4, true)
 	pCT := teamWinProbability(common.TeamCounterTerrorists, 3, 4, true)
-	if math.Abs(pT+pCT-1) > 1e-9 {
+	if !closeTo(pT+pCT, 1) {
 		t.Errorf("perspectives sum to %v, want 1", pT+pCT)
 	}
 }
@@ -151,11 +151,11 @@ func TestBlendRatingOfBaselineAveragesIsOne(t *testing.T) {
 		"kills": got.Kills, "damage": got.Damage, "survival": got.Survival,
 		"kast": got.KAST, "multi_kill": got.MultiKill, "round_swing": got.RoundSwing,
 	} {
-		if math.Abs(sub-1) > 1e-9 {
+		if !closeTo(sub, 1) {
 			t.Errorf("baseline %s sub-rating = %v, want 1", name, sub)
 		}
 	}
-	if math.Abs(got.Value-1) > 1e-9 {
+	if !closeTo(got.Value, 1) {
 		t.Errorf("baseline rating = %v, want exactly 1.00", got.Value)
 	}
 }
@@ -175,7 +175,7 @@ func TestDeriveDividesRatingInputsByMatchRounds(t *testing.T) {
 
 	a.derive(4)
 
-	if got := a.players[1].Rating.Kills; math.Abs(got-2) > 1e-9 {
+	if got := a.players[1].Rating.Kills; !closeTo(got, 2) {
 		t.Errorf("kills sub-rating = %v, want 2", got)
 	}
 	if a.players[1].Rating.Value <= 0 {
