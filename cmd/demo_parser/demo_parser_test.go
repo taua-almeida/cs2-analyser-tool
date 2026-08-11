@@ -10,29 +10,33 @@ import (
 	events "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/events"
 )
 
-// The handlers under test only ask the parser whether the demo is in
-// warmup, who is playing, and what time it is, so these stubs answer those
-// three questions and leave the embedded interfaces nil.
+// The handlers under test only ask the parser for round state, who is
+// playing, and the current time, so these stubs answer those questions and
+// leave the embedded interfaces nil.
 type matchParser struct {
 	demoinfocs.Parser
 	playing     []*common.Player
 	warmup      bool
+	gamePhase   common.GamePhase
 	currentTime time.Duration
 }
 
 func (p *matchParser) GameState() demoinfocs.GameState {
-	return matchGameState{playing: p.playing, warmup: p.warmup}
+	return matchGameState{playing: p.playing, warmup: p.warmup, gamePhase: p.gamePhase}
 }
 
 func (p *matchParser) CurrentTime() time.Duration { return p.currentTime }
 
 type matchGameState struct {
 	demoinfocs.GameState
-	playing []*common.Player
-	warmup  bool
+	playing   []*common.Player
+	warmup    bool
+	gamePhase common.GamePhase
 }
 
 func (g matchGameState) IsWarmupPeriod() bool { return g.warmup }
+
+func (g matchGameState) GamePhase() common.GamePhase { return g.gamePhase }
 
 func (g matchGameState) Participants() demoinfocs.Participants {
 	return matchParticipants{playing: g.playing}
@@ -175,6 +179,116 @@ func TestPostRoundDeathBeforeOfficialEndCancelsKast(t *testing.T) {
 	// finalized at all rather than the whole outcome being dropped.
 	if got := a.kastRounds[shooterID].Total; got != 1 {
 		t.Errorf("shooter kast rounds = %d, want 1", got)
+	}
+}
+
+func TestPregameKnifeRoundIsExcludedBeforeFirstScoredRound(t *testing.T) {
+	shooter := player(shooterID, "shooter", common.TeamTerrorists)
+	victim := player(victimID, "victim", common.TeamCounterTerrorists)
+	assister := player(3, "assister", common.TeamTerrorists)
+	parser := &matchParser{
+		playing:   []*common.Player{shooter, victim},
+		gamePhase: common.GamePhasePregame,
+	}
+	a := newAnalyser(parser)
+	knife := &common.Equipment{Type: common.EqKnife}
+
+	a.onRoundStart(events.RoundStart{})
+	a.onRoundFreezetimeEnd(events.RoundFreezetimeEnd{})
+	a.onBombPlanted(events.BombPlanted{})
+	a.onPlayerHurt(events.PlayerHurt{
+		Player: victim, Attacker: shooter, Weapon: knife, HealthDamageTaken: 100, Health: 0,
+	})
+	a.onKill(events.Kill{
+		Killer: shooter, Victim: victim, Assister: assister, Weapon: knife, IsHeadshot: true,
+	})
+	a.onPlayerFlashed(events.PlayerFlashed{Player: victim, Attacker: shooter})
+	a.onGrenadeProjectileThrow(grenadeThrow(shooter, common.EqFlash))
+	a.onRoundMVP(events.RoundMVPAnnouncement{Player: shooter})
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	if len(a.players) != 0 {
+		t.Fatalf("pregame round created player statistics: %+v", a.players)
+	}
+
+	parser.gamePhase = common.GamePhaseStartGamePhase
+	a.onRoundStart(events.RoundStart{})
+	hurtBy(a, shooter, victim, 30)
+	a.onKill(events.Kill{
+		Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47},
+	})
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	gotShooter := a.players[shooterID]
+	if gotShooter.KillStats.Total != 1 || gotShooter.AssistStats.DamageGiven != 30 {
+		t.Errorf("scored-round kills/damage = %d/%d, want 1/30",
+			gotShooter.KillStats.Total, gotShooter.AssistStats.DamageGiven)
+	}
+	if gotShooter.SideStats.Rounds.Total != 1 {
+		t.Errorf("scored rounds = %d, want 1", gotShooter.SideStats.Rounds.Total)
+	}
+	if gotShooter.OpeningDuelStats.OpeningKills.Total != 1 {
+		t.Errorf("opening kills = %d, want 1", gotShooter.OpeningDuelStats.OpeningKills.Total)
+	}
+	if gotShooter.PlayerMapStats.MVPs != 0 || gotShooter.UtilityStats.GrenadesThrown.Total != 0 {
+		t.Errorf("pregame MVP/grenade leaked into stats: MVPs=%d grenades=%d",
+			gotShooter.PlayerMapStats.MVPs, gotShooter.UtilityStats.GrenadesThrown.Total)
+	}
+	gotVictim := a.players[victimID]
+	if gotVictim.Deaths != 1 || gotVictim.SideStats.Rounds.Total != 1 {
+		t.Errorf("scored-round deaths/rounds = %d/%d, want 1/1",
+			gotVictim.Deaths, gotVictim.SideStats.Rounds.Total)
+	}
+}
+
+func TestDemoStartingWithCompetitiveRoundKeepsFirstRound(t *testing.T) {
+	shooter := player(shooterID, "shooter", common.TeamTerrorists)
+	victim := player(victimID, "victim", common.TeamCounterTerrorists)
+	parser := &matchParser{
+		playing:   []*common.Player{shooter, victim},
+		gamePhase: common.GamePhaseStartGamePhase,
+	}
+	a := newAnalyser(parser)
+
+	playRound(a, common.TeamTerrorists, events.Kill{
+		Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47},
+	})
+
+	if got := a.players[shooterID].KillStats.Total; got != 1 {
+		t.Errorf("kills = %d, want 1", got)
+	}
+	if got := a.players[shooterID].SideStats.Rounds.Total; got != 1 {
+		t.Errorf("rounds = %d, want 1", got)
+	}
+	if got := a.players[victimID].Deaths; got != 1 {
+		t.Errorf("deaths = %d, want 1", got)
+	}
+}
+
+func TestNextRoundFinalizesDecidedRoundWithoutOfficialEndOnce(t *testing.T) {
+	a, shooter, victim := liveRound()
+	a.onKill(events.Kill{
+		Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47},
+	})
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	a.onRoundStart(events.RoundStart{})
+
+	if got := a.players[shooterID].SideStats.Rounds.Total; got != 1 {
+		t.Fatalf("rounds after fallback finalization = %d, want 1", got)
+	}
+	if got := a.players[shooterID].OpeningDuelStats.OpeningKills.Total; got != 1 {
+		t.Fatalf("opening kills after fallback finalization = %d, want 1", got)
+	}
+
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamCounterTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+	if got := a.players[shooterID].SideStats.Rounds.Total; got != 2 {
+		t.Errorf("rounds after the next official end = %d, want 2", got)
+	}
+	if got := a.players[shooterID].OpeningDuelStats.OpeningKills.Total; got != 1 {
+		t.Errorf("first round was finalized more than once: opening kills = %d", got)
 	}
 }
 

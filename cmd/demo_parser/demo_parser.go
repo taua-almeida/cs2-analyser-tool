@@ -138,8 +138,12 @@ func trackerID(p *common.Player) uint64 {
 	return uint64(p.UserID) | 1<<62
 }
 
-func (a *analyser) inWarmup() bool {
-	return a.parser.GameState().IsWarmupPeriod()
+func (a *analyser) inWarmupOrPregame() bool {
+	state := a.parser.GameState()
+	// Tournament knife rounds can report match-started and non-warmup while
+	// the game rules still identify them as pregame. Rejecting that phase
+	// keeps the following 0:0 competitive round without relying on its order.
+	return state.IsWarmupPeriod() || state.GamePhase() == common.GamePhasePregame
 }
 
 // playingRoster reads the players currently on a side into the shape the
@@ -162,7 +166,7 @@ func (a *analyser) playingRoster() map[uint64]common.Team {
 }
 
 func (a *analyser) onRoundStart(e events.RoundStart) {
-	if a.inWarmup() {
+	if a.inWarmupOrPregame() {
 		return
 	}
 	// Close the previous round in case its official end was never seen.
@@ -178,7 +182,7 @@ func (a *analyser) onRoundStart(e events.RoundStart) {
 // opens, so without this they play a round that counts them nowhere: their
 // kills, deaths and damage land on a side whose round count never moved.
 func (a *analyser) onRoundFreezetimeEnd(e events.RoundFreezetimeEnd) {
-	if a.inWarmup() {
+	if a.inWarmupOrPregame() {
 		return
 	}
 	a.tracker.joinRound(a.playingRoster())
@@ -187,14 +191,14 @@ func (a *analyser) onRoundFreezetimeEnd(e events.RoundFreezetimeEnd) {
 // onBombPlanted feeds the round tracker the bomb state its round-swing
 // win-probability model conditions on.
 func (a *analyser) onBombPlanted(e events.BombPlanted) {
-	if a.inWarmup() {
+	if a.inWarmupOrPregame() {
 		return
 	}
 	a.tracker.plantBomb()
 }
 
 func (a *analyser) onKill(e events.Kill) {
-	if a.inWarmup() || e.Victim == nil {
+	if a.inWarmupOrPregame() || e.Victim == nil {
 		return
 	}
 
@@ -268,7 +272,7 @@ func (a *analyser) onKill(e events.Kill) {
 }
 
 func (a *analyser) onPlayerHurt(e events.PlayerHurt) {
-	if a.inWarmup() || e.Player == nil {
+	if a.inWarmupOrPregame() || e.Player == nil {
 		return
 	}
 
@@ -314,7 +318,7 @@ func (a *analyser) onPlayerHurt(e events.PlayerHurt) {
 }
 
 func (a *analyser) onPlayerFlashed(e events.PlayerFlashed) {
-	if a.inWarmup() || e.Player == nil {
+	if a.inWarmupOrPregame() || e.Player == nil {
 		return
 	}
 	addedBlindTime := a.addedFlashTime(e.Player, e.FlashDuration())
@@ -338,7 +342,7 @@ func (a *analyser) onPlayerFlashed(e events.PlayerFlashed) {
 }
 
 func (a *analyser) onGrenadeProjectileThrow(e events.GrenadeProjectileThrow) {
-	if a.inWarmup() || e.Projectile == nil {
+	if a.inWarmupOrPregame() || e.Projectile == nil {
 		return
 	}
 	if thrower := a.ensurePlayer(e.Projectile.Thrower); thrower != nil {
@@ -347,7 +351,7 @@ func (a *analyser) onGrenadeProjectileThrow(e events.GrenadeProjectileThrow) {
 }
 
 func (a *analyser) onRoundMVP(e events.RoundMVPAnnouncement) {
-	if a.inWarmup() {
+	if a.inWarmupOrPregame() {
 		return
 	}
 	if player := a.ensurePlayer(e.Player); player != nil {
@@ -362,6 +366,9 @@ func (a *analyser) onDisconnect(e events.PlayerDisconnected) {
 }
 
 func (a *analyser) onRoundEnd(e events.RoundEnd) {
+	if a.inWarmupOrPregame() {
+		return
+	}
 	a.syncScoreboardMVPs()
 	a.tracker.markEnd(e.Winner)
 }
