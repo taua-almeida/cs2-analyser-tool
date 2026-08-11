@@ -167,7 +167,7 @@ Unlike the counts, these two are rates and so have no `total` field. The match-w
 
 ### Rating (`rating`)
 
-An HLTV Rating 3.0-style rating. **HLTV's exact formula is proprietary, so this is an approximation**: it follows the structure HLTV has described publicly — six sub-ratings, most of them economy-adjusted — with every constant chosen here and calibrated so an average player lands near 1.00. Do not expect it to match the number HLTV publishes for the same match.
+An HLTV Rating 3.0-style rating. **HLTV's exact formula is proprietary, so this is an approximation**: it follows the structure HLTV has described publicly — six sub-ratings, most of them economy-adjusted — with every constant chosen here and calibrated so an average player lands near 1.00. Do not expect it to match the number HLTV publishes for the same match. This section is the field reference; the full calculation — every formula, constant, table and worked example, plus the current status against HLTV's own Rating 3.0 — is in [RATING](./RATING.MD).
 
 | Field | JSON key | Description |
 | --- | --- | --- |
