@@ -21,26 +21,23 @@ type demoFixture struct {
 	sha256               string
 	golden               string
 	expectsUnusedUtility bool
+	expectsSideSwap      bool
 }
 
-// The two fixtures cover the two ways a CS2 demo reports round MVPs, which
-// matters because the parser has to handle both:
+// The fixtures cover the two ways a CS2 demo reports round MVPs, which
+// matters because the parser has to handle both, plus event sequences the
+// shorter matches do not contain:
 //
 //   - mirage is from January 2024 and still carries round_mvp game events,
 //     so it exercises the RoundMVPAnnouncement handler.
 //   - ancient is a later Premier match with no round_mvp events at all, so
 //     its MVP counts can only come from the scoreboard entity property.
 //     Dropping syncScoreboardMVPs zeroes this golden's MVPs.
-//
-// Two things these fixtures cannot cover, both left to unit tests:
-//
-//   - Neither demo contains shotgun damage, so the per-event damage cap for
-//     double-reported pellets is covered by
-//     TestShotgunPelletsDoNotDoubleCountDamage instead. A fixture with
-//     shotgun hits would close that end to end, tracked in issue #12.
-//   - Both matches end before halftime (8 and 10 rounds), so every player
-//     stays on one side and the goldens never exercise the side swap. That
-//     is TestSideStatsFollowTheHalftimeSwap's job.
+//   - inferno contains XM1014 pellet events whose reported damage exceeds
+//     the victim's real health loss, reaches halftime, and has a player join
+//     between RoundStart and the end of freeze time. It exercises the damage
+//     cap, side splits after the swap, and freeze-time roster update through
+//     a real parse.
 var demoFixtures = []demoFixture{
 	{
 		name:                 "mirage_round_mvp_events",
@@ -54,6 +51,13 @@ var demoFixtures = []demoFixture{
 		demo:   "testdata/ancient.dem",
 		sha256: "b29a9cb537a181deef97b15cfed10ee722a37999644a27bb2226fdd77a1337fc",
 		golden: "testdata/golden_ancient.json",
+	},
+	{
+		name:            "inferno_shotgun_halftime_and_freeze_join",
+		demo:            "testdata/inferno-shotgun.dem",
+		sha256:          "095625b47c2cc6ace12414a6bbc987ea254904d969ae39fb95c7d54e085f7f93",
+		golden:          "testdata/golden_inferno_shotgun.json",
+		expectsSideSwap: true,
 	},
 }
 
@@ -84,6 +88,13 @@ func TestProcessDemoGolden(t *testing.T) {
 			if err != nil {
 				t.Fatalf("reading fixture: %v", err)
 			}
+			if len(demoBytes) < 1024 &&
+				strings.HasPrefix(string(demoBytes), "version https://git-lfs.github.com/spec/v1\n") {
+				if os.Getenv("REQUIRE_TEST_DEMO") != "" {
+					t.Fatalf("fixture %s is still a Git LFS pointer; run `make download-test-demos`", f.demo)
+				}
+				t.Skipf("fixture %s is still a Git LFS pointer, run `make download-test-demos`", f.demo)
+			}
 			sum := sha256.Sum256(demoBytes)
 			if got := hex.EncodeToString(sum[:]); got != f.sha256 {
 				t.Fatalf("fixture %s has sha256 %s, want %s; delete it and run `make download-test-demos` again",
@@ -107,6 +118,21 @@ func TestProcessDemoGolden(t *testing.T) {
 				}
 				if !observed {
 					t.Fatal("fixture produced no unused utility; Kill may no longer expose pre-death inventory")
+				}
+			}
+			if f.expectsSideSwap {
+				if result.Map.TotalRounds < 13 {
+					t.Fatalf("fixture has %d rounds, want at least 13 to cross halftime", result.Map.TotalRounds)
+				}
+				observed := false
+				for _, player := range result.Players {
+					if player.SideStats.Rounds.CT > 0 && player.SideStats.Rounds.T > 0 {
+						observed = true
+						break
+					}
+				}
+				if !observed {
+					t.Fatal("fixture produced no player with rounds on both sides")
 				}
 			}
 
