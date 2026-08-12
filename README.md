@@ -49,6 +49,11 @@ The data output showed in the terminal table is not all the analyzed data, to ge
 
 ## Contributing
 
+The opt-in external-oracle test for HLTV match 129241 is documented in
+[HLTV_REGRESSION.md](./_docs/HLTV_REGRESSION.md). It is separate from the
+repository's self-golden integration fixtures and never downloads demos or
+scrapes HLTV during a test run.
+
 ### Clone the repo
 
 ```bash
