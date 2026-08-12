@@ -16,10 +16,11 @@ import (
 // leave the embedded interfaces nil.
 type matchParser struct {
 	demoinfocs.Parser
-	playing     []*common.Player
-	warmup      bool
-	gamePhase   common.GamePhase
-	currentTime time.Duration
+	playing      []*common.Player
+	warmup       bool
+	gamePhase    common.GamePhase
+	currentTime  time.Duration
+	currentFrame int
 }
 
 func (p *matchParser) GameState() demoinfocs.GameState {
@@ -27,6 +28,8 @@ func (p *matchParser) GameState() demoinfocs.GameState {
 }
 
 func (p *matchParser) CurrentTime() time.Duration { return p.currentTime }
+
+func (p *matchParser) CurrentFrame() int { return p.currentFrame }
 
 type matchGameState struct {
 	demoinfocs.GameState
@@ -97,13 +100,26 @@ func botPlayer(userID int, name string, team common.Team) *common.Player {
 // hurt builds a PlayerHurt from an enemy shooter, where healthAfter is the
 // victim's health once the event has been applied.
 func hurt(weapon common.EquipmentType, damageTaken, healthAfter int) events.PlayerHurt {
+	return hurtEvent(
+		player(shooterID, "shooter", common.TeamTerrorists),
+		player(victimID, "victim", common.TeamCounterTerrorists),
+		weapon, damageTaken, healthAfter,
+	)
+}
+
+func hurtEvent(attacker, victim *common.Player, weapon common.EquipmentType, damageTaken, healthAfter int) events.PlayerHurt {
 	return events.PlayerHurt{
-		Player:            player(victimID, "victim", common.TeamCounterTerrorists),
-		Attacker:          player(shooterID, "shooter", common.TeamTerrorists),
+		Player:            victim,
+		Attacker:          attacker,
 		Weapon:            &common.Equipment{Type: weapon},
 		HealthDamageTaken: damageTaken,
 		Health:            healthAfter,
 	}
+}
+
+func hurtAtFrame(a *analyser, frame int, event events.PlayerHurt) {
+	a.parser.(*matchParser).currentFrame = frame
+	a.onPlayerHurt(event)
 }
 
 func damageGiven(a *analyser) int {
@@ -236,6 +252,132 @@ func TestSingleHitDamageIsCreditedInFull(t *testing.T) {
 
 	if got := damageGiven(a); got != 27 {
 		t.Errorf("damage given = %d, want 27", got)
+	}
+}
+
+// This mirrors the issue #39 sequence: a 15 HP shot, then an attacker-less
+// 5 HP World event for the same victim on the next recorded demo frame.
+func TestAdjacentWorldDamageCreditsPreviousEnemy(t *testing.T) {
+	a, shooter, victim := liveRound()
+	a.lastHealth[victimID] = 81
+
+	hurtAtFrame(a, 100, hurtEvent(shooter, victim, common.EqUSP, 15, 66))
+	hurtAtFrame(a, 101, hurtEvent(nil, victim, common.EqWorld, 5, 61))
+
+	got := a.players[shooterID]
+	if got.AssistStats.DamageGiven != 20 {
+		t.Errorf("damage given = %d, want 20", got.AssistStats.DamageGiven)
+	}
+	if got.UtilityStats.UtilityDamage != (UtilityDamageStats{}) {
+		t.Errorf("utility damage = %+v, want zero for shot and fall damage", got.UtilityStats.UtilityDamage)
+	}
+	if got := a.sideDamage[shooterID]; got != (SideCount{Total: 20, T: 20}) {
+		t.Errorf("side damage = %+v, want 20 on T side", got)
+	}
+	if got := a.ecoDamage[shooterID]; got != 20 {
+		t.Errorf("eco damage = %v, want 20 for two even-tier damage events", got)
+	}
+	if got := a.tracker.damageTo[victimID][shooterID]; got != 20 {
+		t.Errorf("rating assist damage = %d, want 20", got)
+	}
+}
+
+func TestZeroRealDamageDoesNotEraseWorldDamageSource(t *testing.T) {
+	a, shooter, victim := liveRound()
+	a.lastHealth[victimID] = 81
+
+	hurtAtFrame(a, 100, hurtEvent(shooter, victim, common.EqNova, 15, 66))
+	// Another pellet reports damage against the same resulting health, so it
+	// removed no additional HP and must not erase the blast's attribution.
+	hurtAtFrame(a, 100, hurtEvent(shooter, victim, common.EqNova, 15, 66))
+	hurtAtFrame(a, 101, hurtEvent(nil, victim, common.EqWorld, 5, 61))
+
+	if got := damageGiven(a); got != 20 {
+		t.Errorf("damage given = %d, want 20", got)
+	}
+}
+
+func TestWorldDamageRequiresAdjacentEnemySource(t *testing.T) {
+	tests := []struct {
+		name       string
+		withSource bool
+		worldFrame int
+		want       int
+	}{
+		{name: "isolated World event", worldFrame: 101, want: 0},
+		{name: "source is two frames old", withSource: true, worldFrame: 102, want: 15},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			a, shooter, victim := liveRound()
+			a.lastHealth[victimID] = 81
+			if test.withSource {
+				hurtAtFrame(a, 100, hurtEvent(shooter, victim, common.EqUSP, 15, 66))
+			} else {
+				a.lastHealth[victimID] = 66
+			}
+			hurtAtFrame(a, test.worldFrame, hurtEvent(nil, victim, common.EqWorld, 5, 61))
+
+			if got := damageGiven(a); got != test.want {
+				t.Errorf("damage given = %d, want %d", got, test.want)
+			}
+		})
+	}
+}
+
+func TestWorldFallbackWithHitGroupDoesNotCreditPreviousEnemy(t *testing.T) {
+	a, shooter, victim := liveRound()
+	a.lastHealth[victimID] = 81
+	hurtAtFrame(a, 100, hurtEvent(shooter, victim, common.EqUSP, 15, 66))
+
+	unresolvedHit := hurtEvent(nil, victim, common.EqWorld, 5, 61)
+	unresolvedHit.HitGroup = events.HitGroupChest
+	hurtAtFrame(a, 101, unresolvedHit)
+
+	if got := damageGiven(a); got != 15 {
+		t.Errorf("damage given = %d, want only the resolved 15 HP hit", got)
+	}
+}
+
+func TestInterveningTeamDamageClearsWorldDamageSource(t *testing.T) {
+	a, shooter, victim := liveRound()
+	teammate := player(3, "teammate", common.TeamCounterTerrorists)
+	a.lastHealth[victimID] = 81
+
+	hurtAtFrame(a, 100, hurtEvent(shooter, victim, common.EqUSP, 15, 66))
+	hurtAtFrame(a, 101, hurtEvent(teammate, victim, common.EqM4A4, 7, 59))
+	hurtAtFrame(a, 101, hurtEvent(nil, victim, common.EqWorld, 5, 54))
+
+	if got := damageGiven(a); got != 15 {
+		t.Errorf("damage given = %d, want only the initial 15", got)
+	}
+}
+
+func TestRoundStartClearsWorldDamageSource(t *testing.T) {
+	a, shooter, victim := liveRound()
+	a.lastHealth[victimID] = 81
+	hurtAtFrame(a, 100, hurtEvent(shooter, victim, common.EqUSP, 15, 66))
+
+	a.onRoundStart(events.RoundStart{})
+	a.lastHealth[victimID] = 100
+	hurtAtFrame(a, 101, hurtEvent(nil, victim, common.EqWorld, 5, 95))
+
+	if got := damageGiven(a); got != 15 {
+		t.Errorf("damage given = %d, want only the prior round's 15", got)
+	}
+}
+
+func TestMatchEndWorldCleanupDoesNotCreditDamage(t *testing.T) {
+	a, shooter, victim := liveRound()
+	a.lastHealth[victimID] = 81
+	hurtAtFrame(a, 100, hurtEvent(shooter, victim, common.EqUSP, 15, 66))
+
+	a.parser.(*matchParser).gamePhase = common.GamePhaseGameEnded
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	hurtAtFrame(a, 101, hurtEvent(nil, victim, common.EqWorld, 5, 61))
+
+	if got := damageGiven(a); got != 15 {
+		t.Errorf("damage given = %d, want only the pre-cleanup 15", got)
 	}
 }
 

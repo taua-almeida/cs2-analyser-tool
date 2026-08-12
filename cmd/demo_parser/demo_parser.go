@@ -23,6 +23,7 @@ type analyser struct {
 	sideDamage  map[uint64]SideCount // damage given, total and per side
 	openingWins map[uint64]int       // rounds won after taking the opening kill
 	lastHealth  map[uint64]int
+	worldSource map[uint64]worldDamageSource
 	flashEnds   map[uint64]time.Duration // latest known end of each player's blind interval
 	ecoKills    map[uint64]float64       // eco-adjusted kill points
 	ecoDamage   map[uint64]float64       // eco-adjusted damage given
@@ -34,6 +35,11 @@ type analyser struct {
 	gameMode    string
 }
 
+type worldDamageSource struct {
+	attacker *common.Player
+	frame    int
+}
+
 func newAnalyser(parser demoinfocs.Parser) *analyser {
 	return &analyser{
 		parser:      parser,
@@ -43,6 +49,7 @@ func newAnalyser(parser demoinfocs.Parser) *analyser {
 		sideDamage:  make(map[uint64]SideCount),
 		openingWins: make(map[uint64]int),
 		lastHealth:  make(map[uint64]int),
+		worldSource: make(map[uint64]worldDamageSource),
 		flashEnds:   make(map[uint64]time.Duration),
 		ecoKills:    make(map[uint64]float64),
 		ecoDamage:   make(map[uint64]float64),
@@ -193,6 +200,7 @@ func (a *analyser) onRoundStart(e events.RoundStart) {
 	// reset has to fall between it and the roster read for the new round.
 	a.applyRoundOutcome(a.tracker.finalize())
 	clear(a.roundTiers)
+	clear(a.worldSource)
 	a.tracker.startRound(a.playingRoster())
 }
 
@@ -320,32 +328,63 @@ func (a *analyser) onPlayerHurt(e events.PlayerHurt) {
 	realDamage := min(e.HealthDamageTaken, max(0, before-e.Health))
 	a.lastHealth[victimID] = e.Health
 
-	if e.Attacker == nil {
+	// In the #39 demo, a landing appears as an attacker-less World event one
+	// demo frame after an enemy hit, and HLTV includes its 5 HP in that
+	// attacker's ADR. demoinfocs also uses EqWorld as a fallback for unresolved
+	// empty-weapon events, so attribution additionally requires the landing's
+	// generic hit group, lack of armor damage, adjacent frame and same victim.
+	// Isolated World damage remains uncredited.
+	frame := a.parser.CurrentFrame()
+	source, hasSource := a.worldSource[victimID]
+	// A later pellet from the same blast can report no new health loss. Keep
+	// the blast as the source, but let every other intervening hurt invalidate it.
+	sameSourceOverlap := realDamage == 0 && e.Attacker != nil && hasSource &&
+		frame == source.frame && trackerID(e.Attacker) == trackerID(source.attacker)
+	if hasSource && !sameSourceOverlap {
+		delete(a.worldSource, victimID)
+	}
+	damageAttacker := e.Attacker
+	unattributedWorldDamage := realDamage > 0 && damageAttacker == nil &&
+		e.Weapon != nil && e.Weapon.Type == common.EqWorld &&
+		e.HitGroup == events.HitGroupGeneric && e.ArmorDamageTaken == 0
+	matchEndWorldCleanup := a.tracker.isPostRoundWorldCleanup(unattributedWorldDamage) &&
+		a.parser.GameState().GamePhase() == common.GamePhaseGameEnded
+	if unattributedWorldDamage && hasSource && !matchEndWorldCleanup &&
+		frame >= source.frame && frame-source.frame <= 1 {
+		damageAttacker = source.attacker
+	}
+
+	if damageAttacker == nil {
 		return
 	}
 	// Team damage and self damage never count towards damage given, and
 	// following HLTV convention neither does bomb damage (when the game
 	// credits the explosion to the planter).
-	if e.Attacker.SteamID64 == e.Player.SteamID64 || e.Attacker.Team == e.Player.Team {
+	if damageAttacker.SteamID64 == e.Player.SteamID64 || damageAttacker.Team == e.Player.Team {
 		return
 	}
 	if e.Weapon != nil && e.Weapon.Type == common.EqBomb {
 		return
 	}
-	if attacker := a.ensurePlayer(e.Attacker); attacker != nil {
-		attacker.AssistStats.DamageGiven += realDamage
-		addSide(a.sideDamage, attacker.SteamID, e.Attacker.Team, realDamage)
-		if e.Weapon != nil {
-			attacker.UtilityStats.UtilityDamage.add(e.Weapon.Type, realDamage)
-		}
-		// Zero-damage events are common (overlapping shotgun pellets, fully
-		// absorbed hits) and cannot change either total, so skip pricing
-		// their duel.
-		if realDamage > 0 {
-			a.ecoDamage[attacker.SteamID] += float64(realDamage) *
-				ecoDuelFactor(playerTier(e.Attacker.Inventory), playerTier(e.Player.Inventory))
-			a.tracker.damage(trackerID(e.Attacker), victimID, realDamage)
-		}
+	attackerStats := a.ensurePlayer(damageAttacker)
+	if attackerStats == nil {
+		return
+	}
+	if e.Attacker != nil && realDamage > 0 {
+		a.worldSource[victimID] = worldDamageSource{attacker: damageAttacker, frame: frame}
+	}
+	attackerStats.AssistStats.DamageGiven += realDamage
+	addSide(a.sideDamage, attackerStats.SteamID, damageAttacker.Team, realDamage)
+	if e.Weapon != nil {
+		attackerStats.UtilityStats.UtilityDamage.add(e.Weapon.Type, realDamage)
+	}
+	// Zero-damage events are common (overlapping shotgun pellets, fully
+	// absorbed hits) and cannot change either total, so skip pricing
+	// their duel.
+	if realDamage > 0 {
+		a.ecoDamage[attackerStats.SteamID] += float64(realDamage) *
+			ecoDuelFactor(playerTier(damageAttacker.Inventory), playerTier(e.Player.Inventory))
+		a.tracker.damage(trackerID(damageAttacker), victimID, realDamage)
 	}
 }
 
