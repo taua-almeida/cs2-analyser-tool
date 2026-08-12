@@ -327,6 +327,7 @@ func TestUnusedUtilityCountsRepeatedAndPostRoundCombatDeaths(t *testing.T) {
 	a.onKill(combatDeath)
 	a.onKill(combatDeath)
 	a.parser.(*matchParser).gamePhase = common.GamePhaseGameEnded
+	markRoundScored(a)
 	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
 	a.onKill(combatDeath)
 	a.onKill(events.Kill{Killer: victim, Victim: victim, Weapon: &common.Equipment{Type: common.EqWorld}})

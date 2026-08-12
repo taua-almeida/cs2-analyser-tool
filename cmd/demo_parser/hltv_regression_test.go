@@ -17,14 +17,17 @@ import (
 )
 
 const (
-	hltvDemoDirEnv        = "HLTV_DEMO_DIR"
-	requireHLTVDemosEnv   = "REQUIRE_HLTV_DEMOS"
-	hltvOracleFixturePath = "testdata/hltv-129241/expected.json"
-	adrMetric             = "ADR"
-	kastMetric            = "KAST qualifying rounds"
+	hltvDemoDirEnv          = "HLTV_DEMO_DIR"
+	requireHLTVDemosEnv     = "REQUIRE_HLTV_DEMOS"
+	hltvExtraDemoDirsEnv    = "HLTV_EXTRA_DEMO_DIRS"
+	requireHLTVExtraDemoEnv = "REQUIRE_HLTV_EXTRA_DEMOS"
+	hltvOracleFixturePath   = "testdata/hltv-129241/expected.json"
+	adrMetric               = "ADR"
+	kastMetric              = "KAST qualifying rounds"
 )
 
 type hltvOracle struct {
+	FixtureID     string            `json:"fixture_id"`
 	MatchID       int               `json:"match_id"`
 	MatchStatsURL string            `json:"match_stats_url"`
 	Maps          []hltvMapExpected `json:"maps"`
@@ -53,41 +56,88 @@ type hltvPlayerExpected struct {
 }
 
 type hltvDifferenceKey struct {
-	MapName string
-	SteamID uint64
-	Metric  string
+	FixtureID string
+	MapID     int
+	SteamID   uint64
+	Metric    string
+}
+
+type hltvFixtureMapKey struct {
+	FixtureID string
+	MapID     int
 }
 
 type hltvExpectedDifference struct {
-	MapName   string
+	FixtureID string
+	MapID     int
 	SteamID   uint64
 	Metric    string
 	HLTVValue string
 	ToolValue string
-	Issue     int
+	FollowUp  string
 }
 
 func (d hltvExpectedDifference) key() hltvDifferenceKey {
-	return hltvDifferenceKey{MapName: d.MapName, SteamID: d.SteamID, Metric: d.Metric}
+	return hltvDifferenceKey{
+		FixtureID: d.FixtureID,
+		MapID:     d.MapID,
+		SteamID:   d.SteamID,
+		Metric:    d.Metric,
+	}
 }
 
 // These are known parser differences, not tolerances. Each row pins both
 // sides of the current discrepancy: a new value fails, and reaching parity
 // also fails until the stale exception is removed.
 var hltvExpectedDifferences = []hltvExpectedDifference{
-	{MapName: "inferno", SteamID: 76561198158971650, Metric: kastMetric, HLTVValue: "17/22 (77.3%)", ToolValue: "18/22 (81.8%)", Issue: 38},
-	{MapName: "inferno", SteamID: 76561198050779850, Metric: kastMetric, HLTVValue: "14/22 (63.6%)", ToolValue: "16/22 (72.7%)", Issue: 38},
-	{MapName: "inferno", SteamID: 76561198127259887, Metric: kastMetric, HLTVValue: "14/22 (63.6%)", ToolValue: "15/22 (68.2%)", Issue: 38},
-	{MapName: "inferno", SteamID: 76561198081702155, Metric: kastMetric, HLTVValue: "15/22 (68.2%)", ToolValue: "16/22 (72.7%)", Issue: 38},
-	{MapName: "inferno", SteamID: 76561198044112269, Metric: kastMetric, HLTVValue: "16/22 (72.7%)", ToolValue: "18/22 (81.8%)", Issue: 38},
-	{MapName: "inferno", SteamID: 76561199048086137, Metric: kastMetric, HLTVValue: "18/22 (81.8%)", ToolValue: "17/22 (77.3%)", Issue: 38},
-	{MapName: "inferno", SteamID: 76561198226777692, Metric: kastMetric, HLTVValue: "15/22 (68.2%)", ToolValue: "16/22 (72.7%)", Issue: 38},
-	{MapName: "inferno", SteamID: 76561198208618504, Metric: kastMetric, HLTVValue: "16/22 (72.7%)", ToolValue: "17/22 (77.3%)", Issue: 38},
-	{MapName: "anubis", SteamID: 76561198081702155, Metric: kastMetric, HLTVValue: "13/19 (68.4%)", ToolValue: "12/19 (63.2%)", Issue: 38},
-	{MapName: "anubis", SteamID: 76561198108660703, Metric: kastMetric, HLTVValue: "14/19 (73.7%)", ToolValue: "15/19 (78.9%)", Issue: 38},
-	{MapName: "anubis", SteamID: 76561198044112269, Metric: kastMetric, HLTVValue: "15/19 (78.9%)", ToolValue: "16/19 (84.2%)", Issue: 38},
-	{MapName: "mirage", SteamID: 76561198108660703, Metric: kastMetric, HLTVValue: "17/23 (73.9%)", ToolValue: "18/23 (78.3%)", Issue: 38},
-	{MapName: "mirage", SteamID: 76561199048086137, Metric: kastMetric, HLTVValue: "17/23 (73.9%)", ToolValue: "19/23 (82.6%)", Issue: 38},
+	{
+		FixtureID: "match-129241", MapID: 234944, SteamID: 76561199048086137,
+		Metric: kastMetric, HLTVValue: "18/22 (81.8%)", ToolValue: "17/22 (77.3%)", FollowUp: "issue #38",
+	},
+	{
+		FixtureID: "match-128974", MapID: 234227, SteamID: 76561198081484775,
+		Metric: adrMetric, HLTVValue: "49.6", ToolValue: "49.5", FollowUp: "ADR rounding follow-up",
+	},
+	{
+		FixtureID: "match-128974", MapID: 234227, SteamID: 76561198310561479,
+		Metric: adrMetric, HLTVValue: "108.7", ToolValue: "108.8", FollowUp: "ADR rounding follow-up",
+	},
+	{
+		FixtureID: "match-128974", MapID: 234233, SteamID: 76561198081484775,
+		Metric: adrMetric, HLTVValue: "59.6", ToolValue: "59.7", FollowUp: "ADR rounding follow-up",
+	},
+	{
+		FixtureID: "match-128974", MapID: 234238, SteamID: 76561198998266210,
+		Metric: adrMetric, HLTVValue: "64.8", ToolValue: "64.9", FollowUp: "ADR rounding follow-up",
+	},
+	{
+		FixtureID: "match-128974", MapID: 234256, SteamID: 76561198193174134,
+		Metric: adrMetric, HLTVValue: "81.4", ToolValue: "81.5", FollowUp: "ADR rounding follow-up",
+	},
+	{
+		FixtureID: "match-128974", MapID: 234256, SteamID: 76561198310561479,
+		Metric: adrMetric, HLTVValue: "76.5", ToolValue: "76.6", FollowUp: "ADR rounding follow-up",
+	},
+	{
+		FixtureID: "match-2396559", MapID: 234956, SteamID: 76561199024583803,
+		Metric: adrMetric, HLTVValue: "63.9", ToolValue: "64.0", FollowUp: "ADR rounding follow-up",
+	},
+	{
+		FixtureID: "match-2396559", MapID: 234956, SteamID: 76561199063238565,
+		Metric: kastMetric, HLTVValue: "18/23 (78.3%)", ToolValue: "17/23 (73.9%)", FollowUp: "issue #38",
+	},
+}
+
+type hltvOracleSpec struct {
+	Path         string
+	ExpectedMaps int
+	Extra        bool
+}
+
+var hltvOracleSpecs = []hltvOracleSpec{
+	{Path: hltvOracleFixturePath, ExpectedMaps: 3},
+	{Path: "testdata/hltv-128974/expected.json", ExpectedMaps: 4, Extra: true},
+	{Path: "testdata/hltv-2396559/expected.json", ExpectedMaps: 1, Extra: true},
 }
 
 type ratingObservation struct {
@@ -113,69 +163,147 @@ type hltvParity struct {
 }
 
 func TestHLTVRegression(t *testing.T) {
-	oracle := loadHLTVOracle(t)
-	demoDir := os.Getenv(hltvDemoDirEnv)
-	requireDemos := os.Getenv(requireHLTVDemosEnv) != ""
-	if demoDir == "" {
-		if requireDemos {
-			t.Fatalf("%s is set but %s is empty; point it at the directory containing the three match 129241 demos",
-				requireHLTVDemosEnv, hltvDemoDirEnv)
+	oracles := make([]hltvOracle, len(hltvOracleSpecs))
+	for i, spec := range hltvOracleSpecs {
+		oracles[i] = loadHLTVOracle(t, spec.Path)
+	}
+	validateHLTVOracleSet(t, hltvOracleSpecs, oracles)
+	validateHLTVExpectedDifferences(t, oracles)
+
+	originalDirs := configuredDemoDirs(os.Getenv(hltvDemoDirEnv))
+	extraDirs := configuredDemoDirs(os.Getenv(hltvExtraDemoDirsEnv))
+	requireOriginal := os.Getenv(requireHLTVDemosEnv) != ""
+	requireExtra := os.Getenv(requireHLTVExtraDemoEnv) != ""
+	if requireOriginal && len(originalDirs) == 0 {
+		t.Fatalf("%s is set but %s is empty; point it at the directory containing the three match 129241 demos",
+			requireHLTVDemosEnv, hltvDemoDirEnv)
+	}
+	if requireExtra && len(extraDirs) == 0 {
+		t.Fatalf("%s is set but %s is empty; provide an OS path-list containing the five additional demos",
+			requireHLTVExtraDemoEnv, hltvExtraDemoDirsEnv)
+	}
+
+	var originalRatings, extraRatings []ratingObservation
+	var originalParity, extraParity hltvParity
+	for i, spec := range hltvOracleSpecs {
+		oracle := oracles[i]
+		dirs := originalDirs
+		required := requireOriginal
+		requireEnv := requireHLTVDemosEnv
+		if spec.Extra {
+			dirs = extraDirs
+			required = requireExtra
+			requireEnv = requireHLTVExtraDemoEnv
 		}
-		t.Skipf("HLTV regression demos are not configured; set %s to run the external-oracle harness", hltvDemoDirEnv)
+
+		for _, expectedMap := range oracle.Maps {
+			testName := expectedMap.Name
+			if spec.Extra {
+				testName = fmt.Sprintf("extra/%s/%s-%d", oracle.FixtureID, expectedMap.Name, expectedMap.MapID)
+			}
+			t.Run(testName, func(t *testing.T) {
+				if len(dirs) == 0 {
+					t.Skipf("HLTV demos are not configured; set %s to run this external-oracle fixture", demoDirsEnv(spec.Extra))
+				}
+				demoPath, err := findDemo(dirs, expectedMap.DemoFile)
+				if err != nil {
+					if errors.Is(err, os.ErrNotExist) && !required {
+						t.Skipf("HLTV demo %s is absent; set %s to make missing demos fail", expectedMap.DemoFile, requireEnv)
+					}
+					t.Fatalf("locating HLTV demo: %v", err)
+				}
+				if err := verifyDemoChecksum(demoPath, expectedMap.DemoSHA256); err != nil {
+					t.Fatalf("verifying HLTV demo: %v", err)
+				}
+
+				result, err := ProcessDemo(demoPath)
+				if err != nil {
+					t.Fatalf("ProcessDemo(%s): %v", expectedMap.DemoFile, err)
+				}
+
+				assertHLTVMap(t, oracle.FixtureID, result, expectedMap)
+				assertHLTVRoster(t, oracle.FixtureID, result.Players, expectedMap)
+				for _, expectedPlayer := range expectedMap.Players {
+					player := result.Players[expectedPlayer.SteamID]
+					assertHLTVPlayer(t, oracle.FixtureID, expectedMap, expectedPlayer, player)
+					parity := &originalParity
+					ratings := &originalRatings
+					if spec.Extra {
+						parity = &extraParity
+						ratings = &extraRatings
+					}
+					observeHLTVParity(parity, player, expectedMap, expectedPlayer)
+					*ratings = append(*ratings, ratingObservation{
+						Tool: displayedRating(player.Rating.Value),
+						HLTV: expectedPlayer.Rating,
+					})
+				}
+			})
+		}
 	}
 
-	var ratings []ratingObservation
-	var parity hltvParity
-	for _, expectedMap := range oracle.Maps {
-		t.Run(expectedMap.Name, func(t *testing.T) {
-			demoPath := filepath.Join(demoDir, expectedMap.DemoFile)
-			if err := verifyDemoChecksum(demoPath, expectedMap.DemoSHA256); err != nil {
-				if errors.Is(err, os.ErrNotExist) && !requireDemos {
-					t.Skipf("HLTV demo %s is absent; set %s to make missing demos fail", demoPath, requireHLTVDemosEnv)
-				}
-				t.Fatalf("verifying HLTV demo: %v", err)
-			}
+	logHLTVParity(t, "original fixture", originalParity, originalRatings)
+	logHLTVParity(t, "additional fixtures", extraParity, extraRatings)
+}
 
-			result, err := ProcessDemo(demoPath)
-			if err != nil {
-				t.Fatalf("ProcessDemo(%s): %v", expectedMap.DemoFile, err)
-			}
-
-			assertHLTVMap(t, result, expectedMap)
-			assertHLTVRoster(t, result.Players, expectedMap)
-			for _, expectedPlayer := range expectedMap.Players {
-				player := result.Players[expectedPlayer.SteamID]
-				assertHLTVPlayer(t, expectedMap, expectedPlayer, player)
-				if player.KillStats.Total == expectedPlayer.Kills {
-					parity.Kills++
-				}
-				if player.Deaths == expectedPlayer.Deaths {
-					parity.Deaths++
-				}
-				if fmt.Sprintf("%.1f", player.AssistStats.ADR) == fmt.Sprintf("%.1f", expectedPlayer.ADR) {
-					parity.ADR++
-				}
-				if kastRounds(player.PlayerMapStats.KAST, expectedMap.Rounds) ==
-					kastRounds(expectedPlayer.KASTPercent, expectedMap.Rounds) {
-					parity.KAST++
-				}
-				ratings = append(ratings, ratingObservation{
-					Tool: displayedRating(player.Rating.Value),
-					HLTV: expectedPlayer.Rating,
-				})
-			}
-		})
+func configuredDemoDirs(value string) []string {
+	var dirs []string
+	for _, dir := range filepath.SplitList(value) {
+		if dir = strings.TrimSpace(dir); dir != "" {
+			dirs = append(dirs, dir)
+		}
 	}
+	return dirs
+}
 
-	if len(ratings) > 0 {
-		rows := len(ratings)
-		t.Logf("HLTV parity (%d player-maps): kills=%d/%d deaths=%d/%d ADR=%d/%d KAST=%d/%d",
-			rows, parity.Kills, rows, parity.Deaths, rows, parity.ADR, rows, parity.KAST, rows)
-		quality := summarizeRatingQuality(ratings)
-		t.Logf("Rating 3.0 quality (%d player-maps): MAE=%.3f RMSE=%.3f bias=%+.3f Spearman=%.3f; within ±0.05=%d, ±0.10=%d, ±0.20=%d",
-			rows, quality.MAE, quality.RMSE, quality.Bias, quality.Spearman,
-			quality.Within005, quality.Within010, quality.Within020)
+func demoDirsEnv(extra bool) string {
+	if extra {
+		return hltvExtraDemoDirsEnv
 	}
+	return hltvDemoDirEnv
+}
+
+func findDemo(dirs []string, name string) (string, error) {
+	for _, dir := range dirs {
+		path := filepath.Join(dir, name)
+		_, err := os.Stat(path)
+		if err == nil {
+			return path, nil
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("checking %s: %w", path, err)
+		}
+	}
+	return "", fmt.Errorf("%s not found in %v: %w", name, dirs, os.ErrNotExist)
+}
+
+func observeHLTVParity(parity *hltvParity, player *DemoPlayer, expectedMap hltvMapExpected, expected hltvPlayerExpected) {
+	if player.KillStats.Total == expected.Kills {
+		parity.Kills++
+	}
+	if player.Deaths == expected.Deaths {
+		parity.Deaths++
+	}
+	if fmt.Sprintf("%.1f", player.AssistStats.ADR) == fmt.Sprintf("%.1f", expected.ADR) {
+		parity.ADR++
+	}
+	if kastRounds(player.PlayerMapStats.KAST, expectedMap.Rounds) == kastRounds(expected.KASTPercent, expectedMap.Rounds) {
+		parity.KAST++
+	}
+}
+
+func logHLTVParity(t *testing.T, label string, parity hltvParity, ratings []ratingObservation) {
+	t.Helper()
+	if len(ratings) == 0 {
+		return
+	}
+	rows := len(ratings)
+	t.Logf("HLTV parity, %s (%d player-maps): kills=%d/%d deaths=%d/%d ADR=%d/%d KAST=%d/%d",
+		label, rows, parity.Kills, rows, parity.Deaths, rows, parity.ADR, rows, parity.KAST, rows)
+	quality := summarizeRatingQuality(ratings)
+	t.Logf("Rating 3.0 quality, %s (%d player-maps): MAE=%.3f RMSE=%.3f bias=%+.3f Spearman=%.3f; within ±0.05=%d, ±0.10=%d, ±0.20=%d",
+		label, rows, quality.MAE, quality.RMSE, quality.Bias, quality.Spearman,
+		quality.Within005, quality.Within010, quality.Within020)
 }
 
 func TestSummarizeRatingQuality(t *testing.T) {
@@ -223,6 +351,20 @@ func TestKASTRounds(t *testing.T) {
 	}
 }
 
+func TestHLTVDifferenceKeyIncludesFixtureIdentity(t *testing.T) {
+	base := hltvExpectedDifference{
+		FixtureID: "fixture-a", MapID: 1, SteamID: 2, Metric: adrMetric,
+	}
+	keys := map[hltvDifferenceKey]bool{
+		base.key(): true,
+		(hltvExpectedDifference{FixtureID: "fixture-b", MapID: 1, SteamID: 2, Metric: adrMetric}).key(): true,
+		(hltvExpectedDifference{FixtureID: "fixture-a", MapID: 3, SteamID: 2, Metric: adrMetric}).key(): true,
+	}
+	if len(keys) != 3 {
+		t.Fatalf("fixture/map identities collapsed into %d expected-difference keys, want 3", len(keys))
+	}
+}
+
 func TestSpearmanRankCorrelation(t *testing.T) {
 	tests := []struct {
 		name string
@@ -243,82 +385,127 @@ func TestSpearmanRankCorrelation(t *testing.T) {
 	}
 }
 
-func loadHLTVOracle(t *testing.T) hltvOracle {
+func loadHLTVOracle(t *testing.T, path string) hltvOracle {
 	t.Helper()
-	data, err := os.ReadFile(hltvOracleFixturePath)
+	data, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatalf("reading HLTV oracle fixture: %v", err)
+		t.Fatalf("reading HLTV oracle fixture %s: %v", path, err)
 	}
 	var oracle hltvOracle
 	decoder := json.NewDecoder(strings.NewReader(string(data)))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&oracle); err != nil {
-		t.Fatalf("decoding HLTV oracle fixture: %v", err)
+		t.Fatalf("decoding HLTV oracle fixture %s: %v", path, err)
 	}
-	validateHLTVOracle(t, oracle)
+	validateHLTVOracle(t, path, oracle)
 	return oracle
 }
 
-func validateHLTVOracle(t *testing.T, oracle hltvOracle) {
+func validateHLTVOracle(t *testing.T, path string, oracle hltvOracle) {
 	t.Helper()
-	if oracle.MatchID != 129241 {
-		t.Fatalf("HLTV oracle match_id = %d, want 129241", oracle.MatchID)
+	if oracle.FixtureID == "" {
+		t.Fatalf("HLTV oracle %s has an empty fixture_id", path)
 	}
-	if len(oracle.Maps) != 3 {
-		t.Fatalf("HLTV oracle has %d maps, want 3", len(oracle.Maps))
+	if oracle.MatchID == 0 || oracle.MatchStatsURL == "" {
+		t.Fatalf("HLTV oracle %s is missing match metadata", path)
+	}
+	if len(oracle.Maps) == 0 {
+		t.Fatalf("HLTV oracle %s has no maps", path)
 	}
 
-	mapsByName := make(map[string]hltvMapExpected, len(oracle.Maps))
+	mapsByID := make(map[int]hltvMapExpected, len(oracle.Maps))
 	for _, expectedMap := range oracle.Maps {
-		if _, exists := mapsByName[expectedMap.Name]; exists {
-			t.Fatalf("HLTV oracle repeats map %q", expectedMap.Name)
+		if expectedMap.MapID == 0 || expectedMap.MapStatsURL == "" || expectedMap.DemoSHA256 == "" {
+			t.Fatalf("HLTV oracle %s map %q is missing source metadata", path, expectedMap.Name)
 		}
-		mapsByName[expectedMap.Name] = expectedMap
+		if _, exists := mapsByID[expectedMap.MapID]; exists {
+			t.Fatalf("HLTV oracle %s repeats map ID %d", path, expectedMap.MapID)
+		}
+		mapsByID[expectedMap.MapID] = expectedMap
 		if len(expectedMap.Players) != 10 {
-			t.Fatalf("HLTV oracle map %s has %d players, want 10", expectedMap.Name, len(expectedMap.Players))
+			t.Fatalf("HLTV oracle %s map %s has %d players, want 10", path, expectedMap.Name, len(expectedMap.Players))
 		}
 		seenPlayers := make(map[uint64]bool, len(expectedMap.Players))
 		for _, player := range expectedMap.Players {
 			if player.SteamID == 0 {
-				t.Fatalf("HLTV oracle map %s contains a zero SteamID", expectedMap.Name)
+				t.Fatalf("HLTV oracle %s map %s contains a zero SteamID", path, expectedMap.Name)
 			}
 			if seenPlayers[player.SteamID] {
-				t.Fatalf("HLTV oracle map %s repeats SteamID %d", expectedMap.Name, player.SteamID)
+				t.Fatalf("HLTV oracle %s map %s repeats SteamID %d", path, expectedMap.Name, player.SteamID)
 			}
 			seenPlayers[player.SteamID] = true
 		}
 	}
+}
 
+func validateHLTVOracleSet(t *testing.T, specs []hltvOracleSpec, oracles []hltvOracle) {
+	t.Helper()
+	if len(specs) != len(oracles) {
+		t.Fatalf("HLTV oracle specs = %d, loaded oracles = %d", len(specs), len(oracles))
+	}
+	seenFixtures := make(map[string]bool, len(oracles))
+	totalMaps, totalRows := 0, 0
+	for i, oracle := range oracles {
+		if seenFixtures[oracle.FixtureID] {
+			t.Fatalf("HLTV oracles repeat fixture_id %q", oracle.FixtureID)
+		}
+		seenFixtures[oracle.FixtureID] = true
+		if got, want := len(oracle.Maps), specs[i].ExpectedMaps; got != want {
+			t.Fatalf("HLTV oracle %s has %d maps, want %d", specs[i].Path, got, want)
+		}
+		totalMaps += len(oracle.Maps)
+		for _, expectedMap := range oracle.Maps {
+			totalRows += len(expectedMap.Players)
+		}
+	}
+	if totalMaps != 8 || totalRows != 80 {
+		t.Fatalf("HLTV oracle coverage = %d maps/%d player-maps, want 8/80", totalMaps, totalRows)
+	}
+}
+
+func validateHLTVExpectedDifferences(t *testing.T, oracles []hltvOracle) {
+	t.Helper()
+	mapsByKey := make(map[hltvFixtureMapKey]hltvMapExpected)
+	for _, oracle := range oracles {
+		for _, expectedMap := range oracle.Maps {
+			key := hltvFixtureMapKey{FixtureID: oracle.FixtureID, MapID: expectedMap.MapID}
+			if _, exists := mapsByKey[key]; exists {
+				t.Fatalf("HLTV oracles repeat fixture/map key %s/%d", oracle.FixtureID, expectedMap.MapID)
+			}
+			mapsByKey[key] = expectedMap
+		}
+	}
 	seenDifferences := make(map[hltvDifferenceKey]bool, len(hltvExpectedDifferences))
 	for _, difference := range hltvExpectedDifferences {
 		if seenDifferences[difference.key()] {
 			t.Fatalf("expected-difference table repeats %+v", difference.key())
 		}
 		seenDifferences[difference.key()] = true
-		expectedMap, exists := mapsByName[difference.MapName]
+		expectedMap, exists := mapsByKey[hltvFixtureMapKey{FixtureID: difference.FixtureID, MapID: difference.MapID}]
 		if !exists {
-			t.Fatalf("expected difference references unknown map %q", difference.MapName)
+			t.Fatalf("expected difference references unknown fixture/map %q/%d", difference.FixtureID, difference.MapID)
 		}
 		expectedPlayer, exists := findExpectedPlayer(expectedMap, difference.SteamID)
 		if !exists {
-			t.Fatalf("expected difference references unknown SteamID %d on %s", difference.SteamID, difference.MapName)
+			t.Fatalf("expected difference references unknown SteamID %d on %s/%d",
+				difference.SteamID, difference.FixtureID, difference.MapID)
 		}
 		wantValue := expectedMetricValue(t, expectedMap, expectedPlayer, difference.Metric)
 		if difference.HLTVValue != wantValue {
-			t.Fatalf("expected difference %s/%d/%s has HLTV value %q, fixture says %q",
-				difference.MapName, difference.SteamID, difference.Metric, difference.HLTVValue, wantValue)
+			t.Fatalf("expected difference %s/%d/%d/%s has HLTV value %q, fixture says %q",
+				difference.FixtureID, difference.MapID, difference.SteamID, difference.Metric, difference.HLTVValue, wantValue)
 		}
 		if difference.ToolValue == difference.HLTVValue {
-			t.Fatalf("expected difference %s/%d/%s has identical HLTV and tool values %q",
-				difference.MapName, difference.SteamID, difference.Metric, difference.HLTVValue)
+			t.Fatalf("expected difference %s/%d/%d/%s has identical HLTV and tool values %q",
+				difference.FixtureID, difference.MapID, difference.SteamID, difference.Metric, difference.HLTVValue)
 		}
-		if difference.Metric != kastMetric {
-			t.Fatalf("expected difference %s/%d uses unsupported metric %q; only issue #38 KAST differences are allowed",
-				difference.MapName, difference.SteamID, difference.Metric)
+		if difference.Metric != adrMetric && difference.Metric != kastMetric {
+			t.Fatalf("expected difference %s/%d/%d uses unsupported metric %q",
+				difference.FixtureID, difference.MapID, difference.SteamID, difference.Metric)
 		}
-		if difference.Issue != 38 {
-			t.Fatalf("expected difference %s/%d/%s points to issue #%d", difference.MapName,
-				difference.SteamID, difference.Metric, difference.Issue)
+		if difference.FollowUp == "" {
+			t.Fatalf("expected difference %s/%d/%d/%s has no follow-up reference",
+				difference.FixtureID, difference.MapID, difference.SteamID, difference.Metric)
 		}
 	}
 }
@@ -336,27 +523,28 @@ func verifyDemoChecksum(path, want string) error {
 	}
 	got := hex.EncodeToString(hash.Sum(nil))
 	if got != want {
-		return fmt.Errorf("%s has SHA-256 %s, want %s; use the exact match 129241 demo", path, got, want)
+		return fmt.Errorf("%s has SHA-256 %s, want %s; use the exact audited demo named by the oracle", path, got, want)
 	}
 	return nil
 }
 
-func assertHLTVMap(t *testing.T, result *ProcessedDemo, expected hltvMapExpected) {
+func assertHLTVMap(t *testing.T, fixtureID string, result *ProcessedDemo, expected hltvMapExpected) {
 	t.Helper()
+	label := fmt.Sprintf("%s/%d/%s", fixtureID, expected.MapID, expected.Name)
 	if result.Map.MapName != expected.ParserMapName {
-		t.Errorf("map name = %q, want %q", result.Map.MapName, expected.ParserMapName)
+		t.Errorf("%s map name = %q, want %q", label, result.Map.MapName, expected.ParserMapName)
 	}
 	if result.Map.TotalRounds != expected.Rounds {
-		t.Errorf("%s rounds = %d, want %d", expected.Name, result.Map.TotalRounds, expected.Rounds)
+		t.Errorf("%s rounds = %d, want %d", label, result.Map.TotalRounds, expected.Rounds)
 	}
 	gotScore := sortedScore(result.Map.RoundsWonCT, result.Map.RoundsWonT)
 	wantScore := sortedScore(expected.ScoreValues[0], expected.ScoreValues[1])
 	if gotScore != wantScore {
-		t.Errorf("%s score values = %v, want %v", expected.Name, gotScore, wantScore)
+		t.Errorf("%s score values = %v, want %v", label, gotScore, wantScore)
 	}
 }
 
-func assertHLTVRoster(t *testing.T, players map[uint64]*DemoPlayer, expected hltvMapExpected) {
+func assertHLTVRoster(t *testing.T, fixtureID string, players map[uint64]*DemoPlayer, expected hltvMapExpected) {
 	t.Helper()
 	expectedPlayers := make(map[uint64]string, len(expected.Players))
 	for _, player := range expected.Players {
@@ -377,30 +565,32 @@ func assertHLTVRoster(t *testing.T, players map[uint64]*DemoPlayer, expected hlt
 	sort.Strings(missing)
 	sort.Strings(unexpected)
 	if len(players) != 10 || len(missing) > 0 || len(unexpected) > 0 {
-		t.Fatalf("%s roster mismatch: got %d players; missing=%v unexpected=%v", expected.Name,
+		t.Fatalf("%s/%d/%s roster mismatch: got %d players; missing=%v unexpected=%v",
+			fixtureID, expected.MapID, expected.Name,
 			len(players), missing, unexpected)
 	}
 }
 
-func assertHLTVPlayer(t *testing.T, expectedMap hltvMapExpected, expected hltvPlayerExpected, player *DemoPlayer) {
+func assertHLTVPlayer(t *testing.T, fixtureID string, expectedMap hltvMapExpected, expected hltvPlayerExpected, player *DemoPlayer) {
 	t.Helper()
 	if player.SteamID != expected.SteamID {
-		t.Errorf("%s/%s SteamID = %d, want %d", expectedMap.Name, expected.HLTVName, player.SteamID, expected.SteamID)
+		t.Errorf("%s/%d/%s SteamID = %d, want %d",
+			fixtureID, expectedMap.MapID, expected.HLTVName, player.SteamID, expected.SteamID)
 	}
 	if player.KillStats.Total != expected.Kills {
-		t.Errorf("%s/%s (%d) kills = %d, HLTV %d", expectedMap.Name, expected.HLTVName,
+		t.Errorf("%s/%d/%s (%d) kills = %d, HLTV %d", fixtureID, expectedMap.MapID, expected.HLTVName,
 			expected.SteamID, player.KillStats.Total, expected.Kills)
 	}
 	if player.Deaths != expected.Deaths {
-		t.Errorf("%s/%s (%d) deaths = %d, HLTV %d", expectedMap.Name, expected.HLTVName,
+		t.Errorf("%s/%d/%s (%d) deaths = %d, HLTV %d", fixtureID, expectedMap.MapID, expected.HLTVName,
 			expected.SteamID, player.Deaths, expected.Deaths)
 	}
 
-	assertHLTVMetric(t, hltvDifferenceKey{expectedMap.Name, expected.SteamID, adrMetric},
+	assertHLTVMetric(t, hltvDifferenceKey{fixtureID, expectedMap.MapID, expected.SteamID, adrMetric},
 		fmt.Sprintf("%.1f", expected.ADR), fmt.Sprintf("%.1f", player.AssistStats.ADR), expected.HLTVName)
 	wantKASTRounds := kastRounds(expected.KASTPercent, expectedMap.Rounds)
 	gotKASTRounds := kastRounds(player.PlayerMapStats.KAST, expectedMap.Rounds)
-	assertHLTVMetric(t, hltvDifferenceKey{expectedMap.Name, expected.SteamID, kastMetric},
+	assertHLTVMetric(t, hltvDifferenceKey{fixtureID, expectedMap.MapID, expected.SteamID, kastMetric},
 		formatKAST(wantKASTRounds, expectedMap.Rounds, expected.KASTPercent),
 		formatKAST(gotKASTRounds, expectedMap.Rounds, player.PlayerMapStats.KAST), expected.HLTVName)
 }
@@ -410,23 +600,24 @@ func assertHLTVMetric(t *testing.T, key hltvDifferenceKey, want, got, hltvName s
 	difference, known := findExpectedDifference(key)
 	if !known {
 		if got != want {
-			t.Errorf("%s/%s (%d) %s = %s, HLTV %s", key.MapName, hltvName, key.SteamID, key.Metric, got, want)
+			t.Errorf("%s/%d/%s (%d) %s = %s, HLTV %s",
+				key.FixtureID, key.MapID, hltvName, key.SteamID, key.Metric, got, want)
 		}
 		return
 	}
 	if difference.HLTVValue != want {
-		t.Fatalf("%s/%s (%d) %s exception says HLTV %s, fixture says %s",
-			key.MapName, hltvName, key.SteamID, key.Metric, difference.HLTVValue, want)
+		t.Fatalf("%s/%d/%s (%d) %s exception says HLTV %s, fixture says %s",
+			key.FixtureID, key.MapID, hltvName, key.SteamID, key.Metric, difference.HLTVValue, want)
 	}
 	if got == want {
-		t.Errorf("%s/%s (%d) %s now matches HLTV at %s; remove the stale issue #%d exception and promote this row to strict parity",
-			key.MapName, hltvName, key.SteamID, key.Metric, got, difference.Issue)
+		t.Errorf("%s/%d/%s (%d) %s now matches HLTV at %s; remove the stale exception (%s) and promote this row to strict parity",
+			key.FixtureID, key.MapID, hltvName, key.SteamID, key.Metric, got, difference.FollowUp)
 		return
 	}
 	if got != difference.ToolValue {
-		t.Errorf("%s/%s (%d) %s = %s, want current tool value %s (HLTV %s, issue #%d)",
-			key.MapName, hltvName, key.SteamID, key.Metric, got, difference.ToolValue,
-			difference.HLTVValue, difference.Issue)
+		t.Errorf("%s/%d/%s (%d) %s = %s, want current tool value %s (HLTV %s; %s)",
+			key.FixtureID, key.MapID, hltvName, key.SteamID, key.Metric, got, difference.ToolValue,
+			difference.HLTVValue, difference.FollowUp)
 	}
 }
 

@@ -2,6 +2,7 @@ package demoparser
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -16,23 +17,47 @@ import (
 // analyser accumulates player stats while the demo is parsed. Round-scoped
 // bookkeeping (clutches, aces, trades, KAST) is delegated to roundTracker.
 type analyser struct {
-	parser      demoinfocs.Parser
-	players     map[uint64]*DemoPlayer
-	tracker     *roundTracker
-	kastRounds  map[uint64]SideCount // rounds with KAST, total and per side
-	sideDamage  map[uint64]SideCount // damage given, total and per side
-	openingWins map[uint64]int       // rounds won after taking the opening kill
-	lastHealth  map[uint64]int
-	worldSource map[uint64]worldDamageSource
-	flashEnds   map[uint64]time.Duration // latest known end of each player's blind interval
-	ecoKills    map[uint64]float64       // eco-adjusted kill points
-	ecoDamage   map[uint64]float64       // eco-adjusted damage given
-	roundSwing  map[uint64]float64       // summed round-win-probability swing
-	ecoSurvival map[uint64]float64       // eco-weighted rounds survived
-	ecoKast     map[uint64]float64       // eco-weighted rounds with rating KAST credit
-	roundTiers  map[uint64]equipTier     // loadout tier per player in the current round
-	mapData     MapData
-	gameMode    string
+	parser         demoinfocs.Parser
+	players        map[uint64]*DemoPlayer
+	tracker        *roundTracker
+	kastRounds     map[uint64]SideCount // rounds with KAST, total and per side
+	sideDamage     map[uint64]SideCount // damage given, total and per side
+	openingWins    map[uint64]int       // rounds won after taking the opening kill
+	lastHealth     map[uint64]int
+	worldSource    map[uint64]worldDamageSource
+	flashEnds      map[uint64]time.Duration // latest known end of each player's blind interval
+	ecoKills       map[uint64]float64       // eco-adjusted kill points
+	ecoDamage      map[uint64]float64       // eco-adjusted damage given
+	roundSwing     map[uint64]float64       // summed round-win-probability swing
+	ecoSurvival    map[uint64]float64       // eco-weighted rounds survived
+	ecoKast        map[uint64]float64       // eco-weighted rounds with rating KAST credit
+	roundTiers     map[uint64]equipTier     // loadout tier per player in the current round
+	roundMVPs      map[uint64]int           // cumulative scoreboard MVPs captured for the current round
+	roundEcoKills  []playerRatingFact       // rating kill points in event order for the current round
+	roundEcoDamage []playerRatingFact       // rating damage points in event order for the current round
+	pendingRounds  []*pendingRoundFacts     // finalized facts waiting for scoreboard advances
+	latestRound    *pendingRoundFacts       // most recently finalized round, for late MVP events
+	appliedRounds  int                      // authoritative round count already represented in player facts
+	roundsStarted  bool                     // whether appliedRounds has been initialized
+	eventMVPs      map[uint64]int           // MVP announcements from authoritative scored rounds
+	parseErr       error                    // delayed handler error returned after parsing
+	mapData        MapData
+	gameMode       string
+}
+
+type pendingRoundFacts struct {
+	outcome    roundOutcome
+	tiers      map[uint64]equipTier
+	mvps       map[uint64]int
+	ecoKills   []playerRatingFact
+	ecoDamage  []playerRatingFact
+	scored     bool
+	mvpCounted bool
+}
+
+type playerRatingFact struct {
+	player uint64
+	value  float64
 }
 
 type worldDamageSource struct {
@@ -57,6 +82,8 @@ func newAnalyser(parser demoinfocs.Parser) *analyser {
 		ecoSurvival: make(map[uint64]float64),
 		ecoKast:     make(map[uint64]float64),
 		roundTiers:  make(map[uint64]equipTier),
+		roundMVPs:   make(map[uint64]int),
+		eventMVPs:   make(map[uint64]int),
 	}
 }
 
@@ -74,6 +101,9 @@ func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
 
 	if err := a.parser.ParseToEnd(); err != nil {
 		return nil, fmt.Errorf("parsing demo: %w", err)
+	}
+	if a.parseErr != nil {
+		return nil, fmt.Errorf("parsing demo: %w", a.parseErr)
 	}
 
 	a.finalise()
@@ -195,11 +225,20 @@ func (a *analyser) onRoundStart(e events.RoundStart) {
 	if a.inWarmupOrPregame() {
 		return
 	}
-	// Close the previous round in case its official end was never seen.
-	// That outcome consumes the previous round's tier snapshot, so the
-	// reset has to fall between it and the roster read for the new round.
-	a.applyRoundOutcome(a.tracker.finalize())
+	if !a.roundsStarted {
+		a.appliedRounds = a.parser.GameState().TotalRoundsPlayed()
+		a.roundsStarted = true
+	}
+	// Close the previous round in case its official end was never seen. It
+	// remains queued until the authoritative round count creates room for it;
+	// this tolerates a late property update without crediting a same-score
+	// setup RoundStart.
+	a.finalizeRoundFacts()
+	a.latestRound = nil
 	clear(a.roundTiers)
+	clear(a.roundMVPs)
+	a.roundEcoKills = a.roundEcoKills[:0]
+	a.roundEcoDamage = a.roundEcoDamage[:0]
 	clear(a.worldSource)
 	a.tracker.startRound(a.playingRoster())
 }
@@ -286,7 +325,10 @@ func (a *analyser) onKill(e events.Kill) {
 			// victim's inventory is still their pre-death one during Kill,
 			// which TestProcessDemoGolden pins for unused utility. Keyed by
 			// SteamID like ecoDamage, matching how derive reads both back.
-			a.ecoKills[killer.SteamID] += killPoints(playerTier(e.Killer.Inventory), playerTier(e.Victim.Inventory))
+			a.roundEcoKills = append(a.roundEcoKills, playerRatingFact{
+				player: killer.SteamID,
+				value:  killPoints(playerTier(e.Killer.Inventory), playerTier(e.Victim.Inventory)),
+			})
 		}
 	}
 
@@ -302,12 +344,12 @@ func (a *analyser) onKill(e events.Kill) {
 		}
 	}
 
-	isTrade := a.tracker.kill(killerID, trackerID(e.Victim), killerTeam, e.Victim.Team, assisterID, byWorld, a.parser.CurrentTime())
-	if isTrade && !teamkill {
-		if killer := a.ensurePlayer(e.Killer); killer != nil {
-			killer.KillStats.TradeKills++
-		}
+	tickTime := a.parser.TickTime()
+	if tickTime <= 0 && a.parseErr == nil {
+		a.parseErr = fmt.Errorf("demo tick duration is %s; cannot calculate trades", tickTime)
 	}
+	a.tracker.kill(killerID, trackerID(e.Victim), killerTeam, e.Victim.Team,
+		assisterID, e.AssistedFlash, byWorld, a.parser.GameState().IngameTick(), tickTime)
 }
 
 func (a *analyser) onPlayerHurt(e events.PlayerHurt) {
@@ -382,8 +424,11 @@ func (a *analyser) onPlayerHurt(e events.PlayerHurt) {
 	// absorbed hits) and cannot change either total, so skip pricing
 	// their duel.
 	if realDamage > 0 {
-		a.ecoDamage[attackerStats.SteamID] += float64(realDamage) *
-			ecoDuelFactor(playerTier(damageAttacker.Inventory), playerTier(e.Player.Inventory))
+		a.roundEcoDamage = append(a.roundEcoDamage, playerRatingFact{
+			player: attackerStats.SteamID,
+			value: float64(realDamage) *
+				ecoDuelFactor(playerTier(damageAttacker.Inventory), playerTier(e.Player.Inventory)),
+		})
 		a.tracker.damage(trackerID(damageAttacker), victimID, realDamage)
 	}
 }
@@ -427,7 +472,17 @@ func (a *analyser) onRoundMVP(e events.RoundMVPAnnouncement) {
 		return
 	}
 	if player := a.ensurePlayer(e.Player); player != nil {
-		player.PlayerMapStats.MVPs++
+		if a.tracker.live {
+			a.tracker.markMVP(player.SteamID)
+			return
+		}
+		// Some demos announce the MVP after RoundEndOfficial finalized the
+		// tracker. Attach it to that round until the next RoundStart instead of
+		// silently dropping it.
+		if a.latestRound != nil && a.latestRound.outcome.mvp == 0 {
+			a.latestRound.outcome.mvp = player.SteamID
+			a.applyEventMVP(a.latestRound)
+		}
 	}
 }
 
@@ -441,12 +496,12 @@ func (a *analyser) onRoundEnd(e events.RoundEnd) {
 	if a.inWarmupOrPregame() {
 		return
 	}
-	a.syncScoreboardMVPs()
+	a.captureScoreboardMVPs()
 	a.tracker.markEnd(e.Winner)
 }
 
 func (a *analyser) onRoundEndOfficial(e events.RoundEndOfficial) {
-	a.applyRoundOutcome(a.tracker.finalize())
+	a.finalizeRoundFacts()
 }
 
 // add credits n to the side the player was on. Anything but CT and T only
@@ -491,7 +546,7 @@ func (m *MultiKillRounds) add(kills int) {
 	}
 }
 
-func (a *analyser) applyRoundOutcome(outcome roundOutcome) {
+func (a *analyser) applyRoundOutcomeWithTiers(outcome roundOutcome, tiers map[uint64]equipTier) {
 	if !outcome.played {
 		return
 	}
@@ -503,6 +558,11 @@ func (a *analyser) applyRoundOutcome(outcome roundOutcome) {
 	for id, kills := range outcome.multiKills {
 		if p := a.players[id]; p != nil {
 			p.PlayerMapStats.MultiKills.add(kills)
+		}
+	}
+	for id, kills := range outcome.tradeKills {
+		if p := a.players[id]; p != nil {
+			p.KillStats.TradeKills += kills
 		}
 	}
 	if p := a.players[outcome.clutcher]; p != nil {
@@ -540,21 +600,96 @@ func (a *analyser) applyRoundOutcome(outcome roundOutcome) {
 	// worth on the player's buy that round is the rating model's business.
 	// A player with no tier snapshot weighs the neutral 1.
 	for id := range outcome.survived {
-		a.ecoSurvival[id] += ecoRoundWeight(a.roundTiers[id])
+		a.ecoSurvival[id] += ecoRoundWeight(tiers[id])
 	}
 	for id := range outcome.ratingKast {
-		a.ecoKast[id] += ecoRoundWeight(a.roundTiers[id])
+		a.ecoKast[id] += ecoRoundWeight(tiers[id])
 	}
 }
 
-// syncScoreboardMVPs mirrors the scoreboard MVP counter into the player
-// stats. CS2 demos no longer carry the round_mvp game event, so the
-// RoundMVPAnnouncement handler never fires and the entity property is the
-// only reliable source. Synced every round end so leavers keep theirs.
-func (a *analyser) syncScoreboardMVPs() {
+// finalizeRoundFacts closes the current round and queues its derived facts.
+// The queue is reconciled against the authoritative round count so a late
+// property update cannot lose a genuine round and an unended setup round
+// cannot consume a scored-round slot. Raw event totals deliberately bypass it.
+func (a *analyser) finalizeRoundFacts() {
+	outcome := a.tracker.finalize()
+	if outcome.played {
+		pending := &pendingRoundFacts{
+			outcome:   outcome,
+			tiers:     maps.Clone(a.roundTiers),
+			mvps:      maps.Clone(a.roundMVPs),
+			ecoKills:  slices.Clone(a.roundEcoKills),
+			ecoDamage: slices.Clone(a.roundEcoDamage),
+		}
+		a.pendingRounds = append(a.pendingRounds, pending)
+		a.latestRound = pending
+	}
+	a.applyScoredRoundFacts()
+}
+
+func (a *analyser) applyScoredRoundFacts() {
+	if !a.roundsStarted {
+		return
+	}
+	available := a.parser.GameState().TotalRoundsPlayed() - a.appliedRounds
+	for available > 0 && len(a.pendingRounds) > 0 {
+		index := a.nextScoredRound()
+		pending := a.pendingRounds[index]
+		a.pendingRounds = slices.Delete(a.pendingRounds, index, index+1)
+		pending.scored = true
+		a.applyRoundOutcomeWithTiers(pending.outcome, pending.tiers)
+		for _, fact := range pending.ecoKills {
+			a.ecoKills[fact.player] += fact.value
+		}
+		for _, fact := range pending.ecoDamage {
+			a.ecoDamage[fact.player] += fact.value
+		}
+		a.applyScoreboardMVPs(pending.mvps)
+		a.applyEventMVP(pending)
+		a.appliedRounds++
+		available--
+	}
+}
+
+// nextScoredRound prefers rounds that received RoundEnd. If only unended
+// candidates remain, the newest one wins: this is the parse-corruption
+// fallback that skips an earlier same-score setup RoundStart.
+func (a *analyser) nextScoredRound() int {
+	for i, pending := range a.pendingRounds {
+		if pending.outcome.decided {
+			return i
+		}
+	}
+	return len(a.pendingRounds) - 1
+}
+
+func (a *analyser) applyEventMVP(pending *pendingRoundFacts) {
+	if !pending.scored || pending.mvpCounted || pending.outcome.mvp == 0 {
+		return
+	}
+	pending.mvpCounted = true
+	id := pending.outcome.mvp
+	a.eventMVPs[id]++
+	if player := a.players[id]; player != nil {
+		player.PlayerMapStats.MVPs = max(player.PlayerMapStats.MVPs, a.eventMVPs[id])
+	}
+}
+
+// captureScoreboardMVPs snapshots the cumulative scoreboard counter while
+// leavers are still present. It is applied only if this round later proves to
+// be scored; CS2 demos often omit RoundMVPAnnouncement entirely.
+func (a *analyser) captureScoreboardMVPs() {
 	for _, pl := range a.parser.GameState().Participants().Playing() {
 		if dp := a.ensurePlayer(pl); dp != nil {
-			dp.PlayerMapStats.MVPs = max(dp.PlayerMapStats.MVPs, pl.MVPs())
+			a.roundMVPs[dp.SteamID] = max(a.roundMVPs[dp.SteamID], pl.MVPs())
+		}
+	}
+}
+
+func (a *analyser) applyScoreboardMVPs(mvps map[uint64]int) {
+	for id, count := range mvps {
+		if player := a.players[id]; player != nil {
+			player.PlayerMapStats.MVPs = max(player.PlayerMapStats.MVPs, count)
 		}
 	}
 }
@@ -562,8 +697,17 @@ func (a *analyser) syncScoreboardMVPs() {
 // finalise fills in everything that needs the full match: final score and
 // the per-player derived stats.
 func (a *analyser) finalise() {
-	a.applyRoundOutcome(a.tracker.finalize())
-	a.syncScoreboardMVPs()
+	a.captureScoreboardMVPs()
+	a.finalizeRoundFacts()
+	// The final scoreboard is authoritative and catches MVP entity updates
+	// that arrived after RoundEndOfficial. Per-round snapshots above still
+	// preserve MVPs for players who disconnected before parse end. Keep this
+	// safety net behind the same scored-round gate as every other MVP fact.
+	if a.latestRound != nil && a.latestRound.scored {
+		a.applyScoreboardMVPs(a.roundMVPs)
+	}
+	a.pendingRounds = nil
+	a.latestRound = nil
 
 	gs := a.parser.GameState()
 	a.mapData.TotalRounds = gs.TotalRoundsPlayed()

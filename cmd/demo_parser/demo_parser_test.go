@@ -12,8 +12,8 @@ import (
 )
 
 // The handlers under test only ask the parser for round state, who is
-// playing, and the current time, so these stubs answer those questions and
-// leave the embedded interfaces nil.
+// playing, the current time, and its tick resolution, so these stubs answer
+// those questions and leave the embedded interfaces nil.
 type matchParser struct {
 	demoinfocs.Parser
 	playing      []*common.Player
@@ -21,26 +21,56 @@ type matchParser struct {
 	gamePhase    common.GamePhase
 	currentTime  time.Duration
 	currentFrame int
+	tickTime     time.Duration
+	ingameTick   int
+	roundsPlayed int
+	ctScore      int
+	tScore       int
 }
 
 func (p *matchParser) GameState() demoinfocs.GameState {
-	return matchGameState{playing: p.playing, warmup: p.warmup, gamePhase: p.gamePhase}
+	return matchGameState{
+		playing: p.playing, warmup: p.warmup, gamePhase: p.gamePhase, ingameTick: p.ingameTick,
+		roundsPlayed: p.roundsPlayed, ctScore: p.ctScore, tScore: p.tScore,
+	}
 }
 
 func (p *matchParser) CurrentTime() time.Duration { return p.currentTime }
 
 func (p *matchParser) CurrentFrame() int { return p.currentFrame }
 
+func (p *matchParser) TickTime() time.Duration { return p.tickTime }
+
 type matchGameState struct {
 	demoinfocs.GameState
-	playing   []*common.Player
-	warmup    bool
-	gamePhase common.GamePhase
+	playing      []*common.Player
+	warmup       bool
+	gamePhase    common.GamePhase
+	ingameTick   int
+	roundsPlayed int
+	ctScore      int
+	tScore       int
 }
 
 func (g matchGameState) IsWarmupPeriod() bool { return g.warmup }
 
 func (g matchGameState) GamePhase() common.GamePhase { return g.gamePhase }
+
+func (g matchGameState) IngameTick() int { return g.ingameTick }
+
+func (g matchGameState) TotalRoundsPlayed() int { return g.roundsPlayed }
+
+func (g matchGameState) TeamCounterTerrorists() *common.TeamState {
+	return &common.TeamState{Entity: matchEntity{properties: map[string]st.PropertyValue{
+		"m_iScore": {Any: int32(g.ctScore)},
+	}}}
+}
+
+func (g matchGameState) TeamTerrorists() *common.TeamState {
+	return &common.TeamState{Entity: matchEntity{properties: map[string]st.PropertyValue{
+		"m_iScore": {Any: int32(g.tScore)},
+	}}}
+}
 
 func (g matchGameState) Participants() demoinfocs.Participants {
 	return matchParticipants{playing: g.playing}
@@ -54,7 +84,17 @@ type matchParticipants struct {
 func (p matchParticipants) Playing() []*common.Player { return p.playing }
 
 func liveAnalyser(playing ...*common.Player) *analyser {
-	return newAnalyser(&matchParser{playing: playing})
+	return newAnalyser(&matchParser{playing: playing, tickTime: time.Second / 64})
+}
+
+func markRoundScored(a *analyser) {
+	a.parser.(*matchParser).roundsPlayed++
+}
+
+func endScoredRound(a *analyser, winner common.Team) {
+	markRoundScored(a)
+	a.onRoundEnd(events.RoundEnd{Winner: winner})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
 }
 
 const (
@@ -156,7 +196,7 @@ func TestPlayingRosterExcludesCoachingController(t *testing.T) {
 				t.Error("coaching controller was exported as a player")
 			}
 
-			a.syncScoreboardMVPs()
+			a.captureScoreboardMVPs()
 			if _, ok := a.players[coachID]; ok {
 				t.Error("scoreboard MVP sync exported the coaching controller")
 			}
@@ -217,8 +257,7 @@ func TestCoachingControllerEventsDoNotAffectCompetitiveRound(t *testing.T) {
 		t.Error("coach plant changed the competitive round state")
 	}
 
-	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
-	a.onRoundEndOfficial(events.RoundEndOfficial{})
+	endScoredRound(a, common.TeamTerrorists)
 	for _, id := range []uint64{shooterID, victimID} {
 		if got := a.players[id].SideStats.Rounds.Total; got != 1 {
 			t.Errorf("player %d rounds = %d, want 1", id, got)
@@ -263,6 +302,7 @@ func TestAdjacentWorldDamageCreditsPreviousEnemy(t *testing.T) {
 
 	hurtAtFrame(a, 100, hurtEvent(shooter, victim, common.EqUSP, 15, 66))
 	hurtAtFrame(a, 101, hurtEvent(nil, victim, common.EqWorld, 5, 61))
+	endScoredRound(a, common.TeamTerrorists)
 
 	got := a.players[shooterID]
 	if got.AssistStats.DamageGiven != 20 {
@@ -423,11 +463,96 @@ func liveRound() (*analyser, *common.Player, *common.Player) {
 func TestSurvivorsGetKastWhenTheRoundEndsOfficially(t *testing.T) {
 	a, _, _ := liveRound()
 
-	a.onRoundEnd(events.RoundEnd{Winner: common.TeamCounterTerrorists})
-	a.onRoundEndOfficial(events.RoundEndOfficial{})
+	endScoredRound(a, common.TeamCounterTerrorists)
 
 	if got := a.kastRounds[victimID].Total; got != 1 {
 		t.Errorf("victim kast rounds = %d, want 1: nobody died all round", got)
+	}
+}
+
+func TestKillHandlerSeparatesClassicAndFlashAssists(t *testing.T) {
+	tests := []struct {
+		name          string
+		assistedFlash bool
+		wantClassic   int
+		wantFlashed   int
+	}{
+		{name: "normal assist", wantClassic: 1},
+		{name: "flash assist", assistedFlash: true, wantFlashed: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			killer := player(11, "killer", common.TeamCounterTerrorists)
+			victim := player(5, "victim", common.TeamTerrorists)
+			assister := player(12, "assister", common.TeamCounterTerrorists)
+			finisher := player(1, "finisher", common.TeamTerrorists)
+			a := liveAnalyser(killer, victim, assister, finisher)
+			a.onRoundStart(events.RoundStart{})
+
+			a.onKill(events.Kill{
+				Killer: killer, Victim: victim, Assister: assister,
+				AssistedFlash: tt.assistedFlash, Weapon: &common.Equipment{Type: common.EqM4A1},
+			})
+			a.onKill(events.Kill{
+				Killer: finisher, Victim: assister, Weapon: &common.Equipment{Type: common.EqAK47},
+			})
+			endScoredRound(a, common.TeamTerrorists)
+
+			if got := a.kastRounds[12].Total; got != tt.wantClassic {
+				t.Errorf("assister classic-KAST rounds = %d, want %d", got, tt.wantClassic)
+			}
+			if got := a.ecoKast[12]; got == 0 {
+				t.Error("demo assist must reach the separate rating-KAST facts")
+			}
+			if got := a.players[12].AssistStats; got.Total != 1 || got.FlashedEnemies != tt.wantFlashed {
+				t.Errorf("assist stats = %+v, want total 1 and flashed %d", got, tt.wantFlashed)
+			}
+		})
+	}
+}
+
+func TestKillHandlerPassesServerTicksToTrades(t *testing.T) {
+	const tick = time.Second / 64
+	killer := player(11, "killer", common.TeamCounterTerrorists)
+	victim := player(1, "victim", common.TeamTerrorists)
+	trader := player(2, "trader", common.TeamTerrorists)
+	a := liveAnalyser(killer, victim, trader)
+	p := a.parser.(*matchParser)
+	p.tickTime = tick
+	a.onRoundStart(events.RoundStart{})
+
+	p.ingameTick = 640
+	a.onKill(events.Kill{Killer: killer, Victim: victim, Weapon: &common.Equipment{Type: common.EqM4A1}})
+	p.ingameTick = 961
+	a.onKill(events.Kill{Killer: trader, Victim: killer, Weapon: &common.Equipment{Type: common.EqAK47}})
+	endScoredRound(a, common.TeamTerrorists)
+
+	if got := a.kastRounds[victim.SteamID64].Total; got != 1 {
+		t.Errorf("traded victim classic-KAST rounds = %d, want 1", got)
+	}
+	if got := a.players[trader.SteamID64].KillStats.TradeKills; got != 1 {
+		t.Errorf("trade kills = %d, want 1", got)
+	}
+}
+
+func TestKillHandlerRejectsUnavailableTickTime(t *testing.T) {
+	for _, tickTime := range []time.Duration{0, -1} {
+		t.Run(tickTime.String(), func(t *testing.T) {
+			killer := player(11, "killer", common.TeamCounterTerrorists)
+			victim := player(1, "victim", common.TeamTerrorists)
+			a := liveAnalyser(killer, victim)
+			a.parser.(*matchParser).tickTime = tickTime
+			a.onRoundStart(events.RoundStart{})
+
+			a.onKill(events.Kill{
+				Killer: killer, Victim: victim, Weapon: &common.Equipment{Type: common.EqM4A1},
+			})
+
+			if a.parseErr == nil {
+				t.Fatal("unavailable tick duration did not produce a parser error")
+			}
+		})
 	}
 }
 
@@ -476,6 +601,7 @@ func TestRoundEndingBombDeathCountsRawDeathDuringActiveGamePhase(t *testing.T) {
 func TestPostRoundBombDeathStillCancelsSurvivalKast(t *testing.T) {
 	a, _, victim := liveRound()
 	a.parser.(*matchParser).gamePhase = common.GamePhaseGameHalfEnded
+	markRoundScored(a)
 	a.onRoundEnd(events.RoundEnd{
 		Winner: common.TeamTerrorists,
 		Reason: events.RoundEndReasonTargetBombed,
@@ -493,6 +619,7 @@ func TestPostRoundDeathBeforeOfficialEndCancelsKast(t *testing.T) {
 
 	// The exit frag lands after the round is decided but before it is
 	// officially over, so the victim did not survive it.
+	markRoundScored(a)
 	a.onRoundEnd(events.RoundEnd{Winner: common.TeamCounterTerrorists})
 	a.onKill(events.Kill{Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47}})
 	a.onRoundEndOfficial(events.RoundEndOfficial{})
@@ -514,6 +641,7 @@ func TestPregameKnifeRoundIsExcludedBeforeFirstScoredRound(t *testing.T) {
 	parser := &matchParser{
 		playing:   []*common.Player{shooter, victim},
 		gamePhase: common.GamePhasePregame,
+		tickTime:  time.Second / 64,
 	}
 	a := newAnalyser(parser)
 	knife := &common.Equipment{Type: common.EqKnife}
@@ -543,8 +671,7 @@ func TestPregameKnifeRoundIsExcludedBeforeFirstScoredRound(t *testing.T) {
 	a.onKill(events.Kill{
 		Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47},
 	})
-	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
-	a.onRoundEndOfficial(events.RoundEndOfficial{})
+	endScoredRound(a, common.TeamTerrorists)
 
 	gotShooter := a.players[shooterID]
 	if gotShooter.KillStats.Total != 1 || gotShooter.AssistStats.DamageGiven != 30 {
@@ -574,6 +701,7 @@ func TestDemoStartingWithCompetitiveRoundKeepsFirstRound(t *testing.T) {
 	parser := &matchParser{
 		playing:   []*common.Player{shooter, victim},
 		gamePhase: common.GamePhaseStartGamePhase,
+		tickTime:  time.Second / 64,
 	}
 	a := newAnalyser(parser)
 
@@ -592,11 +720,276 @@ func TestDemoStartingWithCompetitiveRoundKeepsFirstRound(t *testing.T) {
 	}
 }
 
+func TestUnscoredSetupRoundDiscardsRoundFactsButKeepsRawEvents(t *testing.T) {
+	victim := player(1, "victim", common.TeamTerrorists)
+	trader := player(2, "trader", common.TeamTerrorists)
+	killer := player(11, "killer", common.TeamCounterTerrorists)
+	otherCTs := []*common.Player{
+		player(12, "ct-12", common.TeamCounterTerrorists),
+		player(13, "ct-13", common.TeamCounterTerrorists),
+		player(14, "ct-14", common.TeamCounterTerrorists),
+		player(15, "ct-15", common.TeamCounterTerrorists),
+	}
+	a := liveAnalyser(append([]*common.Player{victim, trader, killer}, otherCTs...)...)
+	a.parser.(*matchParser).gamePhase = common.GamePhaseStartGamePhase
+	a.onRoundStart(events.RoundStart{})
+
+	hurtBy(a, killer, victim, 30)
+	a.parser.(*matchParser).ingameTick = 640
+	a.onKill(events.Kill{Killer: killer, Victim: victim, Weapon: &common.Equipment{Type: common.EqM4A1}})
+	a.parser.(*matchParser).ingameTick = 768
+	a.onKill(events.Kill{Killer: trader, Victim: killer, Weapon: &common.Equipment{Type: common.EqAK47}})
+	for _, ct := range otherCTs {
+		a.onKill(events.Kill{Killer: trader, Victim: ct, Weapon: &common.Equipment{Type: common.EqAK47}})
+	}
+	a.onRoundMVP(events.RoundMVPAnnouncement{Player: trader})
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	// A restart at the same authoritative round count proves the prior
+	// outcome was setup rather than a played round.
+	a.onRoundStart(events.RoundStart{})
+
+	if got := a.players[killer.SteamID64].KillStats.Total; got != 1 {
+		t.Errorf("raw kills = %d, want 1", got)
+	}
+	if got := a.players[victim.SteamID64].Deaths; got != 1 {
+		t.Errorf("raw deaths = %d, want 1", got)
+	}
+	if got := a.players[trader.SteamID64].KillStats.Total; got != 5 {
+		t.Errorf("raw trader kills = %d, want 5", got)
+	}
+	if got := a.players[killer.SteamID64].AssistStats.DamageGiven; got != 30 {
+		t.Errorf("raw damage = %d, want 30", got)
+	}
+	for _, id := range []uint64{victim.SteamID64, trader.SteamID64, killer.SteamID64} {
+		if got := a.players[id].SideStats.Rounds.Total; got != 0 {
+			t.Errorf("player %d rounds = %d, want 0", id, got)
+		}
+		if got := a.kastRounds[id].Total; got != 0 {
+			t.Errorf("player %d KAST rounds = %d, want 0", id, got)
+		}
+		if got := a.ecoSurvival[id]; got != 0 {
+			t.Errorf("player %d rating survival = %v, want 0", id, got)
+		}
+		if got := a.ecoKast[id]; got != 0 {
+			t.Errorf("player %d rating KAST = %v, want 0", id, got)
+		}
+	}
+	if got := a.players[trader.SteamID64].KillStats.TradeKills; got != 0 {
+		t.Errorf("trade kills = %d, want 0", got)
+	}
+	if got := a.players[victim.SteamID64].DeathsTraded.Total; got != 0 {
+		t.Errorf("traded deaths = %d, want 0", got)
+	}
+	if got := a.players[killer.SteamID64].OpeningDuelStats.OpeningKills.Total; got != 0 {
+		t.Errorf("opening kills = %d, want 0", got)
+	}
+	if got := a.players[trader.SteamID64].PlayerMapStats.ClutchesWon; got != 0 {
+		t.Errorf("clutches = %d, want 0", got)
+	}
+	if got := a.players[trader.SteamID64].PlayerMapStats.MVPs; got != 0 {
+		t.Errorf("MVPs = %d, want 0", got)
+	}
+	if got := a.players[trader.SteamID64].PlayerMapStats.ACEs; got != 0 {
+		t.Errorf("ACEs = %d, want 0", got)
+	}
+	if got := a.players[trader.SteamID64].PlayerMapStats.MultiKills; got != (MultiKillRounds{}) {
+		t.Errorf("multi-kills = %+v, want none", got)
+	}
+	if len(a.roundSwing) != 0 {
+		t.Errorf("round swing was committed for setup round: %v", a.roundSwing)
+	}
+	if len(a.ecoKills) != 0 || len(a.ecoDamage) != 0 {
+		t.Errorf("rating kill/damage facts were committed for setup round: kills=%v damage=%v", a.ecoKills, a.ecoDamage)
+	}
+}
+
+func TestMVPFactsWaitForAuthoritativeScore(t *testing.T) {
+	eventMVP := player(1, "event-mvp", common.TeamTerrorists)
+	scoreboardMVP := player(2, "scoreboard-mvp", common.TeamCounterTerrorists)
+	scoreboardMVP.Entity = matchEntity{properties: map[string]st.PropertyValue{
+		"m_iMVPs": {Any: int32(1)},
+	}}
+	a := liveAnalyser(eventMVP, scoreboardMVP)
+	a.onRoundStart(events.RoundStart{})
+	a.onRoundMVP(events.RoundMVPAnnouncement{Player: eventMVP})
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	// Starting again at the same score leaves both event and scoreboard facts
+	// uncommitted; the next scored-round slot belongs to the decided round.
+	a.onRoundStart(events.RoundStart{})
+	for _, id := range []uint64{eventMVP.SteamID64, scoreboardMVP.SteamID64} {
+		if got := a.players[id].PlayerMapStats.MVPs; got != 0 {
+			t.Errorf("setup MVPs for player %d = %d, want 0", id, got)
+		}
+	}
+
+	a.onRoundMVP(events.RoundMVPAnnouncement{Player: eventMVP})
+	endScoredRound(a, common.TeamTerrorists)
+	if got := a.players[eventMVP.SteamID64].PlayerMapStats.MVPs; got != 1 {
+		t.Errorf("event MVPs = %d, want 1", got)
+	}
+	if got := a.players[scoreboardMVP.SteamID64].PlayerMapStats.MVPs; got != 1 {
+		t.Errorf("scoreboard MVPs = %d, want 1", got)
+	}
+}
+
+func TestMVPAnnouncementAfterOfficialEndUsesFinalizedRound(t *testing.T) {
+	mvp := player(1, "mvp", common.TeamTerrorists)
+	opponent := player(11, "opponent", common.TeamCounterTerrorists)
+	a := liveAnalyser(mvp, opponent)
+	a.onRoundStart(events.RoundStart{})
+	endScoredRound(a, common.TeamTerrorists)
+
+	a.onRoundMVP(events.RoundMVPAnnouncement{Player: mvp})
+
+	if got := a.players[mvp.SteamID64].PlayerMapStats.MVPs; got != 1 {
+		t.Errorf("late event MVPs = %d, want 1", got)
+	}
+}
+
+func TestFinaliseAppliesLateScoreboardMVPUpdate(t *testing.T) {
+	mvp := player(1, "mvp", common.TeamTerrorists)
+	opponent := player(11, "opponent", common.TeamCounterTerrorists)
+	properties := map[string]st.PropertyValue{"m_iMVPs": {Any: int32(0)}}
+	mvp.Entity = matchEntity{properties: properties}
+	a := liveAnalyser(mvp, opponent)
+	a.onRoundStart(events.RoundStart{})
+	endScoredRound(a, common.TeamTerrorists)
+
+	properties["m_iMVPs"] = st.PropertyValue{Any: int32(1)}
+	a.finalise()
+
+	if got := a.players[mvp.SteamID64].PlayerMapStats.MVPs; got != 1 {
+		t.Errorf("late scoreboard MVPs = %d, want 1", got)
+	}
+}
+
+func TestFinaliseDoesNotApplyUnscoredScoreboardMVP(t *testing.T) {
+	mvp := player(1, "mvp", common.TeamTerrorists)
+	opponent := player(11, "opponent", common.TeamCounterTerrorists)
+	mvp.Entity = matchEntity{properties: map[string]st.PropertyValue{
+		"m_iMVPs": {Any: int32(1)},
+	}}
+	a := liveAnalyser(mvp, opponent)
+	a.onRoundStart(events.RoundStart{})
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	a.finalise()
+
+	if got := a.players[mvp.SteamID64].PlayerMapStats.MVPs; got != 0 {
+		t.Errorf("unscored scoreboard MVPs = %d, want 0", got)
+	}
+}
+
+func TestHalftimeRoundCommitsAfterScoreAdvance(t *testing.T) {
+	shooter := player(shooterID, "shooter", common.TeamTerrorists)
+	victim := player(victimID, "victim", common.TeamCounterTerrorists)
+	parser := &matchParser{
+		playing:      []*common.Player{shooter, victim},
+		gamePhase:    common.GamePhaseStartGamePhase,
+		roundsPlayed: 11,
+		tickTime:     time.Second / 64,
+	}
+	a := newAnalyser(parser)
+	a.onRoundStart(events.RoundStart{})
+	a.onKill(events.Kill{Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47}})
+
+	parser.gamePhase = common.GamePhaseGameHalfEnded
+	endScoredRound(a, common.TeamTerrorists)
+
+	if got := a.players[shooterID].SideStats.Rounds; got != (SideCount{Total: 1, T: 1}) {
+		t.Errorf("halftime rounds = %+v, want one T round", got)
+	}
+	if got := a.players[shooterID].OpeningDuelStats.OpeningKills.Total; got != 1 {
+		t.Errorf("halftime opening kills = %d, want 1", got)
+	}
+}
+
+func TestDelayedRoundCountDoesNotDiscardScoredRound(t *testing.T) {
+	shooter := player(shooterID, "shooter", common.TeamTerrorists)
+	victim := player(victimID, "victim", common.TeamCounterTerrorists)
+	a := liveAnalyser(shooter, victim)
+	p := a.parser.(*matchParser)
+	a.onRoundStart(events.RoundStart{})
+	a.onKill(events.Kill{
+		Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47},
+	})
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	// The next round begins before m_totalRoundsPlayed reflects round one.
+	a.onRoundStart(events.RoundStart{})
+	if got := a.players[shooterID].SideStats.Rounds.Total; got != 0 {
+		t.Fatalf("round committed before the delayed authoritative count: %d", got)
+	}
+
+	// When the property advances only once at round two's end, the oldest
+	// decided outcome (round one) consumes that slot.
+	p.roundsPlayed = 1
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamCounterTerrorists})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+	if got := a.players[shooterID].SideStats.Rounds.Total; got != 1 {
+		t.Fatalf("rounds after delayed advance = %d, want 1", got)
+	}
+	if got := a.players[shooterID].OpeningDuelStats.OpeningKills.Total; got != 1 {
+		t.Fatalf("the first round's opening kill was lost: %d", got)
+	}
+
+	// A later observation catches the second round up without duplicating the
+	// first one's facts.
+	p.roundsPlayed = 2
+	a.onRoundStart(events.RoundStart{})
+	if got := a.players[shooterID].SideStats.Rounds.Total; got != 2 {
+		t.Errorf("rounds after catch-up = %d, want 2", got)
+	}
+	if got := a.players[shooterID].OpeningDuelStats.OpeningKills.Total; got != 1 {
+		t.Errorf("opening kill was duplicated during catch-up: %d", got)
+	}
+}
+
+func TestFinaliseFlushesLastScoredRoundWithoutOfficialEnd(t *testing.T) {
+	a, shooter, victim := liveRound()
+	a.onKill(events.Kill{Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47}})
+	markRoundScored(a)
+	a.parser.(*matchParser).tScore = 1
+	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
+
+	a.finalise()
+
+	if got := a.mapData.TotalRounds; got != 1 {
+		t.Errorf("map rounds = %d, want 1", got)
+	}
+	if got := a.players[shooterID].SideStats.Rounds.Total; got != 1 {
+		t.Errorf("player rounds = %d, want 1", got)
+	}
+	if got := a.players[shooterID].OpeningDuelStats.OpeningKills.Total; got != 1 {
+		t.Errorf("opening kills = %d, want 1", got)
+	}
+}
+
+func TestDuplicateOfficialEndDoesNotCommitRoundTwice(t *testing.T) {
+	a, _, _ := liveRound()
+	endScoredRound(a, common.TeamCounterTerrorists)
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	if got := a.players[shooterID].SideStats.Rounds.Total; got != 1 {
+		t.Errorf("player rounds = %d, want 1", got)
+	}
+	if got := a.kastRounds[shooterID].Total; got != 1 {
+		t.Errorf("KAST rounds = %d, want 1", got)
+	}
+}
+
 func TestNextRoundFinalizesDecidedRoundWithoutOfficialEndOnce(t *testing.T) {
 	a, shooter, victim := liveRound()
 	a.onKill(events.Kill{
 		Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47},
 	})
+	markRoundScored(a)
 	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
 	a.onRoundStart(events.RoundStart{})
 
@@ -607,8 +1000,7 @@ func TestNextRoundFinalizesDecidedRoundWithoutOfficialEndOnce(t *testing.T) {
 		t.Fatalf("opening kills after fallback finalization = %d, want 1", got)
 	}
 
-	a.onRoundEnd(events.RoundEnd{Winner: common.TeamCounterTerrorists})
-	a.onRoundEndOfficial(events.RoundEndOfficial{})
+	endScoredRound(a, common.TeamCounterTerrorists)
 	if got := a.players[shooterID].SideStats.Rounds.Total; got != 2 {
 		t.Errorf("rounds after the next official end = %d, want 2", got)
 	}
@@ -624,8 +1016,7 @@ func TestOpeningDuelIsCredited(t *testing.T) {
 	a, shooter, victim := liveRound()
 
 	a.onKill(events.Kill{Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47}})
-	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
-	a.onRoundEndOfficial(events.RoundEndOfficial{})
+	endScoredRound(a, common.TeamTerrorists)
 
 	kills := a.players[shooterID].OpeningDuelStats.OpeningKills
 	if kills.Total != 1 || kills.T != 1 || kills.CT != 0 {
@@ -647,8 +1038,7 @@ func playRound(a *analyser, winner common.Team, kills ...events.Kill) {
 	for _, kill := range kills {
 		a.onKill(kill)
 	}
-	a.onRoundEnd(events.RoundEnd{Winner: winner})
-	a.onRoundEndOfficial(events.RoundEndOfficial{})
+	endScoredRound(a, winner)
 }
 
 // hurtBy lands one hit for the given damage, starting the victim from full
@@ -720,16 +1110,14 @@ func TestSideAdrAndKastDivideByRoundsOnThatSide(t *testing.T) {
 		if round == 2 {
 			a.onKill(events.Kill{Killer: victim, Victim: shooter, Weapon: &common.Equipment{Type: common.EqAK47}})
 		}
-		a.onRoundEnd(events.RoundEnd{Winner: common.TeamCounterTerrorists})
-		a.onRoundEndOfficial(events.RoundEndOfficial{})
+		endScoredRound(a, common.TeamCounterTerrorists)
 	}
 
 	// Halftime, then a single round on CT with 60 damage and a survival.
 	shooter.Team, victim.Team = common.TeamCounterTerrorists, common.TeamTerrorists
 	a.onRoundStart(events.RoundStart{})
 	hurtBy(a, shooter, victim, 60)
-	a.onRoundEnd(events.RoundEnd{Winner: common.TeamCounterTerrorists})
-	a.onRoundEndOfficial(events.RoundEndOfficial{})
+	endScoredRound(a, common.TeamCounterTerrorists)
 
 	a.derive(4)
 
@@ -768,8 +1156,7 @@ func TestFreezeTimeJoinerPlaysTheRound(t *testing.T) {
 	joiner.Team = common.TeamTerrorists
 	a.onRoundFreezetimeEnd(events.RoundFreezetimeEnd{})
 	hurtBy(a, joiner, holder, 40)
-	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
-	a.onRoundEndOfficial(events.RoundEndOfficial{})
+	endScoredRound(a, common.TeamTerrorists)
 
 	a.derive(1)
 
@@ -799,8 +1186,7 @@ func TestBotOnBotKillDoesNotStealTheOpeningDuel(t *testing.T) {
 	a.onRoundStart(events.RoundStart{})
 	a.onKill(events.Kill{Killer: botT, Victim: botCT, Weapon: &common.Equipment{Type: common.EqAK47}})
 	a.onKill(events.Kill{Killer: shooter, Victim: victim, Weapon: &common.Equipment{Type: common.EqAK47}})
-	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
-	a.onRoundEndOfficial(events.RoundEndOfficial{})
+	endScoredRound(a, common.TeamTerrorists)
 
 	if got := a.players[shooterID].OpeningDuelStats.OpeningKills.Total; got != 0 {
 		t.Errorf("shooter opening kills = %d, want 0: the bot-on-bot kill opened the round first", got)
@@ -819,8 +1205,7 @@ func TestClutchGoesToTheTeamThatWonTheRound(t *testing.T) {
 	a.onRoundStart(events.RoundStart{})
 	a.onKill(events.Kill{Killer: lone, Victim: first, Weapon: &common.Equipment{Type: common.EqAK47}})
 	a.onKill(events.Kill{Killer: lone, Victim: second, Weapon: &common.Equipment{Type: common.EqAK47}})
-	a.onRoundEnd(events.RoundEnd{Winner: common.TeamTerrorists})
-	a.onRoundEndOfficial(events.RoundEndOfficial{})
+	endScoredRound(a, common.TeamTerrorists)
 
 	if got := a.players[shooterID].PlayerMapStats.ClutchesWon; got != 1 {
 		t.Errorf("clutches won = %d, want 1", got)

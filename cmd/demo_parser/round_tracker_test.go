@@ -24,6 +24,10 @@ func at(seconds int) time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
+func recordKill(rt *roundTracker, killer, victim uint64, killerTeam, victimTeam common.Team, assister uint64, byWorld bool, at time.Duration) {
+	rt.kill(killer, victim, killerTeam, victimTeam, assister, false, byWorld, int(at/time.Millisecond), time.Millisecond)
+}
+
 // endRound decides and immediately finalizes a round, for tests that have
 // no post-round events.
 func endRound(rt *roundTracker, winner common.Team) roundOutcome {
@@ -36,7 +40,7 @@ func TestAce(t *testing.T) {
 	rt.startRound(fiveVsFive())
 
 	for i, victim := range []uint64{11, 12, 13, 14, 15} {
-		rt.kill(1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10+i))
+		recordKill(rt, 1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10+i))
 	}
 
 	outcome := endRound(rt, common.TeamTerrorists)
@@ -56,7 +60,7 @@ func TestFourKillsIsNotAce(t *testing.T) {
 	rt.startRound(fiveVsFive())
 
 	for i, victim := range []uint64{11, 12, 13, 14} {
-		rt.kill(1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10+i))
+		recordKill(rt, 1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10+i))
 	}
 
 	if outcome := endRound(rt, common.TeamTerrorists); len(outcome.aces) != 0 {
@@ -70,9 +74,9 @@ func TestTeamkillsDoNotMakeAnAce(t *testing.T) {
 
 	// Four enemy kills plus a teamkill must not be an ace.
 	for i, victim := range []uint64{11, 12, 13, 14} {
-		rt.kill(1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10+i))
+		recordKill(rt, 1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10+i))
 	}
-	rt.kill(1, 2, common.TeamTerrorists, common.TeamTerrorists, 0, false, at(20))
+	recordKill(rt, 1, 2, common.TeamTerrorists, common.TeamTerrorists, 0, false, at(20))
 
 	if outcome := endRound(rt, common.TeamTerrorists); len(outcome.aces) != 0 {
 		t.Errorf("teamkill counted towards ace: %v", outcome.aces)
@@ -82,7 +86,7 @@ func TestTeamkillsDoNotMakeAnAce(t *testing.T) {
 // killEnemies has player 1 kill n CTs in one round.
 func killEnemies(rt *roundTracker, n int) {
 	for i := range n {
-		rt.kill(1, uint64(11+i), common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10+i))
+		recordKill(rt, 1, uint64(11+i), common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10+i))
 	}
 }
 
@@ -134,7 +138,7 @@ func TestMultiKillTopBucketMatchesAce(t *testing.T) {
 	// Six enemy kills need a CT who reconnected, but if it ever happens the
 	// round has to stay a single 5k so the bucket cannot drift from ACEs.
 	killEnemies(rt, 5)
-	rt.kill(1, 16, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(20))
+	recordKill(rt, 1, 16, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(20))
 
 	outcome := endRound(rt, common.TeamTerrorists)
 	var got MultiKillRounds
@@ -152,9 +156,9 @@ func TestTeamkillsDoNotMakeAMultiKill(t *testing.T) {
 	rt.startRound(fiveVsFive())
 
 	// One enemy kill plus two teamkills is not a 3k, and not even a 2k.
-	rt.kill(1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
-	rt.kill(1, 2, common.TeamTerrorists, common.TeamTerrorists, 0, false, at(12))
-	rt.kill(1, 3, common.TeamTerrorists, common.TeamTerrorists, 0, false, at(14))
+	recordKill(rt, 1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
+	recordKill(rt, 1, 2, common.TeamTerrorists, common.TeamTerrorists, 0, false, at(12))
+	recordKill(rt, 1, 3, common.TeamTerrorists, common.TeamTerrorists, 0, false, at(14))
 
 	if outcome := endRound(rt, common.TeamTerrorists); len(outcome.multiKills) != 0 {
 		t.Errorf("teamkills counted towards a multi-kill: %v", outcome.multiKills)
@@ -211,13 +215,13 @@ func TestFreezeTimeJoinerTradedDeathUsesJoinedSide(t *testing.T) {
 		1: common.TeamTerrorists, 11: common.TeamCounterTerrorists, 16: common.TeamCounterTerrorists,
 	})
 
-	rt.kill(1, 16, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
-	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(13))
+	recordKill(rt, 1, 16, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
+	recordKill(rt, 11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(13))
 	outcome := endRound(rt, common.TeamCounterTerrorists)
 
 	a := liveAnalyser()
 	a.players[16] = &DemoPlayer{SteamID: 16}
-	a.applyRoundOutcome(outcome)
+	a.applyRoundOutcomeWithTiers(outcome, a.roundTiers)
 	if got, want := a.players[16].DeathsTraded, (SideCount{Total: 1, CT: 1}); got != want {
 		t.Errorf("freeze-time joiner's deaths traded = %+v, want %+v", got, want)
 	}
@@ -229,11 +233,11 @@ func TestClutchWon(t *testing.T) {
 
 	// CTs kill four Ts, leaving player 1 in a 1v5.
 	for i, victim := range []uint64{2, 3, 4, 5} {
-		rt.kill(11, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10+i))
+		recordKill(rt, 11, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10+i))
 	}
 	// Player 1 wins the clutch.
 	for i, victim := range []uint64{11, 12, 13, 14, 15} {
-		rt.kill(1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(20+i))
+		recordKill(rt, 1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(20+i))
 	}
 
 	if outcome := endRound(rt, common.TeamTerrorists); outcome.clutcher != 1 {
@@ -246,7 +250,7 @@ func TestClutchLostIsNotCounted(t *testing.T) {
 	rt.startRound(fiveVsFive())
 
 	for i, victim := range []uint64{2, 3, 4, 5} {
-		rt.kill(11, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10+i))
+		recordKill(rt, 11, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10+i))
 	}
 
 	// CTs win: their side never was in a clutch, so nobody gets one.
@@ -261,7 +265,7 @@ func TestClutchWonWithoutKills(t *testing.T) {
 
 	// Ts kill four CTs; player 11 is alone in a 1v5 and wins by defuse.
 	for i, victim := range []uint64{12, 13, 14, 15} {
-		rt.kill(1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10+i))
+		recordKill(rt, 1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10+i))
 	}
 
 	if outcome := endRound(rt, common.TeamCounterTerrorists); outcome.clutcher != 11 {
@@ -274,13 +278,13 @@ func TestOneVersusOneClutchGoesToWinner(t *testing.T) {
 	rt.startRound(fiveVsFive())
 
 	for i, victim := range []uint64{2, 3, 4, 5} {
-		rt.kill(11, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10+i))
+		recordKill(rt, 11, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10+i))
 	}
 	for i, victim := range []uint64{12, 13, 14, 15} {
-		rt.kill(1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(20+i))
+		recordKill(rt, 1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(20+i))
 	}
 	// 1v1 now: player 1 vs player 11. Player 1 wins.
-	rt.kill(1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(30))
+	recordKill(rt, 1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(30))
 
 	if outcome := endRound(rt, common.TeamTerrorists); outcome.clutcher != 1 {
 		t.Errorf("clutcher = %d, want player 1", outcome.clutcher)
@@ -291,13 +295,13 @@ func TestTradeKill(t *testing.T) {
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())
 
-	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
-	isTrade := rt.kill(2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(13))
-	if !isTrade {
-		t.Error("revenge kill 3s after the teammate died should be a trade")
-	}
+	recordKill(rt, 11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	recordKill(rt, 2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(13))
 
 	outcome := endRound(rt, common.TeamCounterTerrorists)
+	if outcome.tradeKills[2] != 1 {
+		t.Errorf("trade kills = %v, want one for player 2", outcome.tradeKills)
+	}
 	if len(outcome.deathsTraded) != 1 || !outcome.deathsTraded[1] {
 		t.Errorf("deaths traded = %v, want only player 1 counted once", outcome.deathsTraded)
 	}
@@ -310,12 +314,10 @@ func TestKillOutsideTradeWindowIsNoTrade(t *testing.T) {
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())
 
-	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
-	if rt.kill(2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(16)) {
-		t.Error("revenge kill 6s later should not be a trade")
-	}
-	if outcome := endRound(rt, common.TeamCounterTerrorists); len(outcome.deathsTraded) != 0 {
-		t.Errorf("death outside the trade window was counted as traded: %v", outcome.deathsTraded)
+	recordKill(rt, 11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	recordKill(rt, 2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(16))
+	if outcome := endRound(rt, common.TeamCounterTerrorists); len(outcome.deathsTraded) != 0 || len(outcome.tradeKills) != 0 {
+		t.Errorf("outside-window trade = deaths %v, kills %v; want none", outcome.deathsTraded, outcome.tradeKills)
 	}
 }
 
@@ -324,34 +326,99 @@ func TestPostRoundDeathCanBeTraded(t *testing.T) {
 	rt.startRound(fiveVsFive())
 
 	rt.markEnd(common.TeamCounterTerrorists)
-	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
-	isTrade := rt.kill(2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(13))
+	recordKill(rt, 11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	recordKill(rt, 2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(13))
 
-	if !isTrade {
-		t.Error("post-round death avenged inside the window should be a trade")
-	}
-	if outcome := rt.finalize(); !outcome.deathsTraded[1] {
-		t.Errorf("post-round death was not marked as traded: %v", outcome.deathsTraded)
+	if outcome := rt.finalize(); !outcome.deathsTraded[1] || outcome.tradeKills[2] != 1 {
+		t.Errorf("post-round trade = deaths %v, kills %v; want player 1 traded by player 2", outcome.deathsTraded, outcome.tradeKills)
 	}
 }
 
-func TestOneTradeKillCanTradeTwoDeaths(t *testing.T) {
+func TestOneTradeKillCreditsTheOldestEligibleDeath(t *testing.T) {
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())
 
-	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
-	rt.kill(11, 2, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(12))
-	tradeKills := 0
-	if rt.kill(3, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(14)) {
-		tradeKills++
-	}
+	recordKill(rt, 11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	recordKill(rt, 11, 2, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(12))
+	recordKill(rt, 3, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(14))
 
 	outcome := endRound(rt, common.TeamTerrorists)
-	if tradeKills != 1 {
-		t.Errorf("trade kills = %d, want one revenge kill", tradeKills)
+	if outcome.tradeKills[3] != 1 {
+		t.Errorf("trade kills = %v, want one for player 3", outcome.tradeKills)
 	}
-	if len(outcome.deathsTraded) != 2 || !outcome.deathsTraded[1] || !outcome.deathsTraded[2] {
-		t.Errorf("deaths traded = %v, want players 1 and 2", outcome.deathsTraded)
+	if len(outcome.deathsTraded) != 1 || !outcome.deathsTraded[1] {
+		t.Errorf("deaths traded = %v, want only the oldest eligible death, player 1", outcome.deathsTraded)
+	}
+}
+
+func TestTradeWindowUsesTickIntervals(t *testing.T) {
+	const tick = time.Second / 64
+	tests := []struct {
+		name    string
+		delta   int
+		isTrade bool
+	}{
+		{name: "immediately below boundary", delta: 320, isTrade: true},
+		{name: "on boundary", delta: 321, isTrade: true},
+		{name: "immediately above boundary", delta: 322},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := insideTradeWindow(10_000, 10_000+tt.delta, tick, tradeWindow)
+			if got != tt.isTrade {
+				t.Errorf("trade %d ticks later with %s ticks = %t, want %t", tt.delta, tick, got, tt.isTrade)
+			}
+		})
+	}
+}
+
+func TestTradeWindowIsInvariantToDemoClockPhase(t *testing.T) {
+	const tick = time.Second / 64
+	for _, start := range []int{0, 76_714, 16_000_000} {
+		if !insideTradeWindow(start, start+321, tick, tradeWindow) {
+			t.Errorf("boundary trade changed at absolute tick %d", start)
+		}
+		if insideTradeWindow(start, start+322, tick, tradeWindow) {
+			t.Errorf("outside trade changed at absolute tick %d", start)
+		}
+	}
+}
+
+func TestTradeWindowIgnoresFloat32AbsoluteTimestampRounding(t *testing.T) {
+	const tickSeconds = float32(1.0 / 64.0)
+	deltas := make(map[time.Duration]bool)
+	for _, start := range []int{1, 1_000_000, 16_000_000, 100_000_000} {
+		deathTime := time.Duration(float32(start) * tickSeconds * float32(time.Second))
+		revengeTime := time.Duration(float32(start+321) * tickSeconds * float32(time.Second))
+		deltas[revengeTime-deathTime] = true
+		if !insideTradeWindow(start, start+321, time.Second/64, tradeWindow) {
+			t.Errorf("float32-derived times %s and %s changed a tick-normalized boundary trade", deathTime, revengeTime)
+		}
+	}
+	if len(deltas) < 2 {
+		t.Fatalf("test phases produced one float32 elapsed time %v; fixture does not exercise absolute-clock rounding", deltas)
+	}
+}
+
+func TestTradeWindowPreservesFractionalConfiguration(t *testing.T) {
+	const (
+		tick   = 16 * time.Millisecond
+		window = 5*time.Second + 7*time.Millisecond
+	)
+	if !insideTradeWindow(100, 413, tick, window) { // minimum elapsed: 4.992s
+		t.Error("last tick below a fractional window was excluded")
+	}
+	if insideTradeWindow(100, 414, tick, window) { // minimum elapsed: 5.008s
+		t.Error("first tick above a fractional window was included")
+	}
+}
+
+func TestTradeWindowRejectsUnavailableResolution(t *testing.T) {
+	for _, tickTime := range []time.Duration{0, -1} {
+		if insideTradeWindow(100, 101, tickTime, tradeWindow) {
+			t.Errorf("tick duration %s produced a trade", tickTime)
+		}
 	}
 }
 
@@ -364,17 +431,17 @@ func TestDeathsTradedFollowTheHalftimeSwap(t *testing.T) {
 	rt.startRound(map[uint64]common.Team{
 		1: common.TeamTerrorists, 2: common.TeamTerrorists, 11: common.TeamCounterTerrorists,
 	})
-	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
-	rt.kill(2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(13))
-	a.applyRoundOutcome(endRound(rt, common.TeamTerrorists))
+	recordKill(rt, 11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	recordKill(rt, 2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(13))
+	a.applyRoundOutcomeWithTiers(endRound(rt, common.TeamTerrorists), a.roundTiers)
 
 	// After halftime the same players swap sides and repeat the trade.
 	rt.startRound(map[uint64]common.Team{
 		1: common.TeamCounterTerrorists, 2: common.TeamCounterTerrorists, 11: common.TeamTerrorists,
 	})
-	rt.kill(11, 1, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(20))
-	rt.kill(2, 11, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(23))
-	a.applyRoundOutcome(endRound(rt, common.TeamCounterTerrorists))
+	recordKill(rt, 11, 1, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(20))
+	recordKill(rt, 2, 11, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(23))
+	a.applyRoundOutcomeWithTiers(endRound(rt, common.TeamCounterTerrorists), a.roundTiers)
 
 	if got, want := a.players[1].DeathsTraded, (SideCount{Total: 2, CT: 1, T: 1}); got != want {
 		t.Errorf("deaths traded = %+v, want %+v after the side swap", got, want)
@@ -386,7 +453,7 @@ func TestKastSurvivorAndUninvolvedVictim(t *testing.T) {
 	rt.startRound(fiveVsFive())
 
 	// Player 5 dies untraded with no kills or assists; everyone else survives.
-	rt.kill(11, 5, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	recordKill(rt, 11, 5, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
 
 	outcome := endRound(rt, common.TeamCounterTerrorists)
 	if outcome.kast[5] {
@@ -404,12 +471,29 @@ func TestAssisterGetsKast(t *testing.T) {
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())
 
-	rt.kill(11, 5, common.TeamCounterTerrorists, common.TeamTerrorists, 12, false, at(10))
+	recordKill(rt, 11, 5, common.TeamCounterTerrorists, common.TeamTerrorists, 12, false, at(10))
 	// Assister 12 then dies untraded: KAST must survive through the assist.
-	rt.kill(1, 12, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(20))
+	recordKill(rt, 1, 12, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(20))
 
 	if outcome := endRound(rt, common.TeamCounterTerrorists); !outcome.kast[12] {
 		t.Error("player 12 assisted and must have KAST")
+	}
+}
+
+func TestFlashAssistOnlyCountsForRatingKAST(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+
+	rt.kill(11, 5, common.TeamCounterTerrorists, common.TeamTerrorists, 12, true, false, 10, time.Second)
+	// The flash assister then dies without another qualifying classic-KAST fact.
+	recordKill(rt, 1, 12, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(20))
+
+	outcome := endRound(rt, common.TeamCounterTerrorists)
+	if outcome.kast[12] {
+		t.Error("flash assist alone must not qualify classic KAST")
+	}
+	if !outcome.ratingKast[12] {
+		t.Error("flash assist must remain a rating-KAST assist")
 	}
 }
 
@@ -418,7 +502,7 @@ func TestSuicideAndWorldDeaths(t *testing.T) {
 	rt.startRound(fiveVsFive())
 
 	// Killer id 0 marks world deaths and suicides.
-	rt.kill(0, 1, common.TeamUnassigned, common.TeamTerrorists, 0, true, at(10))
+	recordKill(rt, 0, 1, common.TeamUnassigned, common.TeamTerrorists, 0, true, at(10))
 
 	outcome := endRound(rt, common.TeamCounterTerrorists)
 	if len(outcome.aces) != 0 {
@@ -459,9 +543,7 @@ func TestPostRoundDisconnectKeepsSurvival(t *testing.T) {
 func TestEventsBeforeRoundStartAreIgnored(t *testing.T) {
 	rt := newRoundTracker()
 
-	if rt.kill(1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10)) {
-		t.Error("kill before any round start should not be a trade")
-	}
+	recordKill(rt, 1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
 	rt.remove(11)
 	if outcome := endRound(rt, common.TeamTerrorists); outcome.played {
 		t.Error("round end without round start should not count as played")
@@ -474,7 +556,7 @@ func TestPostRoundExitFragCancelsSurvival(t *testing.T) {
 	rt.markEnd(common.TeamCounterTerrorists)
 
 	// A real enemy kill after the round is decided still cancels survival.
-	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(70))
+	recordKill(rt, 11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(70))
 
 	outcome := rt.finalize()
 	if outcome.kast[1] {
@@ -492,7 +574,7 @@ func TestPostRoundBombDeathCancelsSurvival(t *testing.T) {
 
 	// The event still cancels survival. Raw totals apply their separate
 	// round/game-phase rule in the analyser.
-	rt.kill(0, 1, common.TeamUnassigned, common.TeamTerrorists, 0, false, at(70))
+	recordKill(rt, 0, 1, common.TeamUnassigned, common.TeamTerrorists, 0, false, at(70))
 
 	if outcome := rt.finalize(); outcome.kast[1] {
 		t.Error("player 1 died to the bomb and must not get survival KAST")
@@ -506,7 +588,7 @@ func TestMatchEndWorldDeathKeepsSurvival(t *testing.T) {
 
 	// Match-end cleanup kills (weapon World, no killer) are artifacts, not
 	// real deaths.
-	rt.kill(0, 1, common.TeamUnassigned, common.TeamTerrorists, 0, true, at(70))
+	recordKill(rt, 0, 1, common.TeamUnassigned, common.TeamTerrorists, 0, true, at(70))
 
 	if outcome := rt.finalize(); !outcome.kast[1] {
 		t.Error("player 1 survived the round; the match-end world kill must not cancel it")
@@ -520,7 +602,7 @@ func TestNoClutchCandidacyAfterRoundDecided(t *testing.T) {
 
 	// Post-round exit frags leave player 1 as the only T alive.
 	for i, victim := range []uint64{2, 3, 4, 5} {
-		rt.kill(11, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(70+i))
+		recordKill(rt, 11, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(70+i))
 	}
 
 	if outcome := rt.finalize(); outcome.clutcher != 0 {
@@ -532,8 +614,8 @@ func TestOpeningDuelGoesToFirstEnemyKill(t *testing.T) {
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())
 
-	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
-	rt.kill(2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(12))
+	recordKill(rt, 11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	recordKill(rt, 2, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(12))
 
 	outcome := endRound(rt, common.TeamCounterTerrorists)
 	want := openingDuel{killer: 11, victim: 1, killerTeam: common.TeamCounterTerrorists, victimTeam: common.TeamTerrorists}
@@ -549,7 +631,7 @@ func TestOpeningDuelInLostRoundIsNotWon(t *testing.T) {
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())
 
-	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	recordKill(rt, 11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
 
 	if outcome := endRound(rt, common.TeamTerrorists); outcome.openingWon {
 		t.Error("the opening killer's team lost the round, openingWon must be false")
@@ -561,9 +643,9 @@ func TestOpeningDuelSkipsTeamkillsAndWorldDeaths(t *testing.T) {
 	rt.startRound(fiveVsFive())
 
 	// A teamkill and a fall death come first; neither opens the round.
-	rt.kill(1, 2, common.TeamTerrorists, common.TeamTerrorists, 0, false, at(5))
-	rt.kill(0, 3, common.TeamUnassigned, common.TeamTerrorists, 0, true, at(8))
-	rt.kill(11, 4, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	recordKill(rt, 1, 2, common.TeamTerrorists, common.TeamTerrorists, 0, false, at(5))
+	recordKill(rt, 0, 3, common.TeamUnassigned, common.TeamTerrorists, 0, true, at(8))
+	recordKill(rt, 11, 4, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
 
 	outcome := endRound(rt, common.TeamCounterTerrorists)
 	if outcome.opening.killer != 11 || outcome.opening.victim != 4 {
@@ -590,7 +672,7 @@ func TestPostRoundKillIsNotAnOpeningDuel(t *testing.T) {
 	rt.markEnd(common.TeamCounterTerrorists)
 
 	// An exit frag in an otherwise killless round is no entry.
-	rt.kill(11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(70))
+	recordKill(rt, 11, 1, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(70))
 
 	if outcome := rt.finalize(); outcome.opening.killer != 0 {
 		t.Errorf("opening = %+v, want none after the round was decided", outcome.opening)

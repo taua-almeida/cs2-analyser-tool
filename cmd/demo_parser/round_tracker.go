@@ -28,8 +28,15 @@ type deathRecord struct {
 	killer     uint64
 	victim     uint64
 	victimTeam common.Team
-	at         time.Duration
+	tick       int
 }
+
+type assistFacts uint8
+
+const (
+	classicAssist assistFacts = 1 << iota
+	ratingAssist
+)
 
 // openingDuel is the first enemy kill of a round. A zero killer means the
 // round had none.
@@ -41,8 +48,11 @@ type openingDuel struct {
 // roundOutcome is what a finished round contributes to player stats.
 type roundOutcome struct {
 	played       bool
+	decided      bool
+	mvp          uint64
 	aces         []uint64
 	multiKills   map[uint64]int // enemy kills of the players that got at least a 2k
+	tradeKills   map[uint64]int // revenge kills that traded one eligible teammate death
 	clutcher     uint64         // winner-side player that won a 1vX, 0 if none
 	opening      openingDuel
 	openingWon   bool // the opening killer's team won the round
@@ -61,12 +71,14 @@ type roundTracker struct {
 	live          bool
 	decided       bool
 	winner        common.Team
+	mvp           uint64
 	bombPlanted   bool
 	startAlive    map[uint64]common.Team
 	alive         map[uint64]common.Team
 	enemyKills    map[uint64]int
-	assists       map[uint64]bool
+	assists       map[uint64]assistFacts
 	traded        map[uint64]bool
+	tradeKills    map[uint64]int
 	deaths        []deathRecord
 	clutchers     map[common.Team]uint64
 	opening       openingDuel
@@ -83,6 +95,7 @@ func (rt *roundTracker) startRound(alive map[uint64]common.Team) {
 	rt.live = true
 	rt.decided = false
 	rt.winner = common.TeamUnassigned
+	rt.mvp = 0
 	rt.startAlive = make(map[uint64]common.Team, len(alive))
 	rt.alive = make(map[uint64]common.Team, len(alive))
 	for id, team := range alive {
@@ -90,8 +103,9 @@ func (rt *roundTracker) startRound(alive map[uint64]common.Team) {
 		rt.alive[id] = team
 	}
 	rt.enemyKills = make(map[uint64]int)
-	rt.assists = make(map[uint64]bool)
+	rt.assists = make(map[uint64]assistFacts)
 	rt.traded = make(map[uint64]bool)
+	rt.tradeKills = make(map[uint64]int)
 	rt.deaths = nil
 	rt.clutchers = make(map[common.Team]uint64)
 	rt.opening = openingDuel{}
@@ -100,6 +114,12 @@ func (rt *roundTracker) startRound(alive map[uint64]common.Team) {
 	rt.damageAssists = make(map[uint64]bool)
 	rt.swing = make(map[uint64]float64)
 	rt.updateClutchCandidates()
+}
+
+func (rt *roundTracker) markMVP(player uint64) {
+	if rt.live {
+		rt.mvp = player
+	}
 }
 
 // plantBomb records the bomb going down, which shifts the win probability
@@ -149,14 +169,13 @@ func (rt *roundTracker) joinRound(alive map[uint64]common.Team) {
 
 // kill records a death in the current round. killer and assister are 0 for
 // world deaths and suicides; byWorld marks deaths with no real cause (falls,
-// match-end cleanup kills), as opposed to the bomb or an enemy. It reports
-// whether the kill traded the death of one of the killer's teammates.
-func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam common.Team, assister uint64, byWorld bool, at time.Duration) bool {
+// match-end cleanup kills), as opposed to the bomb or an enemy. Tick is the
+// server tick that carried the event, and tickTime is that tick's duration.
+func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam common.Team, assister uint64, assistedFlash, byWorld bool, tick int, tickTime time.Duration) {
 	if !rt.live {
-		return false
+		return
 	}
 
-	isTrade := false
 	if killer != 0 && killerTeam != victimTeam {
 		// The first enemy kill is the round's opening duel. Teamkills,
 		// suicides and world deaths never open a round, and once the round
@@ -167,7 +186,10 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 		}
 		rt.enemyKills[killer]++
 		if assister != 0 {
-			rt.assists[assister] = true
+			rt.assists[assister] |= ratingAssist
+			if !assistedFlash {
+				rt.assists[assister] |= classicAssist
+			}
 		}
 		// Post-round kills swing nothing: the probability table has no
 		// notion of a decided round, so without this guard an exit frag
@@ -177,16 +199,19 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 		}
 		// Deliberately no rt.decided guard: deaths and revenge kills stay
 		// eligible until finalize, so a post-round death can still be
-		// avenged inside the window.
+		// avenged inside the window. One revenge kill credits the oldest
+		// eligible death and then stops.
 		for _, d := range rt.deaths {
-			if d.killer == victim && d.victimTeam == killerTeam && at-d.at <= tradeWindow {
+			if d.killer == victim && d.victimTeam == killerTeam &&
+				insideTradeWindow(d.tick, tick, tickTime, tradeWindow) {
 				rt.traded[d.victim] = true
-				isTrade = true
+				rt.tradeKills[killer]++
+				break
 			}
 		}
 	}
 
-	rt.deaths = append(rt.deaths, deathRecord{killer: killer, victim: victim, victimTeam: victimTeam, at: at})
+	rt.deaths = append(rt.deaths, deathRecord{killer: killer, victim: victim, victimTeam: victimTeam, tick: tick})
 	// Dying before the round officially ends cancels survival, including to
 	// the post-round bomb explosion. Raw death totals are handled separately
 	// by the analyser. Only match-end world cleanup kills are ignored once
@@ -204,7 +229,18 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 		}
 		rt.remove(victim)
 	}
-	return isTrade
+}
+
+// insideTradeWindow compares the closest possible instants in two event
+// ticks. An event timestamp identifies an interval, not a point: tick n can
+// occur at its end and tick n+1 at its beginning. Relative ticks avoid the
+// phase-dependent rounding in demoinfocs' float32 absolute demo clock.
+func insideTradeWindow(deathTick, revengeTick int, tickTime, window time.Duration) bool {
+	if tickTime <= 0 || window < 0 || revengeTick < deathTick {
+		return false
+	}
+	minimumElapsedTicks := max(0, revengeTick-deathTick-1)
+	return time.Duration(minimumElapsedTicks)*tickTime <= window
 }
 
 // recordSwing credits the killer with the round-win-probability gain of the
@@ -333,7 +369,10 @@ func (rt *roundTracker) finalize() roundOutcome {
 
 	outcome := roundOutcome{
 		played:       true,
+		decided:      rt.decided,
+		mvp:          rt.mvp,
 		multiKills:   make(map[uint64]int),
+		tradeKills:   rt.tradeKills,
 		clutcher:     rt.clutchers[rt.winner],
 		opening:      rt.opening,
 		openingWon:   rt.opening.killer != 0 && rt.opening.killerTeam == rt.winner,
@@ -357,16 +396,15 @@ func (rt *roundTracker) finalize() roundOutcome {
 		if rt.traded[id] {
 			outcome.deathsTraded[id] = true
 		}
-		if survived || rt.enemyKills[id] > 0 || rt.assists[id] || rt.traded[id] {
+		if survived || rt.enemyKills[id] > 0 || rt.assists[id]&classicAssist != 0 || rt.traded[id] {
 			outcome.kast[id] = true
 		}
 		if survived {
 			outcome.survived[id] = true
 		}
-		// The rating's KAST differs from the classic one in its assist rule:
-		// the demo's assist events stay in (they carry flash assists), and
-		// the 40-damage rule adds contributors those events missed.
-		if outcome.kast[id] || rt.damageAssists[id] {
+		// Rating KAST keeps every demo assist, including flash assists, and
+		// adds contributors that meet its separate 40-damage rule.
+		if outcome.kast[id] || rt.assists[id]&ratingAssist != 0 || rt.damageAssists[id] {
 			outcome.ratingKast[id] = true
 		}
 	}

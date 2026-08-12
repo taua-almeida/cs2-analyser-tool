@@ -33,7 +33,7 @@ type demoFixture struct {
 //     so it exercises the RoundMVPAnnouncement handler.
 //   - ancient is a later Premier match with no round_mvp events at all, so
 //     its MVP counts can only come from the scoreboard entity property.
-//     Dropping syncScoreboardMVPs zeroes this golden's MVPs.
+//     Dropping the staged scoreboard-MVP snapshot zeroes this golden's MVPs.
 //   - inferno contains XM1014 pellet events whose reported damage exceeds
 //     the victim's real health loss, reaches halftime, and has a player join
 //     between RoundStart and the end of freeze time. It exercises the damage
