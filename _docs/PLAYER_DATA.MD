@@ -11,7 +11,7 @@ The `--save` flag writes every analysed player to a file. JSON contains all fiel
 | SteamID | `steam_id` | 64-bit SteamID of the player. |
 | Name | `name` | Last name the player used in the demo. |
 | UserID | `user_id` | Server user ID in this demo. |
-| Deaths | `deaths` | Deaths, including suicides and world deaths (fall damage, C4). |
+| Deaths | `deaths` | Deaths, including suicides, ordinary World deaths such as falls, and C4 deaths. A round-ending C4 blast can emit deaths after `RoundEnd`; they still count during `GamePhaseStartGamePhase`. A C4 death emitted after `RoundEnd` during `GamePhaseGameHalfEnded`, plus match-end World cleanup, is excluded. |
 | DeathsTraded | `deaths_traded` | Per-round traded-death count: `{total, ct, t}`. A round contributes once when at least one of the player's deaths was avenged inside the trade window. |
 
 ### Kill stats (`kill_stats`)
@@ -82,7 +82,7 @@ Each `GrenadeProjectileThrow` adds one use. `WeaponFire` is not counted, and war
 
 #### Unused utility value
 
-This is a cumulative value across deaths, not an average and not the largest inventory seen at one death. Every qualifying death contributes, including repeated deaths in respawn modes, suicides, bomb and fall deaths, and combat deaths after the round result. Automatic World cleanup after the round has already been decided is excluded.
+This is a cumulative value across death events, not an average and not the largest inventory seen at one death. Every qualifying event contributes, including repeated deaths in respawn modes, suicides, bomb and fall deaths, and combat deaths after the round result. A C4 event emitted after `RoundEnd` during `GamePhaseGameHalfEnded` still contributes here even though it is excluded from raw player death totals. Automatic World cleanup after the round has already been decided is excluded.
 
 Only standard grenade inventory is valued. Weapons, armour and game-mode equipment do not contribute. Quantity is `AmmoInMagazine + AmmoReserve`, which counts a second flashbang stored as reserve ammo. The pinned Mirage case in `TestProcessDemoGolden` explicitly verifies that the demoinfocs version used by this project still exposes the victim's pre-death inventory during `Kill`, without parsing the fixture a second time.
 
@@ -109,7 +109,7 @@ All utility scalars are appended to CSV after the existing columns. `--details` 
 | ACEs | `aces` | Rounds with 5 or more enemy kills. |
 | MultiKills | `multi_kills` | Multi-kill rounds bucketed by kill count: `{k2, k3, k4, k5}`. See [multi-kill rounds](#multi-kill-rounds). |
 | ClutchesWon | `clutches_won` | Rounds won after being the last player alive on the team against at least one enemy (1v1 counts). Winning by defuse or time counts — no kills required. |
-| KAST | `kast` | Percentage of the match's rounds with a Kill, Assist, Survival or Traded death (a teammate killed your killer within 5 seconds). Dying before the round officially ends cancels survival — including exit frags and the bomb going off after the whistle (HLTV convention). Match-end cleanup kills do not count. |
+| KAST | `kast` | Percentage of the match's rounds with a Kill, Assist, Survival or Traded death (a teammate killed your killer within 5 seconds). `RoundEnd` does not award survival immediately: exit frags and C4 deaths before `RoundEndOfficial` still cancel it. This round/KAST treatment is separate from raw death totals, where a C4 event emitted after `RoundEnd` during `GamePhaseGameHalfEnded` is excluded. Match-end World cleanup does not cancel survival. |
 
 #### Multi-kill rounds
 

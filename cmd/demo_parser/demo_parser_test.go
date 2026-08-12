@@ -289,6 +289,63 @@ func TestSurvivorsGetKastWhenTheRoundEndsOfficially(t *testing.T) {
 	}
 }
 
+func TestPostRoundBombDeathDoesNotCountRawDeath(t *testing.T) {
+	a, _, victim := liveRound()
+	victim.Inventory = map[int]*common.Equipment{1: {Type: common.EqSmoke}}
+	a.parser.(*matchParser).gamePhase = common.GamePhaseGameHalfEnded
+	a.onRoundEnd(events.RoundEnd{
+		Winner: common.TeamTerrorists,
+		Reason: events.RoundEndReasonTargetBombed,
+	})
+
+	a.onKill(events.Kill{Victim: victim, Weapon: &common.Equipment{Type: common.EqBomb}})
+
+	got := a.players[victimID]
+	if got.Deaths != 0 {
+		t.Errorf("deaths = %d, want 0", got.Deaths)
+	}
+	if got.SideStats.Deaths != (SideCount{}) {
+		t.Errorf("side deaths = %+v, want none", got.SideStats.Deaths)
+	}
+	if got.UtilityStats.UnusedUtilityValue != 300 {
+		t.Errorf("unused utility value = %d, want 300", got.UtilityStats.UnusedUtilityValue)
+	}
+}
+
+func TestRoundEndingBombDeathCountsRawDeathDuringActiveGamePhase(t *testing.T) {
+	a, _, victim := liveRound()
+	a.parser.(*matchParser).gamePhase = common.GamePhaseStartGamePhase
+	a.onRoundEnd(events.RoundEnd{
+		Winner: common.TeamTerrorists,
+		Reason: events.RoundEndReasonTargetBombed,
+	})
+
+	a.onKill(events.Kill{Victim: victim, Weapon: &common.Equipment{Type: common.EqBomb}})
+
+	got := a.players[victimID]
+	if got.Deaths != 1 {
+		t.Errorf("deaths = %d, want 1", got.Deaths)
+	}
+	if want := (SideCount{Total: 1, CT: 1}); got.SideStats.Deaths != want {
+		t.Errorf("side deaths = %+v, want %+v", got.SideStats.Deaths, want)
+	}
+}
+
+func TestPostRoundBombDeathStillCancelsSurvivalKast(t *testing.T) {
+	a, _, victim := liveRound()
+	a.parser.(*matchParser).gamePhase = common.GamePhaseGameHalfEnded
+	a.onRoundEnd(events.RoundEnd{
+		Winner: common.TeamTerrorists,
+		Reason: events.RoundEndReasonTargetBombed,
+	})
+	a.onKill(events.Kill{Victim: victim, Weapon: &common.Equipment{Type: common.EqBomb}})
+	a.onRoundEndOfficial(events.RoundEndOfficial{})
+
+	if got := a.kastRounds[victimID].Total; got != 0 {
+		t.Errorf("victim KAST rounds = %d, want 0: the bomb death still cancels survival", got)
+	}
+}
+
 func TestPostRoundDeathBeforeOfficialEndCancelsKast(t *testing.T) {
 	a, shooter, victim := liveRound()
 
