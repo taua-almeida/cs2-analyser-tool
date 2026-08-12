@@ -31,12 +31,12 @@ A kill is a trade when it lands on the *specific* enemy who killed a teammate, w
 
 - It must be that killer. Killing any other enemy inside the window is not a trade.
 - Both deaths have to fall in the same round.
-- One kill gives its player one `trade_kill`, even when the enemy it lands on had killed two teammates. Each qualifying teammate gets one `deaths_traded`, so that one kill can trade two deaths.
+- One kill gives its player one `trade_kill` and trades at most one death. If the enemy killed several teammates inside the window, the oldest eligible death gets the credit.
 - Post-round events deliberately remain eligible: a death after the round is decided can be traded, and a revenge kill after the round can trade an earlier death, as long as both events stay in this round and inside the window. This differs from opening duels, which cannot start after the round is decided.
 
 `deaths_traded` lives at the player top level beside `deaths` because it describes what happened to the player who died, not a kill they made. It is a per-round count, not a per-death count: the tracker records a boolean per player, so a round adds at most one even when a respawn mode lets that player die and be traded more than once. Its CT/T split always uses the side that player held in that round, never the team they finished the match on. No separate rate is stored. `deaths_traded.total / deaths` is only a per-death rate in modes without mid-round respawns; in respawn modes the numerator stays per-round while `deaths` counts every death.
 
-The 5-second window is a deliberate choice, not a value read out of the demo: HLTV states 5 seconds for Rating 3.0 ("two kills within 5 seconds") and Refrag documents the same for its Trades column. Other trackers differ — Leetify builds 4-second kill chains instead — so trade counts are not comparable between tools even when the label matches. If you are forking and your league counts trades differently, the window is the `tradeWindow` constant at the top of `cmd/demo_parser/round_tracker.go`.
+The 5-second window is a deliberate choice, not a value read out of the demo: HLTV describes a traded death as one avenged within five seconds, and Refrag documents the same duration for its Trades column. Events identify server-tick intervals rather than exact instants. The comparison therefore uses the closest possible instants in those intervals: `(revenge tick - death tick - 1) × tick duration <= 5 seconds`. At 64 ticks per second, a delta of 321 ticks is the inclusive boundary; 322 is outside. Relative ticks make this invariant to the absolute demo-clock phase and avoid demoinfocs' float32 timestamp rounding. If demoinfocs cannot provide a positive tick duration, parsing fails instead of silently reporting zero trades. Fractional configured windows are preserved rather than rounded to whole seconds. Other trackers differ — Leetify builds 4-second kill chains instead — so trade counts are not comparable between tools even when the label matches. If you are forking and your league counts trades differently, the window is the `tradeWindow` constant at the top of `cmd/demo_parser/round_tracker.go`.
 
 The count is in JSON, in CSV as `Deaths Traded` plus its CT/T columns, and in the `Trade stats` table that `--details` prints. The main table stays unchanged.
 
@@ -105,11 +105,28 @@ All utility scalars are appended to CSV after the existing columns. `--details` 
 
 | Field | JSON key | Description |
 | --- | --- | --- |
-| MVPs | `mvps` | Round MVP awards. |
+| MVPs | `mvps` | Round MVP awards. Event and scoreboard values are committed only for authoritative scored rounds. |
 | ACEs | `aces` | Rounds with 5 or more enemy kills. |
 | MultiKills | `multi_kills` | Multi-kill rounds bucketed by kill count: `{k2, k3, k4, k5}`. See [multi-kill rounds](#multi-kill-rounds). |
 | ClutchesWon | `clutches_won` | Rounds won after being the last player alive on the team against at least one enemy (1v1 counts). Winning by defuse or time counts — no kills required. |
-| KAST | `kast` | Percentage of the match's rounds with a Kill, Assist, Survival or Traded death (a teammate killed your killer within 5 seconds). `RoundEnd` does not award survival immediately: exit frags and C4 deaths before `RoundEndOfficial` still cancel it. This round/KAST treatment is separate from raw death totals, where a C4 event emitted after `RoundEnd` during `GamePhaseGameHalfEnded` is excluded. Match-end World cleanup does not cancel survival. |
+| KAST | `kast` | Percentage of the match's rounds with a Kill, non-flash demo Assist, Survival or Traded death. Flash assists are excluded from classic KAST. `RoundEnd` does not award survival immediately: exit frags and C4 deaths before `RoundEndOfficial` still cancel it. This round/KAST treatment is separate from raw death totals, where a C4 event emitted after `RoundEnd` during `GamePhaseGameHalfEnded` is excluded. Match-end World cleanup does not cancel survival. |
+
+#### Authoritative scored rounds
+
+Round-derived facts are queued until the scoreboard's `TotalRoundsPlayed`
+advances. The queue survives a later round start, so a delayed property update
+cannot silently lose a genuine round. If several candidates wait for one
+scored-round slot, a round that received `RoundEnd` is used before an unended
+same-score setup candidate; unresolved extras are discarded at parse end.
+Participation, KAST, survival, rating-KAST, rating kill/damage points, trades,
+openings, clutches, multi-kills, aces, round swing, and MVPs all use this gate.
+A missing `RoundEndOfficial` is handled at the next round start or parse end,
+and duplicate finalization is harmless.
+
+Raw event totals are intentionally separate: kills, deaths, assists, damage,
+and utility still reflect the events present in the demo. Filtering a setup
+round can therefore change round denominators and round-derived rating facts
+without deleting those raw events.
 
 #### Multi-kill rounds
 
@@ -191,7 +208,7 @@ Survival and KAST credit use a per-round weight from the player's own buy, captu
 
 #### Rating KAST
 
-The rating's KAST axis differs from the classic `player_map_stats.kast` in one rule: assists. The classic KAST takes the demo's assist events as they are. The rating additionally credits any player who dealt at least 40 damage to an enemy who died that round — Rating 3.0's threshold, raised from the 25 of Rating 2.0 — whoever or whatever finished them, while keeping the demo's assist events so flash assists still count. Kill, survival and traded-death credit are unchanged. The classic KAST field itself is untouched by this feature.
+The rating's KAST axis differs from the classic `player_map_stats.kast` in its assist rule. Classic KAST counts non-flash demo assists. Rating KAST keeps every demo assist, including flash assists, and additionally credits any player who dealt at least 40 damage to an enemy who died that round — Rating 3.0's threshold, raised from the 25 of Rating 2.0 — whoever or whatever finished them. Kill, survival and traded-death facts are shared. The classic KAST field itself remains separate from this approximate rating logic.
 
 #### Round swing
 

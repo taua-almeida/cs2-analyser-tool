@@ -10,8 +10,8 @@ func TestSwingIsZeroSumAndFavoursTheKiller(t *testing.T) {
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())
 
-	rt.kill(1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
-	rt.kill(12, 2, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(20))
+	recordKill(rt, 1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
+	recordKill(rt, 12, 2, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(20))
 
 	outcome := endRound(rt, common.TeamTerrorists)
 	if outcome.swing[1] <= 0 {
@@ -39,7 +39,7 @@ func TestSwingDiminishesInWonRounds(t *testing.T) {
 	var swings []float64
 	previous := 0.0
 	for _, victim := range []uint64{11, 12, 13, 14, 15} {
-		rt.kill(1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
+		recordKill(rt, 1, victim, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
 		outcomeSoFar := rt.swing[1]
 		swings = append(swings, outcomeSoFar-previous)
 		previous = outcomeSoFar
@@ -57,7 +57,7 @@ func TestPostRoundKillMovesNoSwing(t *testing.T) {
 	rt.startRound(fiveVsFive())
 	rt.markEnd(common.TeamCounterTerrorists)
 
-	rt.kill(1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(100))
+	recordKill(rt, 1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(100))
 
 	if outcome := rt.finalize(); outcome.swing[1] != 0 || outcome.swing[11] != 0 {
 		t.Errorf("exit frag moved swing: killer %v, victim %v", outcome.swing[1], outcome.swing[11])
@@ -74,7 +74,7 @@ func TestBombPlantShrinksTSwing(t *testing.T) {
 		if planted {
 			rt.plantBomb()
 		}
-		rt.kill(1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
+		recordKill(rt, 1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
 		return endRound(rt, common.TeamTerrorists).swing[1]
 	}
 
@@ -95,10 +95,10 @@ func TestFortyDamageBecomesARatingAssist(t *testing.T) {
 	// one point short, and player 1 finishes the job.
 	rt.damage(2, 11, ratingAssistDamage)
 	rt.damage(3, 11, ratingAssistDamage-1)
-	rt.kill(1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
+	recordKill(rt, 1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
 	// Ts lose so that survival cannot grant the credit instead.
 	for _, victim := range []uint64{1, 2, 3, 4, 5} {
-		rt.kill(12, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(20))
+		recordKill(rt, 12, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(20))
 	}
 
 	outcome := endRound(rt, common.TeamCounterTerrorists)
@@ -120,7 +120,7 @@ func TestDamageOnASurvivorIsNoRatingAssist(t *testing.T) {
 	rt.damage(2, 11, 90)
 	// Ts lose with no kills; 11 survives, so 2 has no KAST path at all.
 	for _, victim := range []uint64{1, 2, 3, 4, 5} {
-		rt.kill(11, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(20))
+		recordKill(rt, 11, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(20))
 	}
 
 	if outcome := endRound(rt, common.TeamCounterTerrorists); outcome.ratingKast[2] {
@@ -138,9 +138,9 @@ func TestPostRoundCleanupDeathSettlesNoDamageAssist(t *testing.T) {
 	// Player 2 softens 11 past the threshold and then dies with no other
 	// KAST path; after the whistle, engine cleanup kills 11.
 	rt.damage(2, 11, ratingAssistDamage)
-	rt.kill(11, 2, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
+	recordKill(rt, 11, 2, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(10))
 	rt.markEnd(common.TeamCounterTerrorists)
-	rt.kill(0, 11, common.TeamUnassigned, common.TeamCounterTerrorists, 0, true, at(70))
+	recordKill(rt, 0, 11, common.TeamUnassigned, common.TeamCounterTerrorists, 0, true, at(70))
 
 	outcome := rt.finalize()
 	if !outcome.survived[11] {
@@ -156,7 +156,7 @@ func TestKillerDamageIsNotAlsoAnAssist(t *testing.T) {
 	rt.startRound(fiveVsFive())
 
 	rt.damage(1, 11, 100)
-	rt.kill(1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
+	recordKill(rt, 1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
 
 	if rt.damageAssists[1] {
 		t.Error("the killer's own damage counted as an assist on their kill")
@@ -173,7 +173,7 @@ func TestEcoWeightsFollowTheRoundTier(t *testing.T) {
 	rt := newRoundTracker()
 	rt.startRound(fiveVsFive())
 
-	a.applyRoundOutcome(endRound(rt, common.TeamTerrorists))
+	a.applyRoundOutcomeWithTiers(endRound(rt, common.TeamTerrorists), a.roundTiers)
 
 	if a.ecoSurvival[1] <= a.ecoSurvival[2] {
 		t.Errorf("starter pistol survival weighs %v, full buy %v; want the eco worth more",

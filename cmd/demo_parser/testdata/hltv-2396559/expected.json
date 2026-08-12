@@ -1,0 +1,29 @@
+{
+  "fixture_id": "match-2396559",
+  "match_id": 2396559,
+  "match_stats_url": "https://www.hltv.org/matches/2396559/spirit-vs-jijiehao-esports-world-cup-2026",
+  "maps": [
+    {
+      "name": "mirage",
+      "map_id": 234956,
+      "map_stats_url": "https://www.hltv.org/stats/matches/mapstatsid/234956/spirit-vs-jijiehao",
+      "demo_file": "spirit-vs-jijiehao-mirage.dem",
+      "demo_sha256": "d68a4453645332f2a1da37acb07b1e4621362145e678e056f5252b213df2dd38",
+      "parser_map_name": "de_mirage",
+      "rounds": 23,
+      "score_values": [10, 13],
+      "players": [
+        {"steam_id": "76561198386265483", "hltv_name": "donk", "kills": 23, "deaths": 16, "adr": 93.2, "kast_percent": 69.6, "rating": 1.58},
+        {"steam_id": "76561199063238565", "hltv_name": "magixx", "kills": 13, "deaths": 15, "adr": 71.5, "kast_percent": 78.3, "rating": 1.18},
+        {"steam_id": "76561198872013168", "hltv_name": "tN1R", "kills": 13, "deaths": 16, "adr": 60.7, "kast_percent": 60.9, "rating": 0.78},
+        {"steam_id": "76561198995880877", "hltv_name": "zont1x", "kills": 10, "deaths": 17, "adr": 53.8, "kast_percent": 56.5, "rating": 0.75},
+        {"steam_id": "76561198081484775", "hltv_name": "sh1ro", "kills": 8, "deaths": 15, "adr": 52.3, "kast_percent": 52.2, "rating": 0.52},
+        {"steam_id": "76561198165327895", "hltv_name": "sinnopsyy", "kills": 17, "deaths": 14, "adr": 95.4, "kast_percent": 82.6, "rating": 1.29},
+        {"steam_id": "76561198422389693", "hltv_name": "m1N1", "kills": 17, "deaths": 12, "adr": 69.6, "kast_percent": 65.2, "rating": 1.21},
+        {"steam_id": "76561198263656468", "hltv_name": "CacaNito", "kills": 14, "deaths": 13, "adr": 64.7, "kast_percent": 73.9, "rating": 1.09},
+        {"steam_id": "76561198110839613", "hltv_name": "Bibu", "kills": 16, "deaths": 15, "adr": 84.6, "kast_percent": 65.2, "rating": 1.04},
+        {"steam_id": "76561199024583803", "hltv_name": "0SAMAS", "kills": 14, "deaths": 13, "adr": 63.9, "kast_percent": 69.6, "rating": 1.00}
+      ]
+    }
+  ]
+}

@@ -10,6 +10,10 @@ All demos are pinned by SHA-256 in `integration_test.go`; checksums for the two
 downloaded fixtures are repeated in the `Makefile`. Without the demo bytes,
 `go test ./...` skips the affected integration subtest.
 
+The `hltv-*` directories contain JSON oracles only. Their audited demos stay
+outside Git and are selected with `HLTV_DEMO_DIR` or the OS path-list
+`HLTV_EXTRA_DEMO_DIRS`; see [`_docs/HLTV_REGRESSION.md`](../../../_docs/HLTV_REGRESSION.md).
+
 ## mirage.dem
 
 A CS2 match on de_mirage from January 2024, still carrying `round_mvp` game
