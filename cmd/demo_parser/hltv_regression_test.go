@@ -79,7 +79,6 @@ var hltvExpectedDifferences = []hltvExpectedDifference{
 	{MapName: "inferno", SteamID: 76561198050779850, Metric: kastMetric, HLTVValue: "14/22 (63.6%)", ToolValue: "16/22 (72.7%)", Issue: 38},
 	{MapName: "inferno", SteamID: 76561198127259887, Metric: kastMetric, HLTVValue: "14/22 (63.6%)", ToolValue: "15/22 (68.2%)", Issue: 38},
 	{MapName: "inferno", SteamID: 76561198081702155, Metric: kastMetric, HLTVValue: "15/22 (68.2%)", ToolValue: "16/22 (72.7%)", Issue: 38},
-	{MapName: "inferno", SteamID: 76561198108660703, Metric: adrMetric, HLTVValue: "95.1", ToolValue: "94.9", Issue: 39},
 	{MapName: "inferno", SteamID: 76561198044112269, Metric: kastMetric, HLTVValue: "16/22 (72.7%)", ToolValue: "18/22 (81.8%)", Issue: 38},
 	{MapName: "inferno", SteamID: 76561199048086137, Metric: kastMetric, HLTVValue: "18/22 (81.8%)", ToolValue: "17/22 (77.3%)", Issue: 38},
 	{MapName: "inferno", SteamID: 76561198226777692, Metric: kastMetric, HLTVValue: "15/22 (68.2%)", ToolValue: "16/22 (72.7%)", Issue: 38},
@@ -313,8 +312,11 @@ func validateHLTVOracle(t *testing.T, oracle hltvOracle) {
 			t.Fatalf("expected difference %s/%d/%s has identical HLTV and tool values %q",
 				difference.MapName, difference.SteamID, difference.Metric, difference.HLTVValue)
 		}
-		if (difference.Metric == adrMetric && difference.Issue != 39) ||
-			(difference.Metric == kastMetric && difference.Issue != 38) {
+		if difference.Metric != kastMetric {
+			t.Fatalf("expected difference %s/%d uses unsupported metric %q; only issue #38 KAST differences are allowed",
+				difference.MapName, difference.SteamID, difference.Metric)
+		}
+		if difference.Issue != 38 {
 			t.Fatalf("expected difference %s/%d/%s points to issue #%d", difference.MapName,
 				difference.SteamID, difference.Metric, difference.Issue)
 		}

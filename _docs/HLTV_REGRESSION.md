@@ -87,12 +87,13 @@ shown by HLTV and the CLI. HLTV KAST percentages are converted to integer
 qualifying-round counts with `round(percent * map rounds / 100)` before
 comparison.
 
-The single #39 ADR difference and all #38 KAST differences live together in
+All remaining expected differences are #38 KAST rows in
 `hltvExpectedDifferences`. Every row pins the map, SteamID64, metric, HLTV
 value, current tool value, and issue. A third value fails as a regression. If
 the parser reaches HLTV parity, the test also fails with a request to remove
-the stale exception and promote that row to strict parity. This harness does
-not change or relax the behavior owned by #38 or #39.
+the stale exception and promote that row to strict parity. ADR has no expected
+difference rows, so all 30 player-map ADR values use strict parity. This
+harness does not change or relax the behavior owned by #38.
 
 Rating 3.0 is approximate because HLTV's formula is proprietary. The harness
 therefore reports, but never asserts, exact rating parity: mean absolute error,

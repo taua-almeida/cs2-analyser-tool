@@ -46,7 +46,7 @@ The count is in JSON, in CSV as `Deaths Traded` plus its CT/T columns, and in th
 | --- | --- | --- |
 | Total | `total` | Assists on enemy kills, flash assists included. |
 | FlashedEnemies | `flashed_enemies` | Flash assists: the victim was blinded by this player's flashbang when killed. |
-| DamageGiven | `damage_given` | Health damage dealt to enemies. Team damage, self damage and bomb damage never count (HLTV convention). |
+| DamageGiven | `damage_given` | Health damage credited against enemies. Team damage, self damage and bomb damage never count (HLTV convention). An attacker-less World event is credited to the enemy who damaged the same victim in the same or immediately preceding demo frame; isolated World damage and match-end cleanup are excluded. |
 | ADR | `adr` | Average damage per round: `damage_given / total rounds of the match`. |
 
 ### Utility stats (`utility_stats`)
