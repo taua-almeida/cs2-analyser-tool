@@ -1,0 +1,72 @@
+{
+  "match_id": 129241,
+  "match_stats_url": "https://www.hltv.org/stats/matches/129241/rooster-vs-mindfreak",
+  "maps": [
+    {
+      "name": "inferno",
+      "map_id": 234944,
+      "map_stats_url": "https://www.hltv.org/stats/matches/mapstatsid/234944/rooster-vs-mindfreak",
+      "demo_file": "rooster-vs-mindfreak-m1-inferno.dem",
+      "demo_sha256": "60129e983bb529bd77b642d59bd2e172367b6ab0dbe73849bb656f7eb76d43c4",
+      "parser_map_name": "de_inferno",
+      "rounds": 22,
+      "score_values": [9, 13],
+      "players": [
+        {"steam_id": "76561198158971650", "hltv_name": "chelleos", "kills": 25, "deaths": 13, "adr": 114.0, "kast_percent": 77.3, "rating": 1.63},
+        {"steam_id": "76561198050779850", "hltv_name": "rekonz", "kills": 12, "deaths": 15, "adr": 55.5, "kast_percent": 63.6, "rating": 0.70},
+        {"steam_id": "76561198093162249", "hltv_name": "SkulL", "kills": 15, "deaths": 16, "adr": 96.0, "kast_percent": 68.2, "rating": 1.15},
+        {"steam_id": "76561198127259887", "hltv_name": "JD", "kills": 8, "deaths": 15, "adr": 40.9, "kast_percent": 63.6, "rating": 0.66},
+        {"steam_id": "76561198081702155", "hltv_name": "ADK", "kills": 6, "deaths": 17, "adr": 43.4, "kast_percent": 68.2, "rating": 0.60},
+        {"steam_id": "76561198108660703", "hltv_name": "zune", "kills": 23, "deaths": 12, "adr": 95.1, "kast_percent": 77.3, "rating": 1.82},
+        {"steam_id": "76561198044112269", "hltv_name": "void", "kills": 17, "deaths": 13, "adr": 64.7, "kast_percent": 72.7, "rating": 1.29},
+        {"steam_id": "76561199048086137", "hltv_name": "kairo", "kills": 15, "deaths": 14, "adr": 73.4, "kast_percent": 81.8, "rating": 1.15},
+        {"steam_id": "76561198226777692", "hltv_name": "phoebe", "kills": 10, "deaths": 14, "adr": 65.1, "kast_percent": 68.2, "rating": 0.95},
+        {"steam_id": "76561198208618504", "hltv_name": "lawlkay", "kills": 10, "deaths": 13, "adr": 59.2, "kast_percent": 72.7, "rating": 0.84}
+      ]
+    },
+    {
+      "name": "anubis",
+      "map_id": 234945,
+      "map_stats_url": "https://www.hltv.org/stats/matches/mapstatsid/234945/mindfreak-vs-rooster",
+      "demo_file": "rooster-vs-mindfreak-m2-anubis.dem",
+      "demo_sha256": "7b2a1c89ea0b99be5d4874452716f25cfcbd49353c49b3402cc107f0c5a4bcae",
+      "parser_map_name": "de_anubis",
+      "rounds": 19,
+      "score_values": [13, 6],
+      "players": [
+        {"steam_id": "76561198158971650", "hltv_name": "chelleos", "kills": 21, "deaths": 8, "adr": 106.4, "kast_percent": 94.7, "rating": 1.87},
+        {"steam_id": "76561198050779850", "hltv_name": "rekonz", "kills": 15, "deaths": 12, "adr": 91.2, "kast_percent": 89.5, "rating": 1.43},
+        {"steam_id": "76561198093162249", "hltv_name": "SkulL", "kills": 20, "deaths": 12, "adr": 104.4, "kast_percent": 84.2, "rating": 1.62},
+        {"steam_id": "76561198127259887", "hltv_name": "JD", "kills": 13, "deaths": 10, "adr": 59.7, "kast_percent": 78.9, "rating": 1.01},
+        {"steam_id": "76561198081702155", "hltv_name": "ADK", "kills": 3, "deaths": 11, "adr": 25.4, "kast_percent": 68.4, "rating": 0.65},
+        {"steam_id": "76561198108660703", "hltv_name": "zune", "kills": 16, "deaths": 14, "adr": 96.2, "kast_percent": 73.7, "rating": 1.20},
+        {"steam_id": "76561198044112269", "hltv_name": "void", "kills": 11, "deaths": 14, "adr": 57.8, "kast_percent": 78.9, "rating": 0.87},
+        {"steam_id": "76561199048086137", "hltv_name": "kairo", "kills": 12, "deaths": 13, "adr": 61.1, "kast_percent": 63.2, "rating": 0.92},
+        {"steam_id": "76561198226777692", "hltv_name": "phoebe", "kills": 9, "deaths": 17, "adr": 55.8, "kast_percent": 57.9, "rating": 0.56},
+        {"steam_id": "76561198208618504", "hltv_name": "lawlkay", "kills": 5, "deaths": 14, "adr": 48.6, "kast_percent": 57.9, "rating": 0.54}
+      ]
+    },
+    {
+      "name": "mirage",
+      "map_id": 234947,
+      "map_stats_url": "https://www.hltv.org/stats/matches/mapstatsid/234947/mindfreak-vs-rooster",
+      "demo_file": "rooster-vs-mindfreak-m3-mirage.dem",
+      "demo_sha256": "53a3ab2814af90cb9898f2e8f3d7d14ae254d94f020de418ec307e57abd7008a",
+      "parser_map_name": "de_mirage",
+      "rounds": 23,
+      "score_values": [10, 13],
+      "players": [
+        {"steam_id": "76561198158971650", "hltv_name": "chelleos", "kills": 14, "deaths": 16, "adr": 59.2, "kast_percent": 69.6, "rating": 0.83},
+        {"steam_id": "76561198050779850", "hltv_name": "rekonz", "kills": 22, "deaths": 17, "adr": 119.0, "kast_percent": 91.3, "rating": 1.58},
+        {"steam_id": "76561198093162249", "hltv_name": "SkulL", "kills": 14, "deaths": 19, "adr": 74.4, "kast_percent": 78.3, "rating": 0.96},
+        {"steam_id": "76561198127259887", "hltv_name": "JD", "kills": 13, "deaths": 19, "adr": 64.7, "kast_percent": 65.2, "rating": 0.94},
+        {"steam_id": "76561198081702155", "hltv_name": "ADK", "kills": 11, "deaths": 17, "adr": 45.1, "kast_percent": 52.2, "rating": 0.83},
+        {"steam_id": "76561198108660703", "hltv_name": "zune", "kills": 23, "deaths": 19, "adr": 104.2, "kast_percent": 73.9, "rating": 1.25},
+        {"steam_id": "76561198044112269", "hltv_name": "void", "kills": 15, "deaths": 10, "adr": 71.7, "kast_percent": 78.3, "rating": 1.40},
+        {"steam_id": "76561199048086137", "hltv_name": "kairo", "kills": 17, "deaths": 14, "adr": 52.8, "kast_percent": 73.9, "rating": 1.09},
+        {"steam_id": "76561198226777692", "hltv_name": "phoebe", "kills": 19, "deaths": 19, "adr": 100.5, "kast_percent": 95.7, "rating": 1.33},
+        {"steam_id": "76561198208618504", "hltv_name": "lawlkay", "kills": 14, "deaths": 14, "adr": 69.1, "kast_percent": 82.6, "rating": 1.04}
+      ]
+    }
+  ]
+}
