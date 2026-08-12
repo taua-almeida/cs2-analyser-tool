@@ -233,13 +233,19 @@ func (a *analyser) onKill(e events.Kill) {
 	// kills stay separate from both.
 	byWorld := (e.Killer == nil || suicide) && (e.Weapon == nil || e.Weapon.Type == common.EqWorld)
 	postRoundWorld := a.tracker.isPostRoundWorldCleanup(byWorld)
+	gamePhase := a.parser.GameState().GamePhase()
 	matchEndWorldCleanup := postRoundWorld &&
-		a.parser.GameState().GamePhase() == common.GamePhaseGameEnded
+		gamePhase == common.GamePhaseGameEnded
+	postRoundBombDeath := a.tracker.isPostRound() &&
+		gamePhase == common.GamePhaseGameHalfEnded &&
+		e.Weapon != nil && e.Weapon.Type == common.EqBomb
 
 	if victim := a.ensurePlayer(e.Victim); victim != nil {
-		// Only a World event after the full game ended is engine cleanup.
-		// Ordinary post-round falls and World suicides remain real deaths.
-		if !matchEndWorldCleanup {
+		// HLTV omits C4 deaths after the round and game phase have both
+		// closed. Bomb deaths emitted just after a round-ending explosion
+		// during the active phase still count. Only match-end World events
+		// are cleanup; ordinary post-round falls and World suicides count.
+		if !postRoundBombDeath && !matchEndWorldCleanup {
 			victim.Deaths++
 			victim.SideStats.Deaths.count(e.Victim.Team)
 		}

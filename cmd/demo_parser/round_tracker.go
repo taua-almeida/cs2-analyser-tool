@@ -188,8 +188,9 @@ func (rt *roundTracker) kill(killer, victim uint64, killerTeam, victimTeam commo
 
 	rt.deaths = append(rt.deaths, deathRecord{killer: killer, victim: victim, victimTeam: victimTeam, at: at})
 	// Dying before the round officially ends cancels survival, including to
-	// the post-round bomb explosion (HLTV convention). Only match-end world
-	// cleanup kills are ignored once the round is decided — and because
+	// the post-round bomb explosion. Raw death totals are handled separately
+	// by the analyser. Only match-end world cleanup kills are ignored once
+	// the round is decided — and because
 	// their victim keeps survival, they settle no 40-damage assists either:
 	// damage into a survivor is no assist. Every real death settles them,
 	// whatever caused it; enemy damage into a player finished by the bomb or
@@ -240,11 +241,19 @@ func (rt *roundTracker) aliveCounts() (tAlive, ctAlive int) {
 	return tAlive, ctAlive
 }
 
-// isPostRoundWorldCleanup identifies engine cleanup deaths after the round
-// result is known. The decision remains available after finalize because CS2
-// can dispatch cleanup kills after RoundEndOfficial; startRound clears it.
+// isPostRound reports whether RoundEnd has decided the current or most
+// recently finalized round. The decision remains available after finalize
+// because CS2 can dispatch death events after RoundEndOfficial; startRound
+// clears it.
+func (rt *roundTracker) isPostRound() bool {
+	return rt.decided
+}
+
+// isPostRoundWorldCleanup identifies World events after the round result is
+// known. The analyser separately checks the game phase before excluding one
+// from raw death totals.
 func (rt *roundTracker) isPostRoundWorldCleanup(byWorld bool) bool {
-	return rt.decided && byWorld
+	return rt.isPostRound() && byWorld
 }
 
 // disconnect handles a player leaving mid-round: they count as dead for

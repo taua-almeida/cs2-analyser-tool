@@ -490,8 +490,8 @@ func TestPostRoundBombDeathCancelsSurvival(t *testing.T) {
 	rt.startRound(fiveVsFive())
 	rt.markEnd(common.TeamCounterTerrorists)
 
-	// Dying to the bomb explosion counts as dying in the round (HLTV
-	// convention), even though the kill event lands after the whistle.
+	// The event still cancels survival. Raw totals apply their separate
+	// round/game-phase rule in the analyser.
 	rt.kill(0, 1, common.TeamUnassigned, common.TeamTerrorists, 0, false, at(70))
 
 	if outcome := rt.finalize(); outcome.kast[1] {
