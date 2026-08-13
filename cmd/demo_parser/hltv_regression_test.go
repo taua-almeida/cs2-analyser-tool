@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -226,14 +227,7 @@ func TestHLTVRegression(t *testing.T) {
 					}
 					t.Fatalf("locating HLTV demo: %v", err)
 				}
-				if err := verifyDemoChecksum(demoPath, expectedMap.DemoSHA256); err != nil {
-					t.Fatalf("verifying HLTV demo: %v", err)
-				}
-
-				result, err := ProcessDemo(demoPath)
-				if err != nil {
-					t.Fatalf("ProcessDemo(%s): %v", expectedMap.DemoFile, err)
-				}
+				result := parseVerifiedHLTVDemo(t, demoPath, expectedMap.DemoSHA256)
 
 				assertHLTVMap(t, oracle.FixtureID, result, expectedMap)
 				assertHLTVRoster(t, oracle.FixtureID, result.Players, expectedMap)
@@ -259,6 +253,243 @@ func TestHLTVRegression(t *testing.T) {
 
 	logHLTVParity(t, "original fixture", originalParity, originalRatings)
 	logHLTVParity(t, "additional fixtures", extraParity, extraRatings)
+}
+
+// TestHLTVSeriesRegression drives the whole BO3 pipeline over the original
+// Rooster–Mindfreak fixture: every map is hashed and parsed in oracle order
+// and aggregated with BuildSeries, and the result is checked against values
+// derived from the same audited oracle — per-team map and round wins, the
+// series winner, exact SteamID matching across all three maps, additive
+// totals equal to the sum of the standalone map analyses, and the 64-round
+// series denominator behind every rate. Like TestHLTVRegression it never
+// downloads anything; unconfigured demos skip unless REQUIRE_HLTV_DEMOS is
+// set.
+func TestHLTVSeriesRegression(t *testing.T) {
+	oracle := loadHLTVOracle(t, hltvOracleFixturePath)
+	dirs := configuredDemoDirs(os.Getenv(hltvDemoDirEnv))
+	required := os.Getenv(requireHLTVDemosEnv) != ""
+	if required && len(dirs) == 0 {
+		t.Fatalf("%s is set but %s is empty; point it at the directory containing the three match 129241 demos",
+			requireHLTVDemosEnv, hltvDemoDirEnv)
+	}
+	if len(dirs) == 0 {
+		t.Skipf("HLTV demos are not configured; set %s to run the series fixture", hltvDemoDirEnv)
+	}
+
+	inputs := make([]SeriesMapInput, 0, len(oracle.Maps))
+	for _, expectedMap := range oracle.Maps {
+		demoPath, err := findDemo(dirs, expectedMap.DemoFile)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) && !required {
+				t.Skipf("HLTV demo %s is absent; set %s to make missing demos fail", expectedMap.DemoFile, requireHLTVDemosEnv)
+			}
+			t.Fatalf("locating HLTV demo: %v", err)
+		}
+		result := parseVerifiedHLTVDemo(t, demoPath, expectedMap.DemoSHA256)
+		inputs = append(inputs, SeriesMapInput{Demo: result, SHA256: expectedMap.DemoSHA256})
+	}
+
+	series, err := BuildSeries(3, inputs)
+	if err != nil {
+		t.Fatalf("BuildSeries: %v", err)
+	}
+	if series.BestOf != 3 {
+		t.Errorf("best_of = %d, want 3", series.BestOf)
+	}
+	assertHLTVSeriesMapsInOrder(t, series, oracle)
+	assertHLTVSeriesTeams(t, series, oracle)
+	assertHLTVSeriesPlayers(t, series, inputs, oracle)
+}
+
+// hltvSeriesTeamExpectation is one fixture team folded across the oracle's
+// maps: its roster and its map and round wins.
+type hltvSeriesTeamExpectation struct {
+	name      string
+	steamIDs  []uint64
+	mapsWon   int
+	roundsWon int
+}
+
+// hltvSeriesExpectations derives each fixture team's expected series result
+// from the audited per-map oracle rows, so the test asserts oracle-derived
+// values rather than numbers of its own.
+func hltvSeriesExpectations(t *testing.T, oracle hltvOracle) []hltvSeriesTeamExpectation {
+	t.Helper()
+	var expectations []hltvSeriesTeamExpectation
+	for _, expectedMap := range oracle.Maps {
+		teams := *expectedMap.Teams
+		for i, team := range teams {
+			ids := sortedIDs(team.SteamIDs)
+			index := slices.IndexFunc(expectations, func(e hltvSeriesTeamExpectation) bool {
+				return e.name == team.Name
+			})
+			if index < 0 {
+				index = len(expectations)
+				expectations = append(expectations, hltvSeriesTeamExpectation{name: team.Name, steamIDs: ids})
+			}
+			expectation := &expectations[index]
+			if !slices.Equal(expectation.steamIDs, ids) {
+				t.Fatalf("oracle team %s changes roster between maps; the series fixture assumes stable lineups", team.Name)
+			}
+			expectation.roundsWon += team.Score
+			if team.Score > teams[1-i].Score {
+				expectation.mapsWon++
+			}
+		}
+	}
+	if len(expectations) != 2 {
+		t.Fatalf("oracle names %d series teams, want 2", len(expectations))
+	}
+	return expectations
+}
+
+func assertHLTVSeriesMapsInOrder(t *testing.T, series *ProcessedSeries, oracle hltvOracle) {
+	t.Helper()
+	if len(series.Maps) != len(oracle.Maps) {
+		t.Fatalf("series has %d maps, want %d", len(series.Maps), len(oracle.Maps))
+	}
+	for i, expectedMap := range oracle.Maps {
+		if got := series.Maps[i].SHA256; got != expectedMap.DemoSHA256 {
+			t.Errorf("maps[%d].sha256 = %s, want %s; supplied order must be kept", i, got, expectedMap.DemoSHA256)
+		}
+		if got := series.Maps[i].Analysis.Map.MapName; got != expectedMap.ParserMapName {
+			t.Errorf("maps[%d] analysis map = %q, want %q", i, got, expectedMap.ParserMapName)
+		}
+	}
+}
+
+func assertHLTVSeriesTeams(t *testing.T, series *ProcessedSeries, oracle hltvOracle) {
+	t.Helper()
+	if len(series.Teams) != 2 {
+		t.Fatalf("series has %d teams, want 2", len(series.Teams))
+	}
+	expectations := hltvSeriesExpectations(t, oracle)
+	totalRounds := 0
+	for _, expected := range expectations {
+		team, found := findSeriesTeamByRoster(series.Teams, expected.steamIDs)
+		if !found {
+			t.Errorf("no series team has %s's roster %v; teams %+v", expected.name, expected.steamIDs, series.Teams)
+			continue
+		}
+		if team.Name != expected.name {
+			t.Errorf("series team with %s's roster is named %q", expected.name, team.Name)
+		}
+		if team.MapsWon != expected.mapsWon || team.RoundsWon != expected.roundsWon {
+			t.Errorf("series team %s = %d maps/%d rounds, oracle says %d/%d",
+				expected.name, team.MapsWon, team.RoundsWon, expected.mapsWon, expected.roundsWon)
+		}
+		wantThreshold := expected.mapsWon >= 2
+		if isWinner := team.TeamID == series.WinnerTeamID; isWinner != wantThreshold {
+			t.Errorf("series team %s winner = %t, oracle map wins say %t", expected.name, isWinner, wantThreshold)
+		}
+		totalRounds += expected.roundsWon
+	}
+	gotRounds := 0
+	for _, seriesMap := range series.Maps {
+		gotRounds += seriesMap.Analysis.Map.TotalRounds
+	}
+	if gotRounds != totalRounds {
+		t.Errorf("series rounds = %d, oracle says %d", gotRounds, totalRounds)
+	}
+}
+
+func findSeriesTeamByRoster(teams []SeriesTeam, steamIDs []uint64) (SeriesTeam, bool) {
+	for _, team := range teams {
+		if slices.Equal(team.Roster, steamIDs) {
+			return team, true
+		}
+	}
+	return SeriesTeam{}, false
+}
+
+// assertHLTVSeriesPlayers checks cross-map identity and the aggregation
+// arithmetic: all ten oracle SteamIDs appear once, played every map with the
+// full series-round denominator, their additive totals equal the sums of
+// the standalone analyses, their rates divide exact numerators by that
+// denominator, and their rating was recomputed rather than omitted.
+func assertHLTVSeriesPlayers(t *testing.T, series *ProcessedSeries, inputs []SeriesMapInput, oracle hltvOracle) {
+	t.Helper()
+	totalRounds := 0
+	for _, input := range inputs {
+		totalRounds += input.Demo.Map.TotalRounds
+	}
+	if len(series.Players) != 10 {
+		t.Errorf("series has %d aggregate players, want the ten oracle SteamIDs", len(series.Players))
+	}
+	for _, expectedPlayer := range oracle.Maps[0].Players {
+		player := series.Players[expectedPlayer.SteamID]
+		if player == nil {
+			t.Errorf("aggregate player %d (%s) missing", expectedPlayer.SteamID, expectedPlayer.HLTVName)
+			continue
+		}
+		if player.MapsPlayed != len(inputs) || player.Rounds != totalRounds {
+			t.Errorf("%s maps/rounds = %d/%d, want %d/%d",
+				expectedPlayer.HLTVName, player.MapsPlayed, player.Rounds, len(inputs), totalRounds)
+		}
+
+		var kills, deaths, damage, headshots, assists, kastRounds int
+		for _, input := range inputs {
+			mapPlayer := input.Demo.Players[expectedPlayer.SteamID]
+			if mapPlayer == nil {
+				t.Errorf("%s is missing from a map analysis; every oracle player plays all three maps", expectedPlayer.HLTVName)
+				continue
+			}
+			kills += mapPlayer.KillStats.Total
+			deaths += mapPlayer.Deaths
+			damage += mapPlayer.AssistStats.DamageGiven
+			headshots += mapPlayer.KillStats.HeadShots
+			assists += mapPlayer.AssistStats.Total
+			kastRounds += input.Demo.aggFacts[expectedPlayer.SteamID].kastRounds.Total
+		}
+		if player.KillStats.Total != kills || player.Deaths != deaths ||
+			player.AssistStats.DamageGiven != damage ||
+			player.KillStats.HeadShots != headshots || player.AssistStats.Total != assists {
+			t.Errorf("%s additive totals %d/%d/%d/%d/%d do not equal the map sums %d/%d/%d/%d/%d",
+				expectedPlayer.HLTVName,
+				player.KillStats.Total, player.Deaths, player.AssistStats.DamageGiven,
+				player.KillStats.HeadShots, player.AssistStats.Total,
+				kills, deaths, damage, headshots, assists)
+		}
+		if got, want := player.AssistStats.ADR, perRound(damage, totalRounds); got != want {
+			t.Errorf("%s series ADR = %v, want damage over the %d series rounds (%v)",
+				expectedPlayer.HLTVName, got, totalRounds, want)
+		}
+		if got, want := player.PlayerStats.KAST, 100*perRound(kastRounds, totalRounds); got != want {
+			t.Errorf("%s series KAST = %v, want the exact %d/%d recomputation (%v)",
+				expectedPlayer.HLTVName, got, kastRounds, totalRounds, want)
+		}
+		if player.Rating == nil {
+			t.Errorf("%s series rating omitted; parsed maps carry raw facts, so it must be recomputed", expectedPlayer.HLTVName)
+		}
+	}
+}
+
+// hltvParsedDemos caches checksum-verified parses per demo path for the
+// test binary's lifetime, so the map and series regressions share one parse
+// of each multi-hundred-MB demo instead of repeating seconds of work. Both
+// only read the result: the assertions never write, and BuildSeries
+// documents that it does not mutate its inputs.
+var hltvParsedDemos = struct {
+	sync.Mutex
+	byPath map[string]*ProcessedDemo
+}{byPath: map[string]*ProcessedDemo{}}
+
+func parseVerifiedHLTVDemo(t *testing.T, path, wantSHA256 string) *ProcessedDemo {
+	t.Helper()
+	hltvParsedDemos.Lock()
+	defer hltvParsedDemos.Unlock()
+	if demo, ok := hltvParsedDemos.byPath[path]; ok {
+		return demo
+	}
+	if err := verifyDemoChecksum(path, wantSHA256); err != nil {
+		t.Fatalf("verifying HLTV demo: %v", err)
+	}
+	demo, err := ProcessDemo(path)
+	if err != nil {
+		t.Fatalf("ProcessDemo(%s): %v", path, err)
+	}
+	hltvParsedDemos.byPath[path] = demo
+	return demo
 }
 
 func configuredDemoDirs(value string) []string {

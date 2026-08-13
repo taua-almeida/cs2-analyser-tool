@@ -354,3 +354,79 @@ A round win is attributed to a logical team only when the authoritative scored-r
 `team_id` is scoped to one map: the numbering says only which lineup started the seeding round on which side of *this* demo. It makes no claim about organization identity across demos — the same organization can be team 1 on one map and team 2 on the next. Matching teams across the maps of a BO3/BO5 series is issue #34's job, deliberately not this field's.
 
 Players keep their existing CT/T side splits (`side_stats`), which remain attributed round by round and are unaffected by logical team identity. A player with `team_id` 0 exists in the demo's raw events but never played an accepted round (for example, someone only present during an unscored setup round).
+
+## Series analysis (BO3/BO5)
+
+`analyse --best-of 3|5` with repeated `--demo` flags aggregates a *completed* series. The format is always explicit: multiple demos without `--best-of` are rejected, a series is never inferred from the file count, and history never infers one either. The demos are the played maps in order, and that order is preserved everywhere — parsing, output, errors and JSON. Before parsing, every file is streamed through SHA-256; two inputs with the same digest are rejected as the same demo regardless of their paths.
+
+### Completed series only
+
+A BO3 accepts exactly 2 or 3 played maps and a BO5 exactly 3, 4 or 5. Each map must be decided: exactly two logical teams, untied per-team scores that add up to the map's rounds, and players referencing only those teams. Only the competitive 5v5 format is supported, enforced three ways: a map reporting any game mode other than `competitive`, `scrimcomp5v5`, `premier` or the unknown `""` is rejected outright (casual, deathmatch and Wingman's `scrimcomp2v2` all fail here, whatever their lobby size); every logical team must have fielded at least five eligible players, rejecting Wingman-sized lineups before identity resolution — substitutions only ever make a roster larger, so a competitive map with stand-ins always passes; and a map whose per-round participation exceeds what a 5v5 lobby can produce (ten players per round, with one spare for a freeze-time swap) is rejected, which catches oversized lobbies whose demos name no mode. The final supplied map must be the first point at which a team reaches the clinch threshold — 2 map wins in a BO3, 3 in a BO5. An unclinched series and a map supplied after the clinch are both errors; live or unfinished series are out of scope.
+
+### Series team identity
+
+`team_id` inside one map is map-local (see [Team ID scope](#team-id-scope)); the series introduces *series-local* team IDs 1 and 2, seeded deterministically from the first map's team order, that are scoped to this one series and claim nothing beyond it. Every map's `team_assignments` records the explicit bridge from its map-local IDs to the series IDs.
+
+The two series teams are resolved through a unique joint roster assignment. Each map after the first can keep the first map's orientation or cross it; all combinations (at most 2^4 for a BO5) are evaluated jointly — never greedily map by map — under one rule: the union rosters of the two series teams must stay disjoint. Exactly one surviving combination is success. Zero is a mixed/conflicting-team error, several is an ambiguity error; both are structured, `errors.As`-testable values carrying the map indexes, map-local team IDs, rosters and competing assignments. The joint evaluation is what lets a middle map played entirely by substitutes resolve through a later map that ties those substitutes back to a lineup.
+
+Substitutions are roster additions to the same series team, never a new team. Sides, map-local IDs, filenames, map names, scores, player names and clan names are never identity; clan names may corroborate a label but never resolve an otherwise ambiguous assignment. Series team `aliases` are the deduplicated map-level aliases in first map-observation order, and `name` is the most-observed nonempty map-level name, ties broken by first observation.
+
+### Series JSON
+
+`--save` writes the series envelope (CSV behaves differently, see below):
+
+```json
+{
+  "best_of": 3,
+  "winner_team_id": 2,
+  "teams": [
+    {
+      "team_id": 1,
+      "name": "Rooster",
+      "aliases": ["Rooster"],
+      "maps_won": 1,
+      "rounds_won": 32,
+      "roster": [76561198000000000]
+    }
+  ],
+  "players": {
+    "<steam-id>": { "...": "aggregate player, see below" }
+  },
+  "maps": [
+    {
+      "sha256": "...",
+      "winner_team_id": 2,
+      "team_assignments": [
+        { "map_team_id": 1, "series_team_id": 2 },
+        { "map_team_id": 2, "series_team_id": 1 }
+      ],
+      "analysis": { "...": "the unchanged standalone map record" }
+    }
+  ]
+}
+```
+
+`maps` keeps the supplied order; each entry carries the demo's SHA-256, the map winner translated into series-team terms, the map-local-to-series-team assignments, and the complete standalone analysis with the exact single-map shape documented above. `winner_team_id` at the top level is the completed-series winner, and each team's `maps_won`/`rounds_won` are its map wins and summed logical round wins.
+
+### Aggregate players
+
+`players` is keyed by SteamID64, the only cross-map player identity — names are labels. Each entry is a series-specific record: it deliberately has no `user_id`, because server user IDs are map-local and meaningless across demos. `aliases` collects the player's deduplicated nonempty per-map display names in map order, and `name` picks the most-observed one, first observation breaking ties — the same rule team names use.
+
+Additive facts (kills, deaths, headshots, assists, flash assists, damage, trades, team kills, weapon kills, MVPs, aces, multi-kill buckets, clutches, opening kills/deaths, CT/T count splits, utility counters, flash duration, unused utility value) are exact sums of the per-map values. Every rate is recomputed from exact summed numerators and denominators preserved by the parser — never by combining or averaging the rounded per-map rates:
+
+- `maps_played` counts the maps where the SteamID participated for a logical team, and `rounds` sums those maps' total rounds. All ten players of a three-map series with 22+19+23 rounds therefore have a 64-round denominator.
+- Match-wide ADR, classic KAST, the approximate eKAST and round-swing percentages divide by `rounds`, mirroring how a single map divides by the whole map's rounds; the per-map late-join dilution inside each map is unchanged.
+- CT/T ADR and KAST divide by the player's own summed CT/T rounds; precision, opening success and average enemy flash duration divide their exact summed numerators by their summed counts.
+- `player_map_stats` is named `player_series_stats` in the aggregate record; its fields have the same meaning over the series denominator.
+
+### Series rating
+
+The series `rating` is not an average of map ratings. The parser preserves each map's exact raw rating facts — eco-adjusted kill points and damage, eco-weighted survival and rating-KAST credits, signed round swing, multi-kill buckets — and the rating model runs once over their sums with the player's series round denominator. If a map was not produced by this parser and carries no raw facts (only possible for programmatically constructed inputs, never for `analyse`), the rating is explicitly `null` rather than reconstructed from rounded output.
+
+### Player selection in a series
+
+`--players` is resolved only after cross-map identity and alias collection: names match any collected alias case-insensitively, duplicates count once, a name with no match fails listing the available players, and a name matching more than one SteamID fails with the candidate SteamIDs. Selection never affects team resolution or the aggregate calculations — a filtered save narrows `players` and each map's `analysis.players`, while teams, rosters, scores, map results and team assignments remain complete.
+
+### Series CSV
+
+CSV stays the flat aggregate-player table with the existing single-map header, column order and formatting — no series, team, hash or map columns. The one series-specific cell rule: a player whose series rating was [omitted](#series-rating) has empty cells in the seven rating columns, never a fabricated `0.00`; the CLI tables render the same omission as `-`. Full per-map series data requires JSON.

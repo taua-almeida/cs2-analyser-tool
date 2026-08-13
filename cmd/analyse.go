@@ -14,17 +14,21 @@ import (
 	printstyle "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/print-style"
 )
 
-var players []string // players is the list of players to analyse.
-var demoPath string  // demoPath is the path to the demo file.
-var save bool        // save is the flag to save the demo players data.
-var saveType string  // saveType is the type of storage to use.
-var details bool     // details prints the stats that do not fit the main table.
+var players []string   // players is the list of players to analyse.
+var demoPaths []string // demoPaths are the demo files, in played order for a series.
+var bestOf int         // bestOf is the series format: 0 for a single demo, else 3 or 5.
+var save bool          // save is the flag to save the demo players data.
+var saveType string    // saveType is the type of storage to use.
+var details bool       // details prints the stats that do not fit the main table.
 
 func init() {
 	// Add the analyse command as a subcommand of rootCmd.
 	rootCmd.AddCommand(analyseCmd)
 
-	analyseCmd.Flags().StringVarP(&demoPath, "demo", "d", "", "Demo path.")
+	// StringArray rather than StringSlice: repeated --demo flags keep their
+	// command-line order and a path containing a comma stays one path.
+	analyseCmd.Flags().StringArrayVarP(&demoPaths, "demo", "d", nil, "Demo path. Repeat in played order for a --best-of series.")
+	analyseCmd.Flags().IntVar(&bestOf, "best-of", 0, "Series format for multiple demos: 3 or 5.")
 	analyseCmd.Flags().StringSliceVarP(&players, "players", "p", []string{}, "Players to analyse.")
 	analyseCmd.Flags().BoolVarP(&save, "save", "s", false, "Save the demo players data.")
 	analyseCmd.Flags().StringVar(&saveType, "save-type", "json", "Type of file to save the data [json, csv], default is json.")
@@ -40,7 +44,18 @@ var analyseCmd = &cobra.Command{
 		if saveType != "json" && saveType != "csv" {
 			return fmt.Errorf("invalid --save-type %q, must be json or csv", saveType)
 		}
+		bestOfSet := cmd.Flags().Changed("best-of")
+		if err := validateSeriesFlags(bestOf, bestOfSet, len(demoPaths)); err != nil {
+			return err
+		}
+		if bestOfSet {
+			return runSeriesAnalysis(bestOf, demoPaths)
+		}
 
+		demoPath := ""
+		if len(demoPaths) == 1 {
+			demoPath = demoPaths[0]
+		}
 		if demoPath == "" {
 			selected, err := filepicker.PickDemoFile()
 			if err != nil {
@@ -97,14 +112,11 @@ var analyseCmd = &cobra.Command{
 		}
 
 		if save {
-			lipgloss.Println(printstyle.StyleSuccess.Render("\nWritting data to file..."))
 			analysisToSave := *processedDemoData
 			analysisToSave.Players = playersToAnalyse
-			fileName, err := dataexport.WriteAnalysisToFile(&analysisToSave, saveType)
-			if err != nil {
-				return fmt.Errorf("writing to file: %w", err)
-			}
-			lipgloss.Println(printstyle.StyleSuccess.Render("Data written to file: " + fileName))
+			return saveAndReport(func() (string, error) {
+				return dataexport.WriteAnalysisToFile(&analysisToSave, saveType)
+			})
 		}
 		return nil
 	},

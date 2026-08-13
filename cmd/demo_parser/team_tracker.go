@@ -18,11 +18,55 @@ type teamRoundFacts struct {
 	winner            common.Team
 }
 
-// aliasFact is one observed clan-name spelling and the number of accepted
-// rounds it was on the scoreboard for.
-type aliasFact struct {
-	name   string
-	rounds int
+// nameCount is one observed label spelling and how often it was seen.
+type nameCount struct {
+	name  string
+	count int
+}
+
+// nameTally is the one implementation of the label rule shared by map teams,
+// series teams and series players: nonempty labels are collected
+// deduplicated in first-observation order, and the display name is the most
+// observed one with ties broken by first observation. For a map team an
+// observation is an accepted round, so a mid-match rename only takes over
+// once it has been on the scoreboard longer than the old name; series teams
+// and players observe once per map. Something never named has no display
+// name — one is never invented.
+type nameTally struct {
+	counts []nameCount
+}
+
+func (nt *nameTally) observe(name string) {
+	if name == "" {
+		return
+	}
+	for i := range nt.counts {
+		if nt.counts[i].name == name {
+			nt.counts[i].count++
+			return
+		}
+	}
+	nt.counts = append(nt.counts, nameCount{name: name, count: 1})
+}
+
+func (nt *nameTally) mostObserved() string {
+	name, best := "", 0
+	for _, count := range nt.counts {
+		if count.count > best {
+			name, best = count.name, count.count
+		}
+	}
+	return name
+}
+
+// names returns the observed labels in first-observation order, non-nil even
+// when empty so they serialize as [] rather than null.
+func (nt *nameTally) names() []string {
+	names := make([]string, len(nt.counts))
+	for i, count := range nt.counts {
+		names[i] = count.name
+	}
+	return names
 }
 
 // logicalTeam accumulates one map-local team: the members that have played
@@ -31,7 +75,7 @@ type aliasFact struct {
 type logicalTeam struct {
 	id      int
 	members map[uint64]bool
-	aliases []aliasFact // deduplicated, in first-observation order
+	aliases nameTally
 	score   int
 }
 
@@ -47,47 +91,17 @@ func (lt *logicalTeam) recordRound(roster []uint64, clan string, won bool) {
 	for _, id := range roster {
 		lt.members[id] = true
 	}
-	if clan != "" {
-		lt.recordAlias(clan)
-	}
+	lt.aliases.observe(clan)
 	if won {
 		lt.score++
 	}
 }
 
-func (lt *logicalTeam) recordAlias(clan string) {
-	for i := range lt.aliases {
-		if lt.aliases[i].name == clan {
-			lt.aliases[i].rounds++
-			return
-		}
-	}
-	lt.aliases = append(lt.aliases, aliasFact{name: clan, rounds: 1})
-}
-
-// displayName is the alias observed in the most accepted rounds, ties broken
-// by first observation. A mid-match rename therefore only takes over the
-// display name once it has been on the scoreboard longer than the old name,
-// and a team that never showed a nonempty clan name has no display name.
-func (lt *logicalTeam) displayName() string {
-	name, best := "", 0
-	for _, alias := range lt.aliases {
-		if alias.rounds > best {
-			name, best = alias.name, alias.rounds
-		}
-	}
-	return name
-}
-
 func (lt *logicalTeam) export() DemoTeam {
-	aliases := make([]string, len(lt.aliases))
-	for i, alias := range lt.aliases {
-		aliases[i] = alias.name
-	}
 	return DemoTeam{
 		TeamID:  lt.id,
-		Name:    lt.displayName(),
-		Aliases: aliases,
+		Name:    lt.aliases.mostObserved(),
+		Aliases: lt.aliases.names(),
 		Score:   lt.score,
 		Roster:  lt.memberIDs(),
 	}
