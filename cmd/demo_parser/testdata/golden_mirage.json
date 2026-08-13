@@ -4,6 +4,7 @@
       "steam_id": 76561197964020430,
       "name": "Подсосник blick'a",
       "user_id": 0,
+      "team_id": 2,
       "deaths": 5,
       "deaths_traded": {
         "total": 2,
@@ -116,6 +117,7 @@
       "steam_id": 76561198073049527,
       "name": "miu miu",
       "user_id": 8,
+      "team_id": 1,
       "deaths": 8,
       "deaths_traded": {
         "total": 1,
@@ -227,6 +229,7 @@
       "steam_id": 76561198118803912,
       "name": "Голова, глаза",
       "user_id": 2,
+      "team_id": 2,
       "deaths": 7,
       "deaths_traded": {
         "total": 1,
@@ -337,6 +340,7 @@
       "steam_id": 76561198194694750,
       "name": "Dog",
       "user_id": 7,
+      "team_id": 1,
       "deaths": 7,
       "deaths_traded": {
         "total": 0,
@@ -450,6 +454,7 @@
       "steam_id": 76561198202353993,
       "name": "IMI Negev",
       "user_id": 4,
+      "team_id": 2,
       "deaths": 2,
       "deaths_traded": {
         "total": 1,
@@ -561,6 +566,7 @@
       "steam_id": 76561198244754626,
       "name": "NIGHTSOUL",
       "user_id": 1,
+      "team_id": 2,
       "deaths": 5,
       "deaths_traded": {
         "total": 0,
@@ -672,6 +678,7 @@
       "steam_id": 76561198258044111,
       "name": "-ExΩtiC-",
       "user_id": 9,
+      "team_id": 1,
       "deaths": 8,
       "deaths_traded": {
         "total": 1,
@@ -783,6 +790,7 @@
       "steam_id": 76561198265366770,
       "name": "123",
       "user_id": 3,
+      "team_id": 2,
       "deaths": 4,
       "deaths_traded": {
         "total": 1,
@@ -893,6 +901,7 @@
       "steam_id": 76561198280975787,
       "name": "povergo",
       "user_id": 6,
+      "team_id": 1,
       "deaths": 9,
       "deaths_traded": {
         "total": 0,
@@ -1004,6 +1013,7 @@
       "steam_id": 76561198324843075,
       "name": "Trahun \u003c3 V",
       "user_id": 5,
+      "team_id": 1,
       "deaths": 9,
       "deaths_traded": {
         "total": 2,
@@ -1111,6 +1121,34 @@
       }
     }
   },
+  "teams": [
+    {
+      "team_id": 1,
+      "name": "",
+      "aliases": [],
+      "score": 2,
+      "roster": [
+        76561198073049527,
+        76561198194694750,
+        76561198258044111,
+        76561198280975787,
+        76561198324843075
+      ]
+    },
+    {
+      "team_id": 2,
+      "name": "",
+      "aliases": [],
+      "score": 8,
+      "roster": [
+        76561197964020430,
+        76561198118803912,
+        76561198202353993,
+        76561198244754626,
+        76561198265366770
+      ]
+    }
+  ],
   "map_data": {
     "map_name": "de_mirage",
     "total_rounds": 10,

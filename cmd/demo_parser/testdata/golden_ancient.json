@@ -4,6 +4,7 @@
       "steam_id": 76561198032044481,
       "name": "bonK",
       "user_id": 4,
+      "team_id": 1,
       "deaths": 3,
       "deaths_traded": {
         "total": 1,
@@ -114,6 +115,7 @@
       "steam_id": 76561198071075349,
       "name": "mattos-v",
       "user_id": 1,
+      "team_id": 1,
       "deaths": 2,
       "deaths_traded": {
         "total": 0,
@@ -225,6 +227,7 @@
       "steam_id": 76561198307159112,
       "name": "CHARRADÃO DE FROZEN",
       "user_id": 9,
+      "team_id": 2,
       "deaths": 6,
       "deaths_traded": {
         "total": 0,
@@ -334,6 +337,7 @@
       "steam_id": 76561198387460920,
       "name": "tandu",
       "user_id": 2,
+      "team_id": 1,
       "deaths": 4,
       "deaths_traded": {
         "total": 2,
@@ -441,6 +445,7 @@
       "steam_id": 76561198826243397,
       "name": "botu360",
       "user_id": 0,
+      "team_id": 1,
       "deaths": 3,
       "deaths_traded": {
         "total": 0,
@@ -551,6 +556,7 @@
       "steam_id": 76561198966281369,
       "name": "cmz-",
       "user_id": 3,
+      "team_id": 1,
       "deaths": 4,
       "deaths_traded": {
         "total": 0,
@@ -664,6 +670,7 @@
       "steam_id": 76561199102419525,
       "name": "seloko-numcompensa",
       "user_id": 6,
+      "team_id": 2,
       "deaths": 6,
       "deaths_traded": {
         "total": 1,
@@ -775,6 +782,7 @@
       "steam_id": 76561199271102802,
       "name": "! Ømegapr1v",
       "user_id": 5,
+      "team_id": 2,
       "deaths": 7,
       "deaths_traded": {
         "total": 0,
@@ -884,6 +892,7 @@
       "steam_id": 76561199311359933,
       "name": "Nagi",
       "user_id": 7,
+      "team_id": 2,
       "deaths": 2,
       "deaths_traded": {
         "total": 0,
@@ -994,6 +1003,7 @@
       "steam_id": 76561199558715190,
       "name": "BushBandit",
       "user_id": 8,
+      "team_id": 2,
       "deaths": 6,
       "deaths_traded": {
         "total": 0,
@@ -1101,6 +1111,34 @@
       }
     }
   },
+  "teams": [
+    {
+      "team_id": 1,
+      "name": "",
+      "aliases": [],
+      "score": 6,
+      "roster": [
+        76561198032044481,
+        76561198071075349,
+        76561198387460920,
+        76561198826243397,
+        76561198966281369
+      ]
+    },
+    {
+      "team_id": 2,
+      "name": "",
+      "aliases": [],
+      "score": 2,
+      "roster": [
+        76561198307159112,
+        76561199102419525,
+        76561199271102802,
+        76561199311359933,
+        76561199558715190
+      ]
+    }
+  ],
   "map_data": {
     "map_name": "de_ancient",
     "total_rounds": 8,

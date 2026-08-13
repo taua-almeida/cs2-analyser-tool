@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -43,7 +44,19 @@ type hltvMapExpected struct {
 	GameMode      *string              `json:"game_mode"`
 	Rounds        int                  `json:"rounds"`
 	ScoreValues   [2]int               `json:"score_values"`
+	Teams         *[2]hltvTeamExpected `json:"teams"`
 	Players       []hltvPlayerExpected `json:"players"`
+}
+
+// hltvTeamExpected pins one logical team of a map: the clan name the
+// tournament server showed on the scoreboard (audited against the HLTV team
+// pages), the rounds that lineup won, and its five SteamID64s. Order within
+// the fixture array is presentational; the parser's teams are matched to
+// these rows by exact roster.
+type hltvTeamExpected struct {
+	Name     string   `json:"name"`
+	Score    int      `json:"score"`
+	SteamIDs []uint64 `json:"steam_ids"`
 }
 
 type hltvPlayerExpected struct {
@@ -224,6 +237,7 @@ func TestHLTVRegression(t *testing.T) {
 
 				assertHLTVMap(t, oracle.FixtureID, result, expectedMap)
 				assertHLTVRoster(t, oracle.FixtureID, result.Players, expectedMap)
+				assertHLTVTeams(t, oracle.FixtureID, result, expectedMap)
 				for _, expectedPlayer := range expectedMap.Players {
 					player := result.Players[expectedPlayer.SteamID]
 					assertHLTVPlayer(t, oracle.FixtureID, expectedMap, expectedPlayer, player)
@@ -443,6 +457,50 @@ func validateHLTVOracle(t *testing.T, path string, oracle hltvOracle) {
 			}
 			seenPlayers[player.SteamID] = true
 		}
+		// Teams must be pinned explicitly, like game_mode: they carry the
+		// issue #28 logical-team contract, so an omitted key is an
+		// unaudited fixture rather than a no-team assertion.
+		if expectedMap.Teams == nil {
+			t.Fatalf("HLTV oracle %s map %q has no teams; pin the audited rosters and per-team scores", path, expectedMap.Name)
+		}
+		validateHLTVTeamsFixture(t, path, expectedMap, seenPlayers)
+	}
+}
+
+// validateHLTVTeamsFixture checks a map's pinned teams for internal
+// consistency: two distinct named lineups of five that partition the map's
+// ten players, with scores that add up to the rounds and agree with the
+// existing side-based score_values.
+func validateHLTVTeamsFixture(t *testing.T, path string, expectedMap hltvMapExpected, mapPlayers map[uint64]bool) {
+	t.Helper()
+	teams := *expectedMap.Teams
+	if teams[0].Name == "" || teams[1].Name == "" || teams[0].Name == teams[1].Name {
+		t.Fatalf("HLTV oracle %s map %s teams need two distinct nonempty names, got %q and %q",
+			path, expectedMap.Name, teams[0].Name, teams[1].Name)
+	}
+	onTeams := make(map[uint64]bool, len(mapPlayers))
+	for _, team := range teams {
+		if len(team.SteamIDs) != 5 {
+			t.Fatalf("HLTV oracle %s map %s team %s has %d SteamIDs, want 5",
+				path, expectedMap.Name, team.Name, len(team.SteamIDs))
+		}
+		for _, id := range team.SteamIDs {
+			if !mapPlayers[id] {
+				t.Fatalf("HLTV oracle %s map %s team %s lists SteamID %d that is not among the map's players",
+					path, expectedMap.Name, team.Name, id)
+			}
+			if onTeams[id] {
+				t.Fatalf("HLTV oracle %s map %s lists SteamID %d on both teams", path, expectedMap.Name, id)
+			}
+			onTeams[id] = true
+		}
+	}
+	if got, want := sortedScore(teams[0].Score, teams[1].Score), sortedScore(expectedMap.ScoreValues[0], expectedMap.ScoreValues[1]); got != want {
+		t.Fatalf("HLTV oracle %s map %s team scores %v disagree with score_values %v", path, expectedMap.Name, got, want)
+	}
+	if teams[0].Score+teams[1].Score != expectedMap.Rounds {
+		t.Fatalf("HLTV oracle %s map %s team scores add to %d, want the %d rounds",
+			path, expectedMap.Name, teams[0].Score+teams[1].Score, expectedMap.Rounds)
 	}
 }
 
@@ -580,6 +638,62 @@ func assertHLTVRoster(t *testing.T, fixtureID string, players map[uint64]*DemoPl
 			fixtureID, expected.MapID, expected.Name,
 			len(players), missing, unexpected)
 	}
+}
+
+// assertHLTVTeams checks the issue #28 logical-team contract on a real
+// tournament demo: exactly two teams whose rosters, display names, aliases
+// and per-team scores survive every side switch, whose scores reconcile with
+// the final side-based scoreboard, and whose players reference them through
+// team_id. Parsed teams are matched to the fixture rows by exact roster, so
+// the assertion is independent of the parser's map-local team numbering.
+func assertHLTVTeams(t *testing.T, fixtureID string, result *ProcessedDemo, expected hltvMapExpected) {
+	t.Helper()
+	label := fmt.Sprintf("%s/%d/%s", fixtureID, expected.MapID, expected.Name)
+	if len(result.Teams) != 2 {
+		t.Errorf("%s parsed %d teams, want 2", label, len(result.Teams))
+		return
+	}
+	gotScores := sortedScore(result.Teams[0].Score, result.Teams[1].Score)
+	sideScores := sortedScore(result.Map.RoundsWonCT, result.Map.RoundsWonT)
+	if gotScores != sideScores {
+		t.Errorf("%s team scores %v do not reconcile with final side scores %v", label, gotScores, sideScores)
+	}
+	for _, expectedTeam := range *expected.Teams {
+		team, found := findTeamByRoster(result.Teams, expectedTeam.SteamIDs)
+		if !found {
+			t.Errorf("%s no parsed team has %s's roster %v; parsed teams %+v",
+				label, expectedTeam.Name, sortedIDs(expectedTeam.SteamIDs), result.Teams)
+			continue
+		}
+		if team.Name != expectedTeam.Name {
+			t.Errorf("%s team with %s's roster is named %q, want %q",
+				label, expectedTeam.Name, team.Name, expectedTeam.Name)
+		}
+		if !slices.Equal(team.Aliases, []string{expectedTeam.Name}) {
+			t.Errorf("%s team %s aliases = %v, want exactly the observed clan name",
+				label, expectedTeam.Name, team.Aliases)
+		}
+		if team.Score != expectedTeam.Score {
+			t.Errorf("%s team %s score = %d, want %d", label, expectedTeam.Name, team.Score, expectedTeam.Score)
+		}
+		for _, id := range expectedTeam.SteamIDs {
+			// A missing player is already reported by assertHLTVRoster.
+			if player := result.Players[id]; player != nil && player.TeamID != team.TeamID {
+				t.Errorf("%s player %d team_id = %d, want %d (%s)",
+					label, id, player.TeamID, team.TeamID, expectedTeam.Name)
+			}
+		}
+	}
+}
+
+func findTeamByRoster(teams []DemoTeam, steamIDs []uint64) (DemoTeam, bool) {
+	want := sortedIDs(steamIDs)
+	for _, team := range teams {
+		if slices.Equal(team.Roster, want) {
+			return team, true
+		}
+	}
+	return DemoTeam{}, false
 }
 
 func assertHLTVPlayer(t *testing.T, fixtureID string, expectedMap hltvMapExpected, expected hltvPlayerExpected, player *DemoPlayer) {
