@@ -138,9 +138,13 @@ type RatingStats struct {
 }
 
 type DemoPlayer struct {
-	SteamID          uint64           `json:"steam_id"`
-	Name             string           `json:"name"`
-	UserID           int              `json:"user_id"`
+	SteamID uint64 `json:"steam_id"`
+	Name    string `json:"name"`
+	UserID  int    `json:"user_id"`
+	// TeamID references the logical team in ProcessedDemo.Teams the player
+	// participated for, or 0 for a player who never played an accepted
+	// scored round (and so belongs to no team).
+	TeamID           int              `json:"team_id"`
 	Deaths           int              `json:"deaths"`
 	DeathsTraded     SideCount        `json:"deaths_traded"`
 	KillStats        KillStats        `json:"kill_stats"`
@@ -159,8 +163,37 @@ type MapData struct {
 	RoundsWonT  int    `json:"rounds_won_t"`
 }
 
+// DemoTeam is one of the two logical teams of a map. CT and T are temporary
+// sides that swap at halftime and with every overtime half; a logical team
+// is the lineup that persists across those swaps. Identity comes from
+// eligible nonzero-SteamID64 rosters seeded at the first authoritative
+// scored round — never from sides, clan names, TeamState.ID(), user IDs,
+// entity IDs, filenames or map names. TeamID is map-local: team 1 played CT
+// in the seeding round, team 2 played T, and the IDs claim no organization
+// identity across demos (cross-map matching belongs to issue #34).
+type DemoTeam struct {
+	TeamID int `json:"team_id"`
+	// Name is the display alias: the nonempty clan name observed in the
+	// most accepted rounds, ties broken by first observation. It stays ""
+	// when the demo never showed one; a name is never invented.
+	Name string `json:"name"`
+	// Aliases are the deduplicated nonempty clan names observed while this
+	// team held a side, in first-observation order. Clan names are mutable
+	// labels: they corroborate a team but never define its identity, so
+	// duplicate names across the two teams do not merge them.
+	Aliases []string `json:"aliases"`
+	// Score is the team's accepted round wins. It reconciles with
+	// map_data's final CT/T scores without depending on the side the team
+	// finished the map on.
+	Score int `json:"score"`
+	// Roster is every eligible SteamID64 that played an accepted scored
+	// round for this team, substitutes included, sorted ascending.
+	Roster []uint64 `json:"roster"`
+}
+
 type ProcessedDemo struct {
 	Players  map[uint64]*DemoPlayer `json:"players"`
+	Teams    []DemoTeam             `json:"teams"`
 	Map      MapData                `json:"map_data"`
 	GameMode string                 `json:"game_mode"`
 }

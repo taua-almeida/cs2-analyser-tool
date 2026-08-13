@@ -13,6 +13,10 @@
       "game_mode": "competitive",
       "rounds": 22,
       "score_values": [9, 13],
+      "teams": [
+        {"name": "Rooster", "score": 9, "steam_ids": [76561198050779850, 76561198081702155, 76561198093162249, 76561198127259887, 76561198158971650]},
+        {"name": "Mindfreak", "score": 13, "steam_ids": [76561198044112269, 76561198108660703, 76561198208618504, 76561198226777692, 76561199048086137]}
+      ],
       "players": [
         {"steam_id": "76561198158971650", "hltv_name": "chelleos", "kills": 25, "deaths": 13, "adr": 114.0, "kast_percent": 77.3, "rating": 1.63},
         {"steam_id": "76561198050779850", "hltv_name": "rekonz", "kills": 12, "deaths": 15, "adr": 55.5, "kast_percent": 63.6, "rating": 0.70},
@@ -36,6 +40,10 @@
       "game_mode": "competitive",
       "rounds": 19,
       "score_values": [13, 6],
+      "teams": [
+        {"name": "Rooster", "score": 13, "steam_ids": [76561198050779850, 76561198081702155, 76561198093162249, 76561198127259887, 76561198158971650]},
+        {"name": "Mindfreak", "score": 6, "steam_ids": [76561198044112269, 76561198108660703, 76561198208618504, 76561198226777692, 76561199048086137]}
+      ],
       "players": [
         {"steam_id": "76561198158971650", "hltv_name": "chelleos", "kills": 21, "deaths": 8, "adr": 106.4, "kast_percent": 94.7, "rating": 1.87},
         {"steam_id": "76561198050779850", "hltv_name": "rekonz", "kills": 15, "deaths": 12, "adr": 91.2, "kast_percent": 89.5, "rating": 1.43},
@@ -59,6 +67,10 @@
       "game_mode": "competitive",
       "rounds": 23,
       "score_values": [10, 13],
+      "teams": [
+        {"name": "Rooster", "score": 10, "steam_ids": [76561198050779850, 76561198081702155, 76561198093162249, 76561198127259887, 76561198158971650]},
+        {"name": "Mindfreak", "score": 13, "steam_ids": [76561198044112269, 76561198108660703, 76561198208618504, 76561198226777692, 76561199048086137]}
+      ],
       "players": [
         {"steam_id": "76561198158971650", "hltv_name": "chelleos", "kills": 14, "deaths": 16, "adr": 59.2, "kast_percent": 69.6, "rating": 0.83},
         {"steam_id": "76561198050779850", "hltv_name": "rekonz", "kills": 22, "deaths": 17, "adr": 119.0, "kast_percent": 91.3, "rating": 1.58},

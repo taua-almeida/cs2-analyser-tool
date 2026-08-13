@@ -7,6 +7,9 @@ The `--save` flag writes the analysis to a file. Saved JSON is a complete analys
   "players": {
     "<steam-id>": { "...": "the player fields below" }
   },
+  "teams": [
+    { "...": "the two logical teams, see Logical teams" }
+  ],
   "map_data": {
     "map_name": "de_mirage",
     "total_rounds": 24,
@@ -17,7 +20,7 @@ The `--save` flag writes the analysis to a file. Saved JSON is a complete analys
 }
 ```
 
-Consumers read players from `.players`, keyed by SteamID, a numeric key that JSON renders as a string. Player selection (`--players` or the interactive picker) limits only `.players`; `map_data` and `game_mode` always describe the whole match, from the same parse. This intentionally breaks the previous saved shape, which was the bare `{ "<steam-id>": ... }` player map now nested under `players`. There is no compatibility mode. See [Match data](#match-data) for the two match-level fields.
+Consumers read players from `.players`, keyed by SteamID, a numeric key that JSON renders as a string. Player selection (`--players` or the interactive picker) limits only `.players`; `teams`, `map_data` and `game_mode` always describe the whole match, from the same parse, so a team roster can reference SteamIDs that selection removed from `.players`. This intentionally breaks the previous saved shape, which was the bare `{ "<steam-id>": ... }` player map now nested under `players`. There is no compatibility mode. See [Match data](#match-data) and [Logical teams](#logical-teams-teams) for the match-level fields.
 
 Each `.players` entry contains all fields below; CSV stays a flat player-only file with a flattened selection of them plus the computed K/D, and carries no match-level columns. The CLI table shows a narrower selection still, with `--details` printing the rest in extra tables below it. Stats never include warmup. Bots are never listed, but kills on bots count like any other kill.
 
@@ -30,6 +33,7 @@ Each `.players` entry contains all fields below; CSV stays a flat player-only fi
 | SteamID | `steam_id` | 64-bit SteamID of the player. |
 | Name | `name` | Last name the player used in the demo. |
 | UserID | `user_id` | Server user ID in this demo. |
+| TeamID | `team_id` | Map-local ID of the [logical team](#logical-teams-teams) the player played for, or 0 for a player who never participated in an authoritative scored round. |
 | Deaths | `deaths` | Deaths, including suicides, ordinary World deaths such as falls, and C4 deaths. A round-ending C4 blast can emit deaths after `RoundEnd`; they still count during `GamePhaseStartGamePhase`. A C4 death emitted after `RoundEnd` during `GamePhaseGameHalfEnded`, plus match-end World cleanup, is excluded. |
 | DeathsTraded | `deaths_traded` | Per-round traded-death count: `{total, ct, t}`. A round contributes once when at least one of the player's deaths was avenged inside the trade window. |
 
@@ -288,10 +292,65 @@ Saved JSON carries two match-level fields beside `players`. `map_data` is an obj
 | RoundsWonCT | `rounds_won_ct` | Final score of the side finishing as CT. |
 | RoundsWonT | `rounds_won_t` | Final score of the side finishing as T. |
 
-`rounds_won_ct` and `rounds_won_t` are final side scores, not logical team identity. Sides swap at halftime, and the saved record does not map scores to the teams that earned them.
+`rounds_won_ct` and `rounds_won_t` are final side scores, not logical team identity: `rounds_won_ct` belongs to whichever lineup happened to finish the map as CT. They are kept for compatibility. The mapping from scores to the lineups that earned them lives in [`teams`](#logical-teams-teams), whose per-team scores reconcile with these two fields without depending on final sides.
 
 `game_mode` is a top-level string, e.g. `"premier"`. The primary source is the demo's `ServerInfo.GameSessionConfig`, whose `gamemode` field names the mode directly on Valve servers; a non-empty value there is always reported as-is and takes precedence over everything below.
 
 Tournament servers (the FACEIT, BLAST and ESL demos behind HLTV downloads) send that config with an empty `gamemode`. When the primary value is empty, the parser falls back to the game rules the demo records as ConVars: a demo that explicitly recorded `mp_maxrounds` `24`, `mp_halftime` on and `mp_friendlyfire` on — the regulation MR12 competitive ruleset — reports `"competitive"`. That is the only value the fallback can produce, chosen to match the string Valve servers use for classic competitive play.
 
 Anything less specific stays empty: a demo that names no mode and does not record that full ruleset saves `"game_mode": ""`. An unrecorded ConVar reads as unknown, never as a default, and the mode is never inferred from context outside the demo's own metadata, such as the filename.
+
+## Logical teams (`teams`)
+
+CT and T are temporary sides: lineups swap ends at halftime and with every overtime half. `teams` exports the two *logical* teams of the map — the lineups that persist across those swaps — and each player references theirs through `team_id`:
+
+```json
+"teams": [
+  {
+    "team_id": 1,
+    "name": "Rooster",
+    "aliases": ["Rooster"],
+    "score": 9,
+    "roster": [76561198050779850, 76561198081702155]
+  },
+  { "team_id": 2, "...": "the second team" }
+]
+```
+
+| Field | JSON key | Description |
+| --- | --- | --- |
+| TeamID | `team_id` | Deterministic map-local ID. Team 1 played CT in the seeding round, team 2 played T. See [ID scope](#team-id-scope). |
+| Name | `name` | Display name: the alias observed in the most accepted rounds, ties broken by first observation. `""` when the demo never showed a nonempty clan name — a name is never invented. |
+| Aliases | `aliases` | Deduplicated nonempty clan names observed while the team held a side, in first-observation order. |
+| Score | `score` | The team's accepted round wins. See [team scores](#team-scores). |
+| Roster | `roster` | Every eligible SteamID64 that played an accepted round for the team, substitutes included, sorted ascending. |
+
+Serialization is deterministic: teams are ordered by `team_id`, rosters are sorted, and aliases keep observation order.
+
+### Identity evidence
+
+Identity is seeded once, from the first authoritative scored round (the same [gate](#authoritative-scored-rounds) every round-derived stat uses) that has at least one eligible participant. Warmup, pregame knife rounds, restarts and unscored setup rounds can therefore never seed a team, and neither can rounds played only by bots. Eligible means a real competitor: nonzero SteamID64, not a bot, not a coach, not a spectator.
+
+A round's team-roster evidence is the players on a side when live play begins — the end of freeze time — not the round-start snapshot the player stats keep. The difference matters at halftime and in overtime: the side switch can land during freeze time, after the round started, and a player who disconnects inside that window would otherwise be presented on their stale pre-switch side, among the other lineup. Such a leaver keeps their player-stat participation for the round but contributes no team facts to it; their membership from earlier rounds is untouched.
+
+Team facts are also resolved once at parse end rather than while streaming, because a setup round that received `RoundEnd` and then restarted at the same score is indistinguishable in the moment from a genuine round whose authoritative count replicated late. The parse-end queue reveals which shape occurred: decided rounds left without a scored slot mean an equal number of the earliest decided candidates were setup restarts, and exactly that many are excluded from team identity, aliases and scores. Player statistics keep their existing streaming gate unchanged.
+
+From then on every accepted round's two side rosters are mapped back to the seeded teams through shared SteamIDs — the strongest identity evidence a demo offers. A mapping is *confident* when it has roster evidence (at least one shared eligible SteamID) and no conflict (no player it would place on both teams). Substitutes resolve through their teammates and join the uniquely matched team; a reconnecting player is already a member and cannot be duplicated; even a side of entirely new players resolves by elimination when the other side maps uniquely.
+
+Anything less confident is an *ambiguity* and fails the parse with an error carrying the competing evidence — the sides' rosters, the overlap with each team, and both teams' members — instead of guessing. In particular, a SteamID that appears to participate for both logical teams is an explicit error, never a silent `team_id` overwrite.
+
+The following are never identity: sides (current or final), clan names, `TeamState.ID()`, display names, user IDs, entity IDs, filenames, map names.
+
+### Clan names are labels
+
+Clan names corroborate identity but never define it. They are captured per side per round, follow the side entities across swaps, and attach to whichever logical team held that side. A team whose clan name changes mid-match keeps every nonempty spelling in `aliases`; `name` deterministically picks the most-observed one (first observation wins ties). An empty clan name stays unknown — no organization name is fabricated — and two teams sharing the same clan name remain two teams, because names never merge identity.
+
+### Team scores
+
+A round win is attributed to a logical team only when the authoritative scored-round gate accepted the round, the demo recorded its winning side, and that side's roster resolved to the team. Each team's `score` therefore equals its accepted round wins, and the two scores reconcile with `map_data.rounds_won_ct`/`rounds_won_t` — which stay exactly as before for compatibility — without ever deriving a team's score from the side it finished the map on. Rounds with no eligible participants (bots only) move no team score; their wins still appear in the side-based `map_data` fields, so the two views can differ in such demos.
+
+### Team ID scope
+
+`team_id` is scoped to one map: the numbering says only which lineup started the seeding round on which side of *this* demo. It makes no claim about organization identity across demos — the same organization can be team 1 on one map and team 2 on the next. Matching teams across the maps of a BO3/BO5 series is issue #34's job, deliberately not this field's.
+
+Players keep their existing CT/T side splits (`side_stats`), which remain attributed round by round and are unaffected by logical team identity. A player with `team_id` 0 exists in the demo's raw events but never played an accepted round (for example, someone only present during an unscored setup round).

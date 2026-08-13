@@ -27,12 +27,15 @@ type matchParser struct {
 	roundsPlayed int
 	ctScore      int
 	tScore       int
+	ctClan       string
+	tClan        string
 }
 
 func (p *matchParser) GameState() demoinfocs.GameState {
 	return matchGameState{
 		playing: p.playing, warmup: p.warmup, gamePhase: p.gamePhase, ingameTick: p.ingameTick,
 		roundsPlayed: p.roundsPlayed, ctScore: p.ctScore, tScore: p.tScore,
+		ctClan: p.ctClan, tClan: p.tClan,
 	}
 }
 
@@ -51,6 +54,8 @@ type matchGameState struct {
 	roundsPlayed int
 	ctScore      int
 	tScore       int
+	ctClan       string
+	tClan        string
 }
 
 func (g matchGameState) IsWarmupPeriod() bool { return g.warmup }
@@ -63,13 +68,15 @@ func (g matchGameState) TotalRoundsPlayed() int { return g.roundsPlayed }
 
 func (g matchGameState) TeamCounterTerrorists() *common.TeamState {
 	return &common.TeamState{Entity: matchEntity{properties: map[string]st.PropertyValue{
-		"m_iScore": {Any: int32(g.ctScore)},
+		"m_iScore":         {Any: int32(g.ctScore)},
+		"m_szClanTeamname": {Any: g.ctClan},
 	}}}
 }
 
 func (g matchGameState) TeamTerrorists() *common.TeamState {
 	return &common.TeamState{Entity: matchEntity{properties: map[string]st.PropertyValue{
-		"m_iScore": {Any: int32(g.tScore)},
+		"m_iScore":         {Any: int32(g.tScore)},
+		"m_szClanTeamname": {Any: g.tClan},
 	}}}
 }
 

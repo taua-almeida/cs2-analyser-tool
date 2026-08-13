@@ -89,8 +89,27 @@ extra/match-2396559/mirage-234956
 
 Each map requires exactly the ten oracle SteamIDs. Map name, game mode, round
 count, final score values, kills, and deaths are strict. Score values are
-sorted because the parser exposes final CT/T fields rather than stable team
-identity.
+sorted because the `map_data` CT/T fields describe final sides rather than
+stable team identity.
+
+Every map additionally pins its two logical teams (issue #28): the scoreboard
+clan name the tournament server used — audited against the HLTV team pages —
+the rounds that lineup won, and its five SteamID64s. The field is required,
+like `game_mode`: an omitted `teams` key is an unaudited fixture. Fixture
+validation checks that the two lineups partition the map's ten players and
+that their scores add up to the rounds and agree with `score_values`. At run
+time the harness requires exactly two parsed teams whose scores reconcile
+with the final side scores, matches each fixture team to a parsed team by
+exact roster — never by the parser's map-local team numbering — and asserts
+its display name, its aliases (exactly the one observed clan name for these
+demos), its score, and every rostered player's `team_id`. Because the same
+lineups are matched across all maps of a fixture while sides swap between
+and inside maps, this pins identity stability through halftime and overtime
+switches on real tournament demos. The Rooster–Mindfreak BO3 resolves as
+Inferno Rooster 9 – Mindfreak 13, Anubis Rooster 13 – Mindfreak 6, and
+Mirage Rooster 10 – Mindfreak 13. The EWC fixture also pins that the same
+Spirit lineup is labeled `Team Spirit` there but `Spirit` on the BLAST
+server: clan names are per-demo labels, not identity.
 
 All eight oracle maps pin `game_mode` to `competitive`. Every audited demo
 ran on a tournament server whose `GameSessionConfig` carries an empty

@@ -13,6 +13,10 @@
       "game_mode": "competitive",
       "rounds": 23,
       "score_values": [10, 13],
+      "teams": [
+        {"name": "Team Spirit", "score": 10, "steam_ids": [76561198081484775, 76561198386265483, 76561198872013168, 76561198995880877, 76561199063238565]},
+        {"name": "JiJieHao", "score": 13, "steam_ids": [76561198110839613, 76561198165327895, 76561198263656468, 76561198422389693, 76561199024583803]}
+      ],
       "players": [
         {"steam_id": "76561198386265483", "hltv_name": "donk", "kills": 23, "deaths": 16, "adr": 93.2, "kast_percent": 69.6, "rating": 1.58},
         {"steam_id": "76561199063238565", "hltv_name": "magixx", "kills": 13, "deaths": 15, "adr": 71.5, "kast_percent": 78.3, "rating": 1.18},

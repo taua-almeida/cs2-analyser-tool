@@ -50,8 +50,18 @@ Saved JSON is a complete analysis record, not a bare player map:
 ```json
 {
   "players": {
-    "76561198000000000": { "...": "player data" }
+    "76561198000000000": { "team_id": 1, "...": "player data" }
   },
+  "teams": [
+    {
+      "team_id": 1,
+      "name": "Rooster",
+      "aliases": ["Rooster"],
+      "score": 13,
+      "roster": [76561198000000000]
+    },
+    { "team_id": 2, "...": "the other logical team" }
+  ],
   "map_data": {
     "map_name": "de_mirage",
     "total_rounds": 24,
@@ -62,7 +72,7 @@ Saved JSON is a complete analysis record, not a bare player map:
 }
 ```
 
-Read players from `.players`, keyed by SteamID (a JSON string). `map_data` and `game_mode` describe the whole match and always accompany the players; `--players` limits only `.players`. `game_mode` can be `""` when the demo metadata does not expose it, and `rounds_won_ct`/`rounds_won_t` are the final side scores, not team identities. CSV remains a flat player-only table with the same columns as before. This is an intentional breaking change from the previous format, which was the bare `{ "<steam-id>": ... }` map now nested under `players`.
+Read players from `.players`, keyed by SteamID (a JSON string). `map_data`, `teams` and `game_mode` describe the whole match and always accompany the players; `--players` limits only `.players`. `game_mode` can be `""` when the demo metadata does not expose it, and `rounds_won_ct`/`rounds_won_t` are the final side scores, not team identities. `teams` carries the two logical teams of the map — the lineups that persist through halftime and overtime side switches — with each team's map-local ID, clan-name aliases, final round wins and SteamID roster; each player references their team through `team_id`. The details, including how identity is resolved and when parsing fails instead of guessing, are in [PLAYER_DATA](./_docs/PLAYER_DATA.MD#logical-teams-teams). CSV remains a flat player-only table with the same columns as before. This is an intentional breaking change from the previous format, which was the bare `{ "<steam-id>": ... }` map now nested under `players`.
 
 #### Analyzed data
 

@@ -40,7 +40,12 @@ type analyser struct {
 	appliedRounds  int                      // authoritative round count already represented in player facts
 	roundsStarted  bool                     // whether appliedRounds has been initialized
 	eventMVPs      map[uint64]int           // MVP announcements from authoritative scored rounds
-	parseErr       error                    // delayed handler error returned after parsing
+	teamIdentity   *teamTracker             // logical teams resolved from accepted rounds
+	roundCTClan    string                   // CT-side clan name captured for the current round
+	roundTClan     string                   // T-side clan name captured for the current round
+	roundHistory   []*pendingRoundFacts     // every finalized round in order, for parse-end team resolution
+	teams          []DemoTeam
+	parseErr       error // delayed handler error returned after parsing
 	mapData        MapData
 	gameMode       string
 }
@@ -51,6 +56,8 @@ type pendingRoundFacts struct {
 	mvps       map[uint64]int
 	ecoKills   []playerRatingFact
 	ecoDamage  []playerRatingFact
+	ctClan     string // clan name shown for the CT side during the round
+	tClan      string // clan name shown for the T side during the round
 	scored     bool
 	mvpCounted bool
 }
@@ -67,23 +74,24 @@ type worldDamageSource struct {
 
 func newAnalyser(parser demoinfocs.Parser) *analyser {
 	return &analyser{
-		parser:      parser,
-		players:     make(map[uint64]*DemoPlayer),
-		tracker:     newRoundTracker(),
-		kastRounds:  make(map[uint64]SideCount),
-		sideDamage:  make(map[uint64]SideCount),
-		openingWins: make(map[uint64]int),
-		lastHealth:  make(map[uint64]int),
-		worldSource: make(map[uint64]worldDamageSource),
-		flashEnds:   make(map[uint64]time.Duration),
-		ecoKills:    make(map[uint64]float64),
-		ecoDamage:   make(map[uint64]float64),
-		roundSwing:  make(map[uint64]float64),
-		ecoSurvival: make(map[uint64]float64),
-		ecoKast:     make(map[uint64]float64),
-		roundTiers:  make(map[uint64]equipTier),
-		roundMVPs:   make(map[uint64]int),
-		eventMVPs:   make(map[uint64]int),
+		parser:       parser,
+		players:      make(map[uint64]*DemoPlayer),
+		tracker:      newRoundTracker(),
+		kastRounds:   make(map[uint64]SideCount),
+		sideDamage:   make(map[uint64]SideCount),
+		openingWins:  make(map[uint64]int),
+		lastHealth:   make(map[uint64]int),
+		worldSource:  make(map[uint64]worldDamageSource),
+		flashEnds:    make(map[uint64]time.Duration),
+		ecoKills:     make(map[uint64]float64),
+		ecoDamage:    make(map[uint64]float64),
+		roundSwing:   make(map[uint64]float64),
+		ecoSurvival:  make(map[uint64]float64),
+		ecoKast:      make(map[uint64]float64),
+		roundTiers:   make(map[uint64]equipTier),
+		roundMVPs:    make(map[uint64]int),
+		eventMVPs:    make(map[uint64]int),
+		teamIdentity: newTeamTracker(),
 	}
 }
 
@@ -106,10 +114,13 @@ func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
 		return nil, fmt.Errorf("parsing demo: %w", a.parseErr)
 	}
 
-	a.finalise()
+	if err := a.finalise(); err != nil {
+		return nil, fmt.Errorf("parsing demo: %w", err)
+	}
 
 	return &ProcessedDemo{
 		Players:  a.players,
+		Teams:    a.teams,
 		Map:      a.mapData,
 		GameMode: a.gameMode,
 	}, nil
@@ -280,6 +291,17 @@ func (a *analyser) onRoundStart(e events.RoundStart) {
 	a.roundEcoDamage = a.roundEcoDamage[:0]
 	clear(a.worldSource)
 	a.tracker.startRound(a.playingRoster())
+	a.captureClanNames()
+}
+
+// captureClanNames snapshots the scoreboard clan name of each side for the
+// current round. The names follow the side entities, so after a halftime or
+// overtime swap the same team's name is read from its new side. They are
+// labels for the logical teams and never identity evidence.
+func (a *analyser) captureClanNames() {
+	gs := a.parser.GameState()
+	a.roundCTClan = gs.TeamCounterTerrorists().ClanName()
+	a.roundTClan = gs.TeamTerrorists().ClanName()
 }
 
 // onRoundFreezetimeEnd folds the players who picked a side during freeze
@@ -291,6 +313,9 @@ func (a *analyser) onRoundFreezetimeEnd(e events.RoundFreezetimeEnd) {
 		return
 	}
 	a.tracker.joinRound(a.playingRoster())
+	// Refresh the clan names too: a name configured while the round-start
+	// snapshot was still empty is present by the time live play begins.
+	a.captureClanNames()
 }
 
 // onBombPlanted feeds the round tracker the bomb state its round-swing
@@ -659,8 +684,11 @@ func (a *analyser) finalizeRoundFacts() {
 			mvps:      maps.Clone(a.roundMVPs),
 			ecoKills:  slices.Clone(a.roundEcoKills),
 			ecoDamage: slices.Clone(a.roundEcoDamage),
+			ctClan:    a.roundCTClan,
+			tClan:     a.roundTClan,
 		}
 		a.pendingRounds = append(a.pendingRounds, pending)
+		a.roundHistory = append(a.roundHistory, pending)
 		a.latestRound = pending
 	}
 	a.applyScoredRoundFacts()
@@ -688,6 +716,69 @@ func (a *analyser) applyScoredRoundFacts() {
 		a.appliedRounds++
 		available--
 	}
+}
+
+// applyTeamRounds feeds the accepted rounds to the logical-team tracker
+// once the whole match is known. Team identity cannot be attributed while
+// parsing: a setup round that received RoundEnd and then restarted at the
+// same score is indistinguishable in the moment from a genuine round whose
+// authoritative count replicated late, and the oldest-decided-first slot
+// policy the player facts use would let such a setup round seed the teams
+// and consume the scored slot that belonged to the last real round. Only
+// the parse-end queue reveals which shape occurred: decided rounds left
+// without a scored slot mean an equal number of the earliest decided
+// candidates were setup restarts, so exactly that many are excluded and the
+// remaining rounds are applied in match order.
+func (a *analyser) applyTeamRounds() error {
+	skip := 0
+	for _, round := range a.roundHistory {
+		if !round.scored && round.outcome.decided {
+			skip++
+		}
+	}
+	for i, round := range a.roundHistory {
+		if !round.scored && !round.outcome.decided {
+			continue
+		}
+		if skip > 0 && round.outcome.decided {
+			skip--
+			continue
+		}
+		if err := a.applyTeamFacts(round, i+1); err != nil {
+			// An identity conflict fails the parse: guessing would silently
+			// attach players and scores to the wrong team.
+			return err
+		}
+	}
+	return nil
+}
+
+// applyTeamFacts feeds one accepted round to the logical-team tracker: the
+// eligible players split by the side they held when live play began, the
+// sides' clan names, and the winning side. Eligibility is the players map
+// itself, which ensurePlayer only ever fills with real competitors — never
+// bots, coaches or zero SteamIDs.
+func (a *analyser) applyTeamFacts(pending *pendingRoundFacts, round int) error {
+	facts := teamRoundFacts{
+		round:    round,
+		ctClan:   pending.ctClan,
+		tClan:    pending.tClan,
+		winner:   pending.outcome.winner,
+		ctRoster: make([]uint64, 0, len(pending.outcome.liveSides)),
+		tRoster:  make([]uint64, 0, len(pending.outcome.liveSides)),
+	}
+	for id, side := range pending.outcome.liveSides {
+		if a.players[id] == nil {
+			continue
+		}
+		switch side {
+		case common.TeamCounterTerrorists:
+			facts.ctRoster = append(facts.ctRoster, id)
+		case common.TeamTerrorists:
+			facts.tRoster = append(facts.tRoster, id)
+		}
+	}
+	return a.teamIdentity.applyRound(facts)
 }
 
 // nextScoredRound prefers rounds that received RoundEnd. If only unended
@@ -734,8 +825,10 @@ func (a *analyser) applyScoreboardMVPs(mvps map[uint64]int) {
 }
 
 // finalise fills in everything that needs the full match: final score, the
-// resolved game mode and the per-player derived stats.
-func (a *analyser) finalise() {
+// resolved game mode, the logical teams and the per-player derived stats.
+// It reports the team-identity conflicts that only the finished match can
+// reveal; handler-time failures stay on parseErr, which callers check first.
+func (a *analyser) finalise() error {
 	a.captureScoreboardMVPs()
 	a.finalizeRoundFacts()
 	// The final scoreboard is authoritative and catches MVP entity updates
@@ -754,7 +847,22 @@ func (a *analyser) finalise() {
 	a.mapData.RoundsWonT = gs.TeamTerrorists().Score()
 	a.gameMode = resolveGameMode(a.gameMode, gs.Rules().ConVars())
 
+	if err := a.applyTeamRounds(); err != nil {
+		return err
+	}
+	// The tracker guarantees a SteamID is on at most one roster, so this
+	// assignment can never overwrite one team reference with another.
+	a.teams = a.teamIdentity.export()
+	for _, team := range a.teams {
+		for _, id := range team.Roster {
+			if p := a.players[id]; p != nil {
+				p.TeamID = team.TeamID
+			}
+		}
+	}
+
 	a.derive(a.mapData.TotalRounds)
+	return nil
 }
 
 // perRound divides by the rounds the value was accumulated over, reporting

@@ -49,6 +49,7 @@ type openingDuel struct {
 type roundOutcome struct {
 	played       bool
 	decided      bool
+	winner       common.Team // side that won, TeamUnassigned when undecided
 	mvp          uint64
 	aces         []uint64
 	multiKills   map[uint64]int // enemy kills of the players that got at least a 2k
@@ -57,24 +58,31 @@ type roundOutcome struct {
 	opening      openingDuel
 	openingWon   bool // the opening killer's team won the round
 	participants map[uint64]common.Team
-	deathsTraded map[uint64]bool    // players with a death avenged inside the trade window
-	kast         map[uint64]bool    // players that got a Kill, Assist, Survived or were Traded
-	swing        map[uint64]float64 // per-player round-win-probability swing, zero-sum per round
-	survived     map[uint64]bool    // players still alive when the round closed
-	ratingKast   map[uint64]bool    // players with rating KAST credit; see finalize
+	liveSides    map[uint64]common.Team // roster when live play began; see the tracker field
+	deathsTraded map[uint64]bool        // players with a death avenged inside the trade window
+	kast         map[uint64]bool        // players that got a Kill, Assist, Survived or were Traded
+	swing        map[uint64]float64     // per-player round-win-probability swing, zero-sum per round
+	survived     map[uint64]bool        // players still alive when the round closed
+	ratingKast   map[uint64]bool        // players with rating KAST credit; see finalize
 }
 
 // roundTracker keeps the per-round state needed for clutches, aces, trades
 // and KAST. It is fed plain values instead of parser types so tests can
 // drive it without a demo file.
 type roundTracker struct {
-	live          bool
-	decided       bool
-	winner        common.Team
-	mvp           uint64
-	bombPlanted   bool
-	startAlive    map[uint64]common.Team
-	alive         map[uint64]common.Team
+	live        bool
+	decided     bool
+	winner      common.Team
+	mvp         uint64
+	bombPlanted bool
+	startAlive  map[uint64]common.Team
+	alive       map[uint64]common.Team
+	// liveSides is the roster as of the moment live play begins. Unlike
+	// startAlive it is replaced outright by the freeze-time refresh, so a
+	// player who left during freeze time is absent instead of lingering on
+	// a stale side — which is what logical-team resolution needs when a
+	// halftime side switch lands inside freeze time.
+	liveSides     map[uint64]common.Team
 	enemyKills    map[uint64]int
 	assists       map[uint64]assistFacts
 	traded        map[uint64]bool
@@ -98,9 +106,11 @@ func (rt *roundTracker) startRound(alive map[uint64]common.Team) {
 	rt.mvp = 0
 	rt.startAlive = make(map[uint64]common.Team, len(alive))
 	rt.alive = make(map[uint64]common.Team, len(alive))
+	rt.liveSides = make(map[uint64]common.Team, len(alive))
 	for id, team := range alive {
 		rt.startAlive[id] = team
 		rt.alive[id] = team
+		rt.liveSides[id] = team
 	}
 	rt.enemyKills = make(map[uint64]int)
 	rt.assists = make(map[uint64]assistFacts)
@@ -154,7 +164,9 @@ func (rt *roundTracker) joinRound(alive map[uint64]common.Team) {
 	if !rt.live {
 		return
 	}
+	rt.liveSides = make(map[uint64]common.Team, len(alive))
 	for id, team := range alive {
+		rt.liveSides[id] = team
 		_, started := rt.startAlive[id]
 		_, stillAlive := rt.alive[id]
 		// A player who swapped sides during freeze time plays the round on
@@ -370,6 +382,7 @@ func (rt *roundTracker) finalize() roundOutcome {
 	outcome := roundOutcome{
 		played:       true,
 		decided:      rt.decided,
+		winner:       rt.winner,
 		mvp:          rt.mvp,
 		multiKills:   make(map[uint64]int),
 		tradeKills:   rt.tradeKills,
@@ -377,6 +390,7 @@ func (rt *roundTracker) finalize() roundOutcome {
 		opening:      rt.opening,
 		openingWon:   rt.opening.killer != 0 && rt.opening.killerTeam == rt.winner,
 		participants: rt.startAlive,
+		liveSides:    rt.liveSides,
 		deathsTraded: make(map[uint64]bool),
 		kast:         make(map[uint64]bool),
 		swing:        rt.swing,

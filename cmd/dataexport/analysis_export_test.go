@@ -24,11 +24,18 @@ func analysisWith(players ...*demoparser.DemoPlayer) *demoparser.ProcessedDemo {
 }
 
 // selectedAnalysis is a one-player analysis with full match-level data, as
-// the writer receives it after player selection.
+// the writer receives it after player selection. The teams keep describing
+// the whole match: selection narrows players only, so the roster references
+// a SteamID that is not among the selected players.
 func selectedAnalysis() *demoparser.ProcessedDemo {
 	selected := utilityPlayer()
 	selected.SteamID = 76561198000000000
+	selected.TeamID = 1
 	analysis := analysisWith(selected)
+	analysis.Teams = []demoparser.DemoTeam{
+		{TeamID: 1, Name: "AlphaSquad", Aliases: []string{"AlphaSquad"}, Score: 11, Roster: []uint64{76561198000000000}},
+		{TeamID: 2, Name: "BravoCrew", Aliases: []string{"BravoCrew", "BravoCrew GG"}, Score: 13, Roster: []uint64{76561198000000001}},
+	}
 	analysis.Map = demoparser.MapData{
 		MapName:     "de_mirage",
 		TotalRounds: 24,
@@ -54,7 +61,7 @@ func writeAndRead(t *testing.T, analysis *demoparser.ProcessedDemo, saveType str
 }
 
 // TestJSONEnvelopeTopLevelShape pins the saved document contract: exactly
-// the three envelope keys, never the previous bare SteamID-keyed player map.
+// the four envelope keys, never the previous bare SteamID-keyed player map.
 func TestJSONEnvelopeTopLevelShape(t *testing.T) {
 	data := writeAndRead(t, selectedAnalysis(), "json")
 
@@ -63,7 +70,7 @@ func TestJSONEnvelopeTopLevelShape(t *testing.T) {
 		t.Fatalf("unmarshalling top level: %v", err)
 	}
 	gotKeys := slices.Sorted(maps.Keys(topLevel))
-	wantKeys := []string{"game_mode", "map_data", "players"}
+	wantKeys := []string{"game_mode", "map_data", "players", "teams"}
 	if !reflect.DeepEqual(gotKeys, wantKeys) {
 		t.Fatalf("top-level keys = %q, want %q", gotKeys, wantKeys)
 	}
@@ -104,6 +111,12 @@ func TestJSONEnvelopeDecodesAsProcessedDemo(t *testing.T) {
 	if got.GameMode != "premier" {
 		t.Errorf("game_mode = %q, want %q", got.GameMode, "premier")
 	}
+	if !reflect.DeepEqual(got.Teams, analysis.Teams) {
+		t.Errorf("teams = %+v, want %+v", got.Teams, analysis.Teams)
+	}
+	if gotPlayer.TeamID != 1 {
+		t.Errorf("selected player team_id = %d, want 1", gotPlayer.TeamID)
+	}
 }
 
 // TestJSONEnvelopeKeepsEmptyGameMode pins that an empty mode is written as "".
@@ -140,7 +153,7 @@ func TestCSVIgnoresMatchLevelData(t *testing.T) {
 	if records[0][0] != "Name" || records[1][0] != "utility-player" {
 		t.Errorf("CSV first column = %q/%q, want Name/utility-player", records[0][0], records[1][0])
 	}
-	for _, matchValue := range []string{"de_mirage", "premier", "map_data", "game_mode"} {
+	for _, matchValue := range []string{"de_mirage", "premier", "map_data", "game_mode", "teams", "team_id", "AlphaSquad", "BravoCrew"} {
 		if strings.Contains(string(data), matchValue) {
 			t.Errorf("CSV contains match-level value %q, want players only", matchValue)
 		}

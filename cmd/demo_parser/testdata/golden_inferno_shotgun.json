@@ -4,6 +4,7 @@
       "steam_id": 76561197995625385,
       "name": "Xiscu",
       "user_id": 0,
+      "team_id": 1,
       "deaths": 12,
       "deaths_traded": {
         "total": 1,
@@ -118,6 +119,7 @@
       "steam_id": 76561198038237426,
       "name": "Calitaz",
       "user_id": 2,
+      "team_id": 1,
       "deaths": 12,
       "deaths_traded": {
         "total": 3,
@@ -231,6 +233,7 @@
       "steam_id": 76561198171714151,
       "name": "Perre",
       "user_id": 1,
+      "team_id": 1,
       "deaths": 14,
       "deaths_traded": {
         "total": 2,
@@ -343,6 +346,7 @@
       "steam_id": 76561198195312910,
       "name": "sem habilidade",
       "user_id": 3,
+      "team_id": 1,
       "deaths": 16,
       "deaths_traded": {
         "total": 1,
@@ -458,6 +462,7 @@
       "steam_id": 76561198283132505,
       "name": "blunt1™",
       "user_id": 4,
+      "team_id": 1,
       "deaths": 18,
       "deaths_traded": {
         "total": 2,
@@ -572,6 +577,7 @@
       "steam_id": 76561199013033607,
       "name": "S1lent",
       "user_id": 7,
+      "team_id": 2,
       "deaths": 15,
       "deaths_traded": {
         "total": 3,
@@ -684,6 +690,7 @@
       "steam_id": 76561199064030155,
       "name": "Biel Mexânico",
       "user_id": 5,
+      "team_id": 2,
       "deaths": 13,
       "deaths_traded": {
         "total": 4,
@@ -796,6 +803,7 @@
       "steam_id": 76561199353626993,
       "name": ":ppp",
       "user_id": 9,
+      "team_id": 2,
       "deaths": 16,
       "deaths_traded": {
         "total": 0,
@@ -909,6 +917,7 @@
       "steam_id": 76561199575273990,
       "name": "S1nner",
       "user_id": 6,
+      "team_id": 2,
       "deaths": 14,
       "deaths_traded": {
         "total": 2,
@@ -1023,6 +1032,7 @@
       "steam_id": 76561199680390775,
       "name": "-wLL",
       "user_id": 8,
+      "team_id": 2,
       "deaths": 17,
       "deaths_traded": {
         "total": 3,
@@ -1135,6 +1145,34 @@
       }
     }
   },
+  "teams": [
+    {
+      "team_id": 1,
+      "name": "",
+      "aliases": [],
+      "score": 7,
+      "roster": [
+        76561197995625385,
+        76561198038237426,
+        76561198171714151,
+        76561198195312910,
+        76561198283132505
+      ]
+    },
+    {
+      "team_id": 2,
+      "name": "",
+      "aliases": [],
+      "score": 13,
+      "roster": [
+        76561199013033607,
+        76561199064030155,
+        76561199353626993,
+        76561199575273990,
+        76561199680390775
+      ]
+    }
+  ],
   "map_data": {
     "map_name": "de_inferno",
     "total_rounds": 20,
