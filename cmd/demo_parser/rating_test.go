@@ -184,6 +184,115 @@ func TestDeriveDividesRatingInputsByMatchRounds(t *testing.T) {
 	}
 }
 
+// TestDeriveSharesApproxPercentagesWithTheSubRatings pins the contract of
+// approx_ekast_percent and approx_round_swing_percent: they publish the same
+// per-round values blendRating normalizes, so the documented algebra between
+// percentage and sub-rating holds exactly. Both accumulators are diluted by
+// the whole match's rounds, never a participant count, matching ADR.
+func TestDeriveSharesApproxPercentagesWithTheSubRatings(t *testing.T) {
+	a := liveAnalyser()
+	a.players[1] = &DemoPlayer{SteamID: 1}
+	a.players[2] = &DemoPlayer{SteamID: 2}
+	// Player 1 hits the baseline exactly; player 2 gives back the same
+	// swing player 1 gained and, as a late joiner, holds two full-buy
+	// KAST credits over the eight-round match.
+	a.ecoKast[1] = baselineKast * 8
+	a.roundSwing[1] = 0.32
+	a.ecoKast[2] = 2
+	a.roundSwing[2] = -0.32
+
+	a.derive(8)
+
+	one, two := a.players[1].PlayerMapStats, a.players[2].PlayerMapStats
+	if !closeTo(one.ApproxEKASTPercent, 100*baselineKast) {
+		t.Errorf("baseline eKAST percent = %v, want %v", one.ApproxEKASTPercent, 100*baselineKast)
+	}
+	if got := a.players[1].Rating.KAST; !closeTo(got, 1) {
+		t.Errorf("baseline eKAST sub-rating = %v, want 1.00", got)
+	}
+	if !closeTo(one.ApproxRoundSwingPercent, 4) {
+		t.Errorf("swing percent = %v, want +4.0", one.ApproxRoundSwingPercent)
+	}
+	if got := a.players[1].Rating.RoundSwing; !closeTo(got, 1.10) {
+		t.Errorf("swing sub-rating for +4%% = %v, want 1.10", got)
+	}
+	if !closeTo(two.ApproxRoundSwingPercent, -4) {
+		t.Errorf("negative swing percent = %v, want -4.0", two.ApproxRoundSwingPercent)
+	}
+	if got := a.players[2].Rating.RoundSwing; !closeTo(got, 0.90) {
+		t.Errorf("swing sub-rating for -4%% = %v, want 0.90", got)
+	}
+	if !closeTo(two.ApproxEKASTPercent, 25) {
+		t.Errorf("late joiner eKAST percent = %v, want 25 from 2 credits over all 8 match rounds", two.ApproxEKASTPercent)
+	}
+	if got := a.players[2].Rating.KAST; !closeTo(got, 0.25/baselineKast) {
+		t.Errorf("late joiner eKAST sub-rating = %v, want %v", got, 0.25/baselineKast)
+	}
+}
+
+// TestApproxEKASTOfFullBuyAndEcoCredit walks the two documented anchors: a
+// full-buy credit every round is exactly 100% (sub-rating ~1.27), and eco
+// weighting pushes the percentage past 100 without being clamped.
+func TestApproxEKASTOfFullBuyAndEcoCredit(t *testing.T) {
+	a := liveAnalyser()
+	a.players[1] = &DemoPlayer{SteamID: 1}
+	a.players[2] = &DemoPlayer{SteamID: 2}
+	a.ecoKast[1] = 2 * ecoRoundWeight(tierRifle1)
+	a.ecoKast[2] = 2 * ecoRoundWeight(tierStarterPistol)
+
+	a.derive(2)
+
+	if got := a.players[1].PlayerMapStats.ApproxEKASTPercent; !closeTo(got, 100) {
+		t.Errorf("full-buy credit every round = %v%%, want exactly 100", got)
+	}
+	if got := a.players[1].Rating.KAST; !closeTo(got, 1/baselineKast) {
+		t.Errorf("full-buy eKAST sub-rating = %v, want %v (~1.27)", got, 1/baselineKast)
+	}
+	got := a.players[2].PlayerMapStats.ApproxEKASTPercent
+	if want := 100 * ecoRoundWeight(tierStarterPistol); !closeTo(got, want) {
+		t.Errorf("eco credit every round = %v%%, want the unclamped %v (above 100)", got, want)
+	}
+}
+
+func TestDeriveZeroRoundsProducesZeroApproxMetrics(t *testing.T) {
+	a := liveAnalyser()
+	a.players[1] = &DemoPlayer{SteamID: 1}
+	a.ecoKast[1] = 3
+	a.roundSwing[1] = -0.5
+
+	a.derive(0)
+
+	stats := a.players[1].PlayerMapStats
+	for name, got := range map[string]float64{
+		"approx_ekast_percent":       stats.ApproxEKASTPercent,
+		"approx_round_swing_percent": stats.ApproxRoundSwingPercent,
+	} {
+		// NaN and ±Inf both fail this comparison, so one check covers
+		// "zero, and never a division artifact".
+		if got != 0 {
+			t.Errorf("%s = %v over zero rounds, want a finite 0", name, got)
+		}
+	}
+}
+
+// TestExtremeNegativeSwingStaysSignedWhileSubRatingFloors preserves the
+// information the sub-rating's floor discards: the percentage must not be
+// derived backward from the floored value.
+func TestExtremeNegativeSwingStaysSignedWhileSubRatingFloors(t *testing.T) {
+	a := liveAnalyser()
+	a.players[1] = &DemoPlayer{SteamID: 1}
+	a.roundSwing[1] = -0.45
+
+	a.derive(1)
+
+	if got := a.players[1].PlayerMapStats.ApproxRoundSwingPercent; !closeTo(got, -45) {
+		t.Errorf("extreme swing percent = %v, want -45", got)
+	}
+	if got := a.players[1].Rating.RoundSwing; got != 0 {
+		t.Errorf("swing sub-rating = %v, want the 0 floor", got)
+	}
+}
+
 func TestEcoRoundWeight(t *testing.T) {
 	if w := ecoRoundWeight(tierRifle1); w != 1 {
 		t.Errorf("tier-1 rifle round weighs %v, want exactly 1", w)

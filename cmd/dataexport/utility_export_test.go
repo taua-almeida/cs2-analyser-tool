@@ -67,6 +67,8 @@ func TestCSVAppendsStableUtilityAndRatingColumns(t *testing.T) {
 	player.Rating = demoparser.RatingStats{
 		Value: 1.234, Kills: 1.1, Damage: 0.9, Survival: 1, KAST: 1.05, MultiKill: 0.5, RoundSwing: 1.2,
 	}
+	player.PlayerMapStats.ApproxEKASTPercent = 104.3
+	player.PlayerMapStats.ApproxRoundSwingPercent = -4.5
 
 	fileName, err := WritePlayersToFile(map[uint64]*demoparser.DemoPlayer{player.SteamID: player}, "csv")
 	if err != nil {
@@ -88,7 +90,9 @@ func TestCSVAppendsStableUtilityAndRatingColumns(t *testing.T) {
 	legacyHeader := []string{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Deaths Traded", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "Deaths Traded CT", "Deaths Traded T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon"}
 	utilityHeader := []string{"Enemies Flashed", "Friends Flashed", "Enemy Flash Time (s)", "Average Enemy Flash Time (s)", "Utility Damage Total", "HE Utility Damage", "Fire Utility Damage", "Grenades Thrown Total", "Flashbangs Thrown", "Smokes Thrown", "HE Grenades Thrown", "Molotovs Thrown", "Incendiaries Thrown", "Decoys Thrown", "Unused Utility Value"}
 	ratingHeader := []string{"Rating", "Rating Kills", "Rating Damage", "Rating Survival", "Rating KAST", "Rating Multi-kill", "Rating Round Swing"}
-	wantHeader := slices.Concat(legacyHeader, utilityHeader, ratingHeader)
+	// Appended last so every legacy column keeps its position.
+	approxHeader := []string{"Approx. eKAST (%)", "Approx. swing (%)"}
+	wantHeader := slices.Concat(legacyHeader, utilityHeader, ratingHeader, approxHeader)
 	if !reflect.DeepEqual(records[0], wantHeader) {
 		t.Errorf("CSV header = %q, want %q", records[0], wantHeader)
 	}
@@ -98,8 +102,13 @@ func TestCSVAppendsStableUtilityAndRatingColumns(t *testing.T) {
 		t.Errorf("CSV utility values = %q, want %q", utilityValues, wantUtilityValues)
 	}
 	wantRatingValues := []string{"1.23", "1.10", "0.90", "1.00", "1.05", "0.50", "1.20"}
-	if got := records[1][len(legacyHeader)+len(utilityHeader):]; !reflect.DeepEqual(got, wantRatingValues) {
+	ratingStart := len(legacyHeader) + len(utilityHeader)
+	if got := records[1][ratingStart : ratingStart+len(ratingHeader)]; !reflect.DeepEqual(got, wantRatingValues) {
 		t.Errorf("CSV rating values = %q, want %q", got, wantRatingValues)
+	}
+	wantApproxValues := []string{"104.3", "-4.5"}
+	if got := records[1][ratingStart+len(ratingHeader):]; !reflect.DeepEqual(got, wantApproxValues) {
+		t.Errorf("CSV approx metric values = %q, want %q", got, wantApproxValues)
 	}
 }
 
@@ -132,9 +141,69 @@ func TestRatingDetailTable(t *testing.T) {
 
 	var breakdown strings.Builder
 	printRatingTable(sorted, &breakdown)
-	for _, text := range []string{"Rating breakdown", "Round swing", "1.23", "utility-player"} {
+	for _, text := range []string{"Rating breakdown", "eKAST sub-rating", "Round swing sub-rating", "1.23", "utility-player"} {
 		if !strings.Contains(strings.ToLower(breakdown.String()), strings.ToLower(text)) {
 			t.Errorf("rating table missing %q:\n%s", text, breakdown.String())
+		}
+	}
+}
+
+// TestApproxMetricsDetailTable checks the compact derived-metrics table: both
+// approximate labels, one-decimal eKAST, and explicitly signed swing.
+func TestApproxMetricsDetailTable(t *testing.T) {
+	up := utilityPlayer()
+	up.PlayerMapStats.ApproxEKASTPercent = 104.3
+	up.PlayerMapStats.ApproxRoundSwingPercent = 4
+	down := &demoparser.DemoPlayer{
+		SteamID: 2,
+		Name:    "down-player",
+		PlayerMapStats: demoparser.PlayerMapStats{
+			ApproxEKASTPercent:      51.9,
+			ApproxRoundSwingPercent: -4,
+		},
+	}
+	sorted := sortedByKills(map[uint64]*demoparser.DemoPlayer{up.SteamID: up, down.SteamID: down})
+
+	var out strings.Builder
+	printApproxMetricsTable(sorted, &out)
+	rendered := strings.ToLower(out.String())
+	for _, text := range []string{"Approximate Rating 3.0 metrics", "Approx. eKAST (%)", "Approx. swing (%)", "104.3", "+4.0", "51.9", "-4.0", "utility-player", "down-player"} {
+		if !strings.Contains(rendered, strings.ToLower(text)) {
+			t.Errorf("approx metrics table missing %q:\n%s", text, out.String())
+		}
+	}
+}
+
+// TestJSONExportsApproxMetricsAndPreservesRatingKeys pins the exact new JSON
+// keys and the normalized rating keys they must not replace.
+func TestJSONExportsApproxMetricsAndPreservesRatingKeys(t *testing.T) {
+	t.Chdir(t.TempDir())
+	player := utilityPlayer()
+	player.PlayerMapStats = demoparser.PlayerMapStats{
+		KAST:                    75,
+		ApproxEKASTPercent:      104.3,
+		ApproxRoundSwingPercent: -4.5,
+	}
+	player.Rating = demoparser.RatingStats{KAST: 1.32, RoundSwing: 0.89}
+
+	fileName, err := WritePlayersToFile(map[uint64]*demoparser.DemoPlayer{player.SteamID: player}, "json")
+	if err != nil {
+		t.Fatalf("writing JSON: %v", err)
+	}
+	data, err := os.ReadFile(fileName)
+	if err != nil {
+		t.Fatalf("reading JSON: %v", err)
+	}
+	content := string(data)
+	for _, want := range []string{
+		`"approx_ekast_percent": 104.3`,
+		`"approx_round_swing_percent": -4.5`,
+		`"kast": 75`,
+		`"kast": 1.32`,
+		`"round_swing": 0.89`,
+	} {
+		if !strings.Contains(content, want) {
+			t.Errorf("JSON export missing %s:\n%s", want, content)
 		}
 	}
 }

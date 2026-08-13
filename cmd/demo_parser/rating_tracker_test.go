@@ -64,6 +64,65 @@ func TestPostRoundKillMovesNoSwing(t *testing.T) {
 	}
 }
 
+// TestApproxSwingPercentagesAreZeroSum checks the exposed percentages keep
+// the tracker's zero-sum property: what the killers' percentages gain, the
+// victims' percentages lose.
+func TestApproxSwingPercentagesAreZeroSum(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+	recordKill(rt, 1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
+	recordKill(rt, 12, 2, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(20))
+
+	a := liveAnalyser()
+	for _, id := range []uint64{1, 2, 3, 4, 5, 11, 12, 13, 14, 15} {
+		a.players[id] = &DemoPlayer{SteamID: id}
+	}
+	a.applyRoundOutcomeWithTiers(endRound(rt, common.TeamTerrorists), a.roundTiers)
+	a.derive(2)
+
+	var total float64
+	for _, p := range a.players {
+		total += p.PlayerMapStats.ApproxRoundSwingPercent
+	}
+	if !closeTo(total, 0) {
+		t.Errorf("approx swing percentages sum to %v across the round, want 0", total)
+	}
+	if got := a.players[1].PlayerMapStats.ApproxRoundSwingPercent; got <= 0 {
+		t.Errorf("killer's approx swing = %v%%, want positive", got)
+	}
+	if got := a.players[11].PlayerMapStats.ApproxRoundSwingPercent; got >= 0 {
+		t.Errorf("victim's approx swing = %v%%, want negative", got)
+	}
+}
+
+// TestDamageAssistRaisesApproxEKASTNotClassicKAST follows the 40-damage
+// rating assist proven in TestFortyDamageBecomesARatingAssist through
+// derive: the credit reaches the approximate eKAST percentage while the
+// classic KAST percentage stays untouched.
+func TestDamageAssistRaisesApproxEKASTNotClassicKAST(t *testing.T) {
+	rt := newRoundTracker()
+	rt.startRound(fiveVsFive())
+	rt.damage(2, 11, ratingAssistDamage)
+	recordKill(rt, 1, 11, common.TeamTerrorists, common.TeamCounterTerrorists, 0, false, at(10))
+	// Ts lose so that survival cannot grant the credit instead.
+	for _, victim := range []uint64{1, 2, 3, 4, 5} {
+		recordKill(rt, 12, victim, common.TeamCounterTerrorists, common.TeamTerrorists, 0, false, at(20))
+	}
+
+	a := liveAnalyser()
+	a.players[2] = &DemoPlayer{SteamID: 2}
+	a.applyRoundOutcomeWithTiers(endRound(rt, common.TeamCounterTerrorists), a.roundTiers)
+	a.derive(1)
+
+	stats := a.players[2].PlayerMapStats
+	if !closeTo(stats.ApproxEKASTPercent, 100) {
+		t.Errorf("damage assist gives approx eKAST %v%%, want 100 at the neutral weight", stats.ApproxEKASTPercent)
+	}
+	if stats.KAST != 0 {
+		t.Errorf("classic KAST = %v%%, want 0: damage assists are rating-only", stats.KAST)
+	}
+}
+
 // TestBombPlantShrinksTSwing compares the same T-side kill with and without
 // the bomb down. Post-plant the Ts are already favoured, so the same kill
 // moves the round less.

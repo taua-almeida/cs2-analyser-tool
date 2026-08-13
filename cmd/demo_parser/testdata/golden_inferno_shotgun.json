@@ -41,7 +41,9 @@
           "k5": 0
         },
         "clutches_won": 0,
-        "kast": 75
+        "kast": 75,
+        "approx_ekast_percent": 84.8024444797594,
+        "approx_round_swing_percent": 4.879556423674314
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -152,7 +154,9 @@
           "k5": 0
         },
         "clutches_won": 0,
-        "kast": 70
+        "kast": 70,
+        "approx_ekast_percent": 79.09200077779704,
+        "approx_round_swing_percent": 1.037740669329847
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -262,7 +266,9 @@
           "k5": 0
         },
         "clutches_won": 0,
-        "kast": 75
+        "kast": 75,
+        "approx_ekast_percent": 89.54459457328898,
+        "approx_round_swing_percent": -2.501201804568263
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -375,7 +381,9 @@
           "k5": 0
         },
         "clutches_won": 0,
-        "kast": 60
+        "kast": 60,
+        "approx_ekast_percent": 69.53555005491879,
+        "approx_round_swing_percent": -2.395280093635863
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -487,7 +495,9 @@
           "k5": 0
         },
         "clutches_won": 0,
-        "kast": 60
+        "kast": 60,
+        "approx_ekast_percent": 72.2698692985637,
+        "approx_round_swing_percent": -7.454070900884709
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -597,7 +607,9 @@
           "k5": 0
         },
         "clutches_won": 1,
-        "kast": 70
+        "kast": 70,
+        "approx_ekast_percent": 77.50447649547458,
+        "approx_round_swing_percent": -1.8156765180674697
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -707,7 +719,9 @@
           "k5": 0
         },
         "clutches_won": 1,
-        "kast": 80
+        "kast": 80,
+        "approx_ekast_percent": 85.79626972740314,
+        "approx_round_swing_percent": -0.3694208422161848
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -784,9 +798,9 @@
       "user_id": 9,
       "deaths": 16,
       "deaths_traded": {
-        "total": 1,
+        "total": 0,
         "ct": 0,
-        "t": 1
+        "t": 0
       },
       "kill_stats": {
         "total": 11,
@@ -818,7 +832,9 @@
           "k5": 0
         },
         "clutches_won": 1,
-        "kast": 70
+        "kast": 60,
+        "approx_ekast_percent": 69.83852084060308,
+        "approx_round_swing_percent": -5.176697372330106
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -855,7 +871,7 @@
         },
         "kast": {
           "ct": 50,
-          "t": 83.33333333333334
+          "t": 66.66666666666666
         }
       },
       "utility_stats": {
@@ -880,11 +896,11 @@
         "unused_utility_value": 2500
       },
       "rating": {
-        "value": 0.8921584681408217,
+        "value": 0.8778021853374872,
         "kills": 0.8283065637674779,
         "damage": 1.0674773548452143,
         "survival": 0.5959968297292607,
-        "kast": 0.9797404613969518,
+        "kast": 0.8840319093747225,
         "multi_kill": 0.9090909090909092,
         "round_swing": 0.8705825656917474
       }
@@ -930,7 +946,9 @@
           "k5": 0
         },
         "clutches_won": 2,
-        "kast": 65
+        "kast": 65,
+        "approx_ekast_percent": 69.4296435272045,
+        "approx_round_swing_percent": 8.998505979068076
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -1007,9 +1025,9 @@
       "user_id": 8,
       "deaths": 17,
       "deaths_traded": {
-        "total": 5,
+        "total": 3,
         "ct": 2,
-        "t": 3
+        "t": 1
       },
       "kill_stats": {
         "total": 18,
@@ -1043,7 +1061,9 @@
           "k5": 0
         },
         "clutches_won": 1,
-        "kast": 85
+        "kast": 80,
+        "approx_ekast_percent": 89.57872644151387,
+        "approx_round_swing_percent": 4.79654445963036
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -1080,7 +1100,7 @@
         },
         "kast": {
           "ct": 75,
-          "t": 91.66666666666666
+          "t": 83.33333333333334
         }
       },
       "utility_stats": {
@@ -1105,11 +1125,11 @@
         "unused_utility_value": 3500
       },
       "rating": {
-        "value": 1.2584753369160344,
+        "value": 1.2489816660299584,
         "kills": 1.4752082209903699,
         "damage": 1.38974670477514,
         "survival": 0.717977217196374,
-        "kast": 1.1971990688799223,
+        "kast": 1.133907929639416,
         "multi_kill": 1.3636363636363635,
         "round_swing": 1.119913611490759
       }

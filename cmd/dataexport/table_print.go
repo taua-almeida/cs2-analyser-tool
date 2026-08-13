@@ -74,6 +74,7 @@ func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, mapDat
 func PrintCLIDetailTables(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
 	players := sortedByKills(playerToAnalyse)
 	printRatingTable(players, os.Stdout)
+	printApproxMetricsTable(players, os.Stdout)
 	printMultiKillTable(players, os.Stdout)
 	printTradeTable(players, os.Stdout)
 	printSideSplitTable(players, os.Stdout)
@@ -82,12 +83,14 @@ func PrintCLIDetailTables(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
 }
 
 // printRatingTable breaks the rating into its six sub-ratings, each
-// normalized so 1.00 is an average performance on that axis.
+// normalized so 1.00 is an average performance on that axis. The KAST and
+// round-swing columns are headed as sub-ratings to keep them apart from the
+// approximate percentages printed below them.
 func printRatingTable(players []*demoparser.DemoPlayer, output io.Writer) {
 	t := table.NewWriter()
 	t.SetOutputMirror(output)
 	t.SetTitle("Rating breakdown (1.00 = average)")
-	t.AppendHeader(table.Row{"Name", "Rating", "Kills", "Damage", "Survival", "KAST", "Multi-kill", "Round swing"})
+	t.AppendHeader(table.Row{"Name", "Rating", "Kills", "Damage", "Survival", "eKAST sub-rating", "Multi-kill", "Round swing sub-rating"})
 	for _, player := range players {
 		rating := player.Rating
 		t.AppendRow(table.Row{
@@ -99,6 +102,26 @@ func printRatingTable(players []*demoparser.DemoPlayer, output io.Writer) {
 			fmt.Sprintf("%.2f", rating.KAST),
 			fmt.Sprintf("%.2f", rating.MultiKill),
 			fmt.Sprintf("%.2f", rating.RoundSwing),
+		})
+	}
+	t.Render()
+}
+
+// printApproxMetricsTable shows the interpretable pre-normalization values
+// behind the eKAST and round-swing sub-ratings. Both are Rating 3.0-style
+// approximations: eKAST weights qualifying rounds by economy, so it can
+// exceed 100%, and swing keeps its sign instead of the sub-rating's floor.
+func printApproxMetricsTable(players []*demoparser.DemoPlayer, output io.Writer) {
+	t := table.NewWriter()
+	t.SetOutputMirror(output)
+	t.SetTitle("Approximate Rating 3.0 metrics")
+	t.AppendHeader(table.Row{"Name", "Approx. eKAST (%)", "Approx. swing (%)"})
+	for _, player := range players {
+		stats := player.PlayerMapStats
+		t.AppendRow(table.Row{
+			player.Name,
+			fmt.Sprintf("%.1f", stats.ApproxEKASTPercent),
+			fmt.Sprintf("%+.1f", stats.ApproxRoundSwingPercent),
 		})
 	}
 	t.Render()

@@ -93,6 +93,15 @@ ecoRoundWeight(tier) = 2 × winProb(tier-1 rifle, tier)
 
 The direction is our assumption: survival on an eco exceeds expectation, so it is worth more. The rating's KAST credit itself is kill, survival, traded death (same rules as the classic `kast`), a demo assist event (which keeps flash assists), or at least 40 damage into an enemy who died that round. Match-end cleanup deaths settle no assists, because their victim keeps survival and damage into a survivor is no assist.
 
+The KAST axis's pre-baseline value is published as `player_map_stats.approx_ekast_percent`:
+
+```
+Approx. eKAST (%)  = eco-weighted rating-KAST credits / match rounds × 100
+eKAST sub-rating   = (Approx. eKAST (%) / 100) / 0.79
+```
+
+79.0% is a sub-rating of exactly 1.00 and 100.0% is ~1.27. Because the eco weights above make a qualifying round worth more than 1 on a weak buy, the percentage can exceed 100 and is not clamped. Like every eKAST number in this tool it is an approximation — HLTV publishes eKAST values but not its economy weights, so no exact parity is claimed — and it is not the classic `kast`, which stays the exact public definition.
+
 ## Round swing
 
 Round swing measures how much each kill moved the round. The win-probability model is a lookup table over both sides' alive counts; the value is the probability that the T side wins the round with the bomb not planted:
@@ -119,6 +128,15 @@ round_swing = max(0, 1 + 2.5 × swing per round)
 ```
 
 A player who single-handedly moves 4% of win probability per round rates 1.10 on this axis, roughly the spread the other axes show between an average and a strong player.
+
+The signed pre-normalization value is published as `player_map_stats.approx_round_swing_percent`:
+
+```
+Approx. swing (%)      = summed modeled win-probability deltas / match rounds × 100
+Round swing sub-rating = max(0, 1 + (Approx. swing (%) / 100) × 2.5)
+```
+
++4.0% maps to the 1.10 sub-rating and −4.0% to 0.90. The percentage skips the floor, so an extreme negative match can display below −40% while `rating.round_swing` reads 0 — the sub-rating is not a percentage and the percentage is never clamped. It is an approximation from this same alive-count and bomb-state model, with every limitation listed here unchanged, and claims no exact HLTV Round Swing parity.
 
 ## Multi-kill points
 
