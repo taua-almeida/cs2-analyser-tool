@@ -694,8 +694,107 @@ func TestGetPlayersToAnalyseMatchesCaseInsensitive(t *testing.T) {
 		100: {SteamID: 100, Name: "s1mple"},
 		200: {SteamID: 200, Name: "NiKo"},
 	}
-	got := GetPlayersToAnalyse(players, []string{"S1MPLE"})
+	got, err := GetPlayersToAnalyse(players, []string{"S1MPLE"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if len(got) != 1 || got[100] == nil {
 		t.Errorf("expected to match s1mple case-insensitively, got %v", got)
+	}
+}
+
+func TestGetPlayersToAnalyseSelectsAllRequested(t *testing.T) {
+	players := map[uint64]*DemoPlayer{
+		100: {SteamID: 100, Name: "s1mple"},
+		200: {SteamID: 200, Name: "NiKo"},
+		300: {SteamID: 300, Name: "device"},
+	}
+	got, err := GetPlayersToAnalyse(players, []string{"s1mple", "device"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 2 || got[100] == nil || got[300] == nil {
+		t.Errorf("expected s1mple and device, got %v", got)
+	}
+}
+
+func TestGetPlayersToAnalyseRejectsPartialMatches(t *testing.T) {
+	players := map[uint64]*DemoPlayer{
+		100: {SteamID: 100, Name: "s1mple"},
+		200: {SteamID: 200, Name: "NiKo"},
+	}
+	got, err := GetPlayersToAnalyse(players, []string{"NiKo", "SkulL"})
+	if got != nil {
+		t.Errorf("a failed selection must not return players, got %v", got)
+	}
+	if err == nil {
+		t.Fatal("expected an error for the unmatched name")
+	}
+	want := "players not found in demo: SkulL; available players: NiKo, s1mple"
+	if err.Error() != want {
+		t.Errorf("error = %q, want %q", err.Error(), want)
+	}
+}
+
+func TestGetPlayersToAnalyseRejectsWhenNothingMatches(t *testing.T) {
+	players := map[uint64]*DemoPlayer{
+		100: {SteamID: 100, Name: "zywoo"},
+		200: {SteamID: 200, Name: "device"},
+		300: {SteamID: 300, Name: "NiKo"},
+	}
+	got, err := GetPlayersToAnalyse(players, []string{"void", "SkulL"})
+	if got != nil {
+		t.Errorf("a failed selection must not return players, got %v", got)
+	}
+	if err == nil {
+		t.Fatal("expected an error when nothing matches")
+	}
+	// Unmatched names keep first-request order; available names are sorted.
+	want := "players not found in demo: void, SkulL; available players: NiKo, device, zywoo"
+	if err.Error() != want {
+		t.Errorf("error = %q, want %q", err.Error(), want)
+	}
+}
+
+func TestGetPlayersToAnalyseTreatsDuplicateRequestsAsOne(t *testing.T) {
+	players := map[uint64]*DemoPlayer{
+		100: {SteamID: 100, Name: "s1mple"},
+	}
+	got, err := GetPlayersToAnalyse(players, []string{"s1mple", "S1MPLE"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[100] == nil {
+		t.Errorf("expected a single s1mple selection, got %v", got)
+	}
+}
+
+func TestGetPlayersToAnalyseReportsDuplicateUnmatchedOnce(t *testing.T) {
+	players := map[uint64]*DemoPlayer{
+		100: {SteamID: 100, Name: "s1mple"},
+	}
+	_, err := GetPlayersToAnalyse(players, []string{"SkulL", "skull", "SKULL"})
+	if err == nil {
+		t.Fatal("expected an error for the unmatched name")
+	}
+	// The first spelling of a duplicated unmatched request is preserved.
+	want := "players not found in demo: SkulL; available players: s1mple"
+	if err.Error() != want {
+		t.Errorf("error = %q, want %q", err.Error(), want)
+	}
+}
+
+func TestGetPlayersToAnalyseKeepsAllSameNamePlayers(t *testing.T) {
+	players := map[uint64]*DemoPlayer{
+		100: {SteamID: 100, Name: "smurf"},
+		200: {SteamID: 200, Name: "Smurf"},
+		300: {SteamID: 300, Name: "NiKo"},
+	}
+	got, err := GetPlayersToAnalyse(players, []string{"SMURF"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 2 || got[100] == nil || got[200] == nil {
+		t.Errorf("expected both smurf players, got %v", got)
 	}
 }

@@ -16,7 +16,7 @@ analyse [flags]
 #### Flags
 
 - `-d, --demo <path>`: Path to the CS2 demo file.
-- `-p, --players <players>`: A list of players to analyse. This should be provided as a comma-separated list of player names.
+- `-p, --players <players>`: A list of players to analyse. This should be provided as a comma-separated list of player names. Names match case-insensitively, and if any requested name is not in the demo the command fails and lists the available players.
 - `-s, --save`: Flag to save the demo player's data.
 - `--save-type <type>`: Type of file to save the data. Options are `json` and `csv`. The default is `json`.
 - `--details`: Print the extra stat tables that do not fit the main one: the rating breakdown, approximate Rating 3.0 metrics, multi-kill rounds, trades, CT/T side splits, utility effectiveness and grenades thrown.
