@@ -37,7 +37,7 @@ func TestJSONExportsUtilityStatsAndExistingFlashAssists(t *testing.T) {
 	t.Chdir(t.TempDir())
 	want := utilityPlayer()
 
-	fileName, err := WritePlayersToFile(map[uint64]*demoparser.DemoPlayer{want.SteamID: want}, "json")
+	fileName, err := WriteAnalysisToFile(analysisWith(want), "json")
 	if err != nil {
 		t.Fatalf("writing JSON: %v", err)
 	}
@@ -45,11 +45,11 @@ func TestJSONExportsUtilityStatsAndExistingFlashAssists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading JSON: %v", err)
 	}
-	var players map[uint64]*demoparser.DemoPlayer
-	if err := json.Unmarshal(data, &players); err != nil {
+	var analysis demoparser.ProcessedDemo
+	if err := json.Unmarshal(data, &analysis); err != nil {
 		t.Fatalf("unmarshalling JSON: %v", err)
 	}
-	got := players[want.SteamID]
+	got := analysis.Players[want.SteamID]
 	if got == nil {
 		t.Fatal("exported player missing")
 	}
@@ -70,7 +70,7 @@ func TestCSVAppendsStableUtilityAndRatingColumns(t *testing.T) {
 	player.PlayerMapStats.ApproxEKASTPercent = 104.3
 	player.PlayerMapStats.ApproxRoundSwingPercent = -4.5
 
-	fileName, err := WritePlayersToFile(map[uint64]*demoparser.DemoPlayer{player.SteamID: player}, "csv")
+	fileName, err := WriteAnalysisToFile(analysisWith(player), "csv")
 	if err != nil {
 		t.Fatalf("writing CSV: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestJSONExportsApproxMetricsAndPreservesRatingKeys(t *testing.T) {
 	}
 	player.Rating = demoparser.RatingStats{KAST: 1.32, RoundSwing: 0.89}
 
-	fileName, err := WritePlayersToFile(map[uint64]*demoparser.DemoPlayer{player.SteamID: player}, "json")
+	fileName, err := WriteAnalysisToFile(analysisWith(player), "json")
 	if err != nil {
 		t.Fatalf("writing JSON: %v", err)
 	}

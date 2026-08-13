@@ -43,6 +43,27 @@ analyse --demo path/to/demo --players "player1,player2" --save --save-type csv
 
 This will analyse only "player1" and "player2" from the specified demo and save the data in CSV format.
 
+#### Saved files
+
+Saved JSON is a complete analysis record, not a bare player map:
+
+```json
+{
+  "players": {
+    "76561198000000000": { "...": "player data" }
+  },
+  "map_data": {
+    "map_name": "de_mirage",
+    "total_rounds": 24,
+    "rounds_won_ct": 11,
+    "rounds_won_t": 13
+  },
+  "game_mode": "premier"
+}
+```
+
+Read players from `.players`, keyed by SteamID (a JSON string). `map_data` and `game_mode` describe the whole match and always accompany the players; `--players` limits only `.players`. `game_mode` can be `""` when the demo metadata does not expose it, and `rounds_won_ct`/`rounds_won_t` are the final side scores, not team identities. CSV remains a flat player-only table with the same columns as before. This is an intentional breaking change from the previous format, which was the bare `{ "<steam-id>": ... }` map now nested under `players`.
+
 #### Analyzed data
 
 The data output showed in the terminal table is not all the analyzed data, to get more info about the available data, go to [PLAYER_DATA](./_docs/PLAYER_DATA.MD). The `Rating` column is an HLTV Rating 3.0-style approximation; how it is calculated, constant by constant, is documented in [RATING](./_docs/RATING.MD).
