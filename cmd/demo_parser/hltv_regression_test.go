@@ -40,6 +40,7 @@ type hltvMapExpected struct {
 	DemoFile      string               `json:"demo_file"`
 	DemoSHA256    string               `json:"demo_sha256"`
 	ParserMapName string               `json:"parser_map_name"`
+	GameMode      *string              `json:"game_mode"`
 	Rounds        int                  `json:"rounds"`
 	ScoreValues   [2]int               `json:"score_values"`
 	Players       []hltvPlayerExpected `json:"players"`
@@ -418,6 +419,13 @@ func validateHLTVOracle(t *testing.T, path string, oracle hltvOracle) {
 		if expectedMap.MapID == 0 || expectedMap.MapStatsURL == "" || expectedMap.DemoSHA256 == "" {
 			t.Fatalf("HLTV oracle %s map %q is missing source metadata", path, expectedMap.Name)
 		}
+		// game_mode must be pinned explicitly because "" is itself a valid
+		// expectation: the parser reports it for unknown modes. An omitted
+		// key is an unaudited fixture, not an unknown-mode assertion.
+		if expectedMap.GameMode == nil {
+			t.Fatalf("HLTV oracle %s map %q has no game_mode; pin the audited mode, %q for unknown",
+				path, expectedMap.Name, "")
+		}
 		if _, exists := mapsByID[expectedMap.MapID]; exists {
 			t.Fatalf("HLTV oracle %s repeats map ID %d", path, expectedMap.MapID)
 		}
@@ -533,6 +541,9 @@ func assertHLTVMap(t *testing.T, fixtureID string, result *ProcessedDemo, expect
 	label := fmt.Sprintf("%s/%d/%s", fixtureID, expected.MapID, expected.Name)
 	if result.Map.MapName != expected.ParserMapName {
 		t.Errorf("%s map name = %q, want %q", label, result.Map.MapName, expected.ParserMapName)
+	}
+	if result.GameMode != *expected.GameMode {
+		t.Errorf("%s game mode = %q, want %q", label, result.GameMode, *expected.GameMode)
 	}
 	if result.Map.TotalRounds != expected.Rounds {
 		t.Errorf("%s rounds = %d, want %d", label, result.Map.TotalRounds, expected.Rounds)

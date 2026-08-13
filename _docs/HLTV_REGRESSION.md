@@ -87,9 +87,18 @@ extra/match-2396559/mirage-234956
 
 ## Comparison contract
 
-Each map requires exactly the ten oracle SteamIDs. Map name, round count,
-final score values, kills, and deaths are strict. Score values are sorted
-because the parser exposes final CT/T fields rather than stable team identity.
+Each map requires exactly the ten oracle SteamIDs. Map name, game mode, round
+count, final score values, kills, and deaths are strict. Score values are
+sorted because the parser exposes final CT/T fields rather than stable team
+identity.
+
+All eight oracle maps pin `game_mode` to `competitive`. Every audited demo
+ran on a tournament server whose `GameSessionConfig` carries an empty
+`gamemode`, so the pin exercises the parser's ConVar fallback rather than the
+primary path; the fallback rules live in [Player data](./PLAYER_DATA.MD). The
+comparison is exact, and the field is required: a fixture must pin the mode
+explicitly, with `""` declaring that the parser should report an unknown
+mode.
 
 ADR is compared after both values are formatted to one decimal. KAST is
 compared as an integer qualifying-round count:
