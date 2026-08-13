@@ -1,10 +1,29 @@
 # Player data
 
-The `--save` flag writes every analysed player to a file. JSON contains all fields below; CSV contains a flattened selection of them plus the computed K/D. The CLI table shows a narrower selection still, with `--details` printing the rest in extra tables below it. Stats never include warmup. Bots are never listed, but kills on bots count like any other kill.
+The `--save` flag writes the analysis to a file. Saved JSON is a complete analysis record:
+
+```json
+{
+  "players": {
+    "<steam-id>": { "...": "the player fields below" }
+  },
+  "map_data": {
+    "map_name": "de_mirage",
+    "total_rounds": 24,
+    "rounds_won_ct": 11,
+    "rounds_won_t": 13
+  },
+  "game_mode": "premier"
+}
+```
+
+Consumers read players from `.players`, keyed by SteamID, a numeric key that JSON renders as a string. Player selection (`--players` or the interactive picker) limits only `.players`; `map_data` and `game_mode` always describe the whole match, from the same parse. This intentionally breaks the previous saved shape, which was the bare `{ "<steam-id>": ... }` player map now nested under `players`. There is no compatibility mode. See [Match data](#match-data) for the two match-level fields.
+
+Each `.players` entry contains all fields below; CSV stays a flat player-only file with a flattened selection of them plus the computed K/D, and carries no match-level columns. The CLI table shows a narrower selection still, with `--details` printing the rest in extra tables below it. Stats never include warmup. Bots are never listed, but kills on bots count like any other kill.
 
 ## Fields
 
-### Top level
+### Player top level
 
 | Field | JSON key | Description |
 | --- | --- | --- |
@@ -260,7 +279,7 @@ The rating is in JSON, in CSV as `Rating` plus one column per sub-rating, and in
 
 ## Match data
 
-The JSON table output also carries match-level data:
+Saved JSON carries two match-level fields beside `players`. `map_data` is an object:
 
 | Field | JSON key | Description |
 | --- | --- | --- |
@@ -268,3 +287,7 @@ The JSON table output also carries match-level data:
 | TotalRounds | `total_rounds` | Rounds played. |
 | RoundsWonCT | `rounds_won_ct` | Final score of the side finishing as CT. |
 | RoundsWonT | `rounds_won_t` | Final score of the side finishing as T. |
+
+`rounds_won_ct` and `rounds_won_t` are final side scores, not logical team identity. Sides swap at halftime, and the saved record does not map scores to the teams that earned them.
+
+`game_mode` is a top-level string, e.g. `"premier"`. It is written even when empty: a demo whose metadata does not expose the mode saves `"game_mode": ""`.

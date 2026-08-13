@@ -10,7 +10,9 @@ import (
 	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
 )
 
-func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType string) (string, error) {
+// WriteAnalysisToFile writes the complete analysis as JSON or its players as
+// the existing flat CSV format.
+func WriteAnalysisToFile(analysis *demoparser.ProcessedDemo, saveType string) (string, error) {
 	fileName := fmt.Sprintf("%d_data.%s", time.Now().Unix(), saveType)
 
 	if saveType == "csv" {
@@ -28,7 +30,7 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 		csvRecords := [][]string{
 			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Deaths Traded", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "Deaths Traded CT", "Deaths Traded T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon", "Enemies Flashed", "Friends Flashed", "Enemy Flash Time (s)", "Average Enemy Flash Time (s)", "Utility Damage Total", "HE Utility Damage", "Fire Utility Damage", "Grenades Thrown Total", "Flashbangs Thrown", "Smokes Thrown", "HE Grenades Thrown", "Molotovs Thrown", "Incendiaries Thrown", "Decoys Thrown", "Unused Utility Value", "Rating", "Rating Kills", "Rating Damage", "Rating Survival", "Rating KAST", "Rating Multi-kill", "Rating Round Swing", "Approx. eKAST (%)", "Approx. swing (%)"},
 		}
-		for _, player := range sortedByKills(players) {
+		for _, player := range sortedByKills(analysis.Players) {
 			csvRecords = append(csvRecords, []string{
 				player.Name,
 				fmt.Sprintf("%d", player.KillStats.Total),
@@ -100,7 +102,7 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 		return fileName, nil
 	}
 
-	jsonData, err := json.MarshalIndent(players, "", " ")
+	jsonData, err := json.MarshalIndent(analysis, "", " ")
 	if err != nil {
 		return "", err
 	}

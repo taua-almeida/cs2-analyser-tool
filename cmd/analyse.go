@@ -98,7 +98,9 @@ var analyseCmd = &cobra.Command{
 
 		if save {
 			lipgloss.Println(printstyle.StyleSuccess.Render("\nWritting data to file..."))
-			fileName, err := dataexport.WritePlayersToFile(playersToAnalyse, saveType)
+			analysisToSave := *processedDemoData
+			analysisToSave.Players = playersToAnalyse
+			fileName, err := dataexport.WriteAnalysisToFile(&analysisToSave, saveType)
 			if err != nil {
 				return fmt.Errorf("writing to file: %w", err)
 			}
