@@ -144,11 +144,12 @@ Two classic-KAST rows remain:
 | Original Inferno | kairo | 9 | Died to Skullhunter at tick 76714. Skullhunter killed 1angel at 76991 and died at 77068. kairo-to-revenge is 354 ticks (5.531 s). No K/A/S/T under the supported rule. | Tool 17/22, HLTV 18/22 |
 | Standalone Mirage | magixx | 22 | Died to bibu at tick 176030. tN1R killed m1N1 at 176051 and bibu at 176358. magixx-to-revenge is 328 ticks (5.125 s). No K/A/S/T under the supported rule. | Tool 17/23, HLTV 18/23 |
 
-`TestEvaluateHLTVTradeModels` replays all eight maps through 18 combinations:
-one death versus multiple deaths per revenge kill, earliest versus nearest
-eligible death, exact time versus timestamp-resolution and normalized-tick
-boundaries, and post-round exclusion versus inclusion. The best general model
-is the production rule—one oldest death, a normalized five-second tick
+`TestEvaluateHLTVTradeModels` replays all eight maps through 18 direct
+combinations—one death versus multiple deaths per revenge kill, earliest
+versus nearest eligible death, exact time versus timestamp-resolution and
+normalized-tick boundaries, and post-round exclusion versus inclusion—plus
+the six focused trade-chain models below. The best general model is the
+production rule—one oldest death, a normalized five-second tick
 boundary—which reaches 29/30 original and 49/50 additional rows. Nearest and
 multiple-death attribution regress already-correct rows. Post-round eligibility
 does not change these eight aggregates, though it remains independently tested.
@@ -157,10 +158,87 @@ A six-second boundary fixes the two rows above but creates other aggregate
 regressions. Absolute-clock rounding is rejected because its effective window
 depends on the demo clock's phase. A scalar cutoff selected between observed
 ticks is also rejected as fitted: the original Mirage contains an already
-correct 358-tick control. No evaluated general rule reaches every oracle, so
-the plan's hard gate applies: the two exact #38 exceptions remain and issue
-#38 must not be closed. A focused follow-up needs either an independent
-per-round HLTV oracle or additional evidence for multi-kill trade sequencing.
+correct 358-tick control. The trade-chain evaluation below completes the
+previously requested follow-up on multi-kill trade sequencing. No evaluated
+direct or chain rule passes the gate, so the two exact #38 exceptions remain
+and issue #38 may close as a documented HLTV implementation limitation.
+Reopening it requires an independent per-round oracle or independently
+observable positive controls.
+
+## Trade-chain diagnostics
+
+Both remaining rows share a shape: the direct death-to-revenge gap exceeds
+five seconds, but an intermediate kill splits it into sub-five-second links.
+The chain diagnostics test whether coherent chain semantics—not a wider
+window—explain them. For each enemy terminal revenge kill `R`, candidate
+deaths are earlier deaths `D` with `D.killer == R.victim` and
+`D.victimTeam == R.killerTeam`. The chain anchor starts at `D`; events
+between `D` and `R` are examined chronologically. A permitted bridge
+re-anchors the window only while the chain is active under the same
+normalized `insideTradeWindow` rule; unrelated events never re-anchor; once
+more than five seconds pass since the current anchor, later events cannot
+revive the candidate; the terminal revenge must land inside five seconds of
+the final anchor; multiple bridges may extend one chain; and each terminal
+revenge credits exactly one death, the earliest chain-eligible by event
+order. All six models keep earliest attribution, normalized ticks, and
+post-round inclusion:
+
+| Model | Permitted bridge |
+| --- | --- |
+| production-control | none |
+| killer-chain | an enemy kill by `D.killer` |
+| revenger-any-chain | any enemy kill by `R.killer` |
+| revenger-assister-chain | `R.killer` killing the nonzero assister of `D` |
+| combined-killer-revenger-any | killer-chain or revenger-any-chain |
+| combined-killer-revenger-assister | killer-chain or revenger-assister-chain |
+
+`production-control` is asserted equal to the canonical direct model
+(earliest/normalized-ticks/post=true) on every player-round of all eight
+maps; aggregate equality alone would let opposite round changes cancel.
+Synthetic tests in `TestChainTradeSemantics` pin each bridge rule, chain
+expiry, earliest-death credit, and the 358-tick no-bridge control.
+
+With the pinned demos the chain models score:
+
+| Model | Combined parity | kairo R9 | magixx R22 | Aggregate regressions |
+| --- | ---: | :-: | :-: | --- |
+| production-control | 78/80 | not traded | not traded | none |
+| killer-chain | 73/80 | traded | not traded | 6 rows |
+| revenger-any-chain | 73/80 | not traded | traded | 6 rows |
+| revenger-assister-chain | 78/80 | not traded | traded | 1 row (Inferno SkulL R18) |
+| combined-killer-revenger-any | 71/80 | traded | traded | 9 rows |
+| combined-killer-revenger-assister | 73/80 | traded | traded | 7 rows |
+
+Every regression row is an independent aggregate-negative control: a
+player-map where production already equals HLTV and the chain model moves the
+aggregate away. Some are additions (the bridged trade credits a death
+production did not) and some are removals (an earlier chain-eligible death
+steals the one credit from the death production traded, e.g. Anubis round 4
+rekonz→ADK). The sharpest aggregate counterexample is Inferno round 18: the
+assister-chain model adds KAST credit to SkulL in a structurally similar
+sequence—his death at tick 139240 avenged 424 ticks later, chelleos killing
+the assister in between—and moves his already-correct player-map aggregate
+one above HLTV. Because HLTV publishes no per-round flags, this disproves
+the model across the map but does not independently establish R18's hidden
+HLTV trade flag. The 358-tick Mirage round-4 control stays excluded under
+all six models. Chain results use HLTV oracle names; the raw sequences in
+the evidence table above use demo aliases: Skullhunter is SkulL, 1angel is
+phoebe, and HARRYPOTTER- is void.
+
+Across all eight maps the structural material is common: 153 killer-bridge
+triples and 99 revenger-any triples (counting unit: one scored-round
+`(D, B, R)` kill tuple per category). 15 of the 99 are also
+revenger-assister triples; as mutually exclusive categories that is 84
+other-enemy plus 15 assister triples. There are 16 distinct `(D, R)` pairs
+whose direct gap is outside the window while some chain stays inside. These
+are structural counts, not controls of either kind. No independently
+observable positive controls exist: HLTV publishes
+only map-level KAST aggregates, and the only two production/HLTV differences
+are the target rows themselves. Since every chain model that explains either
+target row regresses at least one already-correct row, no chain rule is
+promoted to production; the two exact exceptions remain, and issue #38 is
+closable only as a documented HLTV implementation limitation, not by a rule
+change validated against these oracles.
 
 Run the model matrix with the same demo paths plus:
 
@@ -178,9 +256,10 @@ HLTV_TRACE_STEAM_ID=76561199063238565 \
 ```
 
 The trace records participation, side, kills, normal/flash assists, death
-cause/frame/time/tick, every direct trade candidate and trading kill, survival
-at `RoundEnd` and `RoundEndOfficial`, disconnects, scored status, rating-assist
-status, and the final classic-KAST reasons. It writes no files.
+cause/frame/time/tick, the assister's name and SteamID64, every direct trade
+candidate and trading kill, survival at `RoundEnd` and `RoundEndOfficial`,
+disconnects, scored status, rating-assist status, and the final classic-KAST
+reasons. It writes no files.
 
 ## Original issue #38 event evidence
 
