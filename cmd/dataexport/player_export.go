@@ -20,8 +20,13 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 		}
 		defer csvFile.Close()
 
+		// New columns are appended after all existing ones so legacy column
+		// positions stay stable. "Rating KAST" and "Rating Round Swing" keep
+		// their headers for the same reason: they remain the normalized
+		// sub-ratings, while the two appended "Approx." columns carry the
+		// pre-normalization percentages.
 		csvRecords := [][]string{
-			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Deaths Traded", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "Deaths Traded CT", "Deaths Traded T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon", "Enemies Flashed", "Friends Flashed", "Enemy Flash Time (s)", "Average Enemy Flash Time (s)", "Utility Damage Total", "HE Utility Damage", "Fire Utility Damage", "Grenades Thrown Total", "Flashbangs Thrown", "Smokes Thrown", "HE Grenades Thrown", "Molotovs Thrown", "Incendiaries Thrown", "Decoys Thrown", "Unused Utility Value", "Rating", "Rating Kills", "Rating Damage", "Rating Survival", "Rating KAST", "Rating Multi-kill", "Rating Round Swing"},
+			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Deaths Traded", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "Deaths Traded CT", "Deaths Traded T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon", "Enemies Flashed", "Friends Flashed", "Enemy Flash Time (s)", "Average Enemy Flash Time (s)", "Utility Damage Total", "HE Utility Damage", "Fire Utility Damage", "Grenades Thrown Total", "Flashbangs Thrown", "Smokes Thrown", "HE Grenades Thrown", "Molotovs Thrown", "Incendiaries Thrown", "Decoys Thrown", "Unused Utility Value", "Rating", "Rating Kills", "Rating Damage", "Rating Survival", "Rating KAST", "Rating Multi-kill", "Rating Round Swing", "Approx. eKAST (%)", "Approx. swing (%)"},
 		}
 		for _, player := range sortedByKills(players) {
 			csvRecords = append(csvRecords, []string{
@@ -83,6 +88,8 @@ func WritePlayersToFile(players map[uint64]*demoparser.DemoPlayer, saveType stri
 				fmt.Sprintf("%.2f", player.Rating.KAST),
 				fmt.Sprintf("%.2f", player.Rating.MultiKill),
 				fmt.Sprintf("%.2f", player.Rating.RoundSwing),
+				fmt.Sprintf("%.1f", player.PlayerMapStats.ApproxEKASTPercent),
+				fmt.Sprintf("%.1f", player.PlayerMapStats.ApproxRoundSwingPercent),
 			})
 		}
 

@@ -41,7 +41,9 @@
           "k5": 0
         },
         "clutches_won": 0,
-        "kast": 75
+        "kast": 75,
+        "approx_ekast_percent": 84.8024444797594,
+        "approx_round_swing_percent": 4.879556423674314
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -152,7 +154,9 @@
           "k5": 0
         },
         "clutches_won": 0,
-        "kast": 70
+        "kast": 70,
+        "approx_ekast_percent": 79.09200077779704,
+        "approx_round_swing_percent": 1.037740669329847
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -262,7 +266,9 @@
           "k5": 0
         },
         "clutches_won": 0,
-        "kast": 75
+        "kast": 75,
+        "approx_ekast_percent": 89.54459457328898,
+        "approx_round_swing_percent": -2.501201804568263
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -375,7 +381,9 @@
           "k5": 0
         },
         "clutches_won": 0,
-        "kast": 60
+        "kast": 60,
+        "approx_ekast_percent": 69.53555005491879,
+        "approx_round_swing_percent": -2.395280093635863
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -487,7 +495,9 @@
           "k5": 0
         },
         "clutches_won": 0,
-        "kast": 60
+        "kast": 60,
+        "approx_ekast_percent": 72.2698692985637,
+        "approx_round_swing_percent": -7.454070900884709
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -597,7 +607,9 @@
           "k5": 0
         },
         "clutches_won": 1,
-        "kast": 70
+        "kast": 70,
+        "approx_ekast_percent": 77.50447649547458,
+        "approx_round_swing_percent": -1.8156765180674697
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -707,7 +719,9 @@
           "k5": 0
         },
         "clutches_won": 1,
-        "kast": 80
+        "kast": 80,
+        "approx_ekast_percent": 85.79626972740314,
+        "approx_round_swing_percent": -0.3694208422161848
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -818,7 +832,9 @@
           "k5": 0
         },
         "clutches_won": 1,
-        "kast": 60
+        "kast": 60,
+        "approx_ekast_percent": 69.83852084060308,
+        "approx_round_swing_percent": -5.176697372330106
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -930,7 +946,9 @@
           "k5": 0
         },
         "clutches_won": 2,
-        "kast": 65
+        "kast": 65,
+        "approx_ekast_percent": 69.4296435272045,
+        "approx_round_swing_percent": 8.998505979068076
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -1043,7 +1061,9 @@
           "k5": 0
         },
         "clutches_won": 1,
-        "kast": 80
+        "kast": 80,
+        "approx_ekast_percent": 89.57872644151387,
+        "approx_round_swing_percent": 4.79654445963036
       },
       "opening_duel_stats": {
         "opening_kills": {

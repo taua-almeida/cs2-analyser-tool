@@ -110,6 +110,38 @@ All utility scalars are appended to CSV after the existing columns. `--details` 
 | MultiKills | `multi_kills` | Multi-kill rounds bucketed by kill count: `{k2, k3, k4, k5}`. See [multi-kill rounds](#multi-kill-rounds). |
 | ClutchesWon | `clutches_won` | Rounds won after being the last player alive on the team against at least one enemy (1v1 counts). Winning by defuse or time counts — no kills required. |
 | KAST | `kast` | Percentage of the match's rounds with a Kill, non-flash demo Assist, Survival or Traded death. Flash assists are excluded from classic KAST. `RoundEnd` does not award survival immediately: exit frags and C4 deaths before `RoundEndOfficial` still cancel it. This round/KAST treatment is separate from raw death totals, where a C4 event emitted after `RoundEnd` during `GamePhaseGameHalfEnded` is excluded. Match-end World cleanup does not cancel survival. |
+| ApproxEKASTPercent | `approx_ekast_percent` | Approximate eKAST: eco-weighted rating-KAST credits per match round, as a percentage. This is the pre-normalization value behind `rating.kast`, and can exceed 100 because economy weighting makes a qualifying round on a weak buy worth more than 1 — it is never clamped. See [KAST and swing side by side](#kast-and-swing-side-by-side). |
+| ApproxRoundSwingPercent | `approx_round_swing_percent` | Approximate round swing: summed modeled round-win-probability deltas per match round, as a signed percentage. This is the pre-floor value behind `rating.round_swing`; a negative match stays negative here. See [KAST and swing side by side](#kast-and-swing-side-by-side). |
+
+#### KAST and swing side by side
+
+Five related values, and none of them interchangeable — three are percentages, two are normalized sub-ratings:
+
+```
+classic KAST (%) = qualifying classic rounds / match rounds × 100
+
+Approx. eKAST (%) =
+    eco-weighted rating-KAST credits / match rounds × 100
+
+eKAST sub-rating =
+    (Approx. eKAST (%) / 100) / 0.79
+
+Approx. swing (%) =
+    summed modeled win-probability deltas / match rounds × 100
+
+Round swing sub-rating =
+    max(0, 1 + (Approx. swing (%) / 100) × 2.5)
+```
+
+- **`kast`** is the classic public KAST definition and the only KAST value in the main table. It is exact, not approximate.
+- **`approx_ekast_percent`** is an approximation in the Rating 3.0 style: it adds the [40-damage assist rule](#rating-kast) and weights each qualifying round by the player's buy, so it can exceed 100% and does not claim exact HLTV eKAST parity.
+- **`rating.kast`** — displayed and documented as the **eKAST sub-rating** — is the same per-round value divided by the 0.79 baseline, so 1.00 is average. It is not a percentage.
+- **`approx_round_swing_percent`** is the signed average modeled win-probability contribution per match round from the [round swing](#round-swing) model, with all of that model's limits; it does not claim exact HLTV Round Swing parity.
+- **`rating.round_swing`** — displayed as the **Round swing sub-rating** — scales that value around 1.00 and floors it at 0. It is not a percentage, and the floor means an extreme negative match reads 0 here while the percentage stays visibly negative.
+
+Worked examples: an approximate eKAST of 79.0% is a sub-rating of exactly 1.00, and 100.0% is ~1.27; an approximate swing of +4.0% is a 1.10 sub-rating, −4.0% is 0.90, and a −45% disaster still prints −45.0% while the sub-rating sits at the 0 floor.
+
+Both approximate percentages divide by the whole match's rounds, exactly as ADR and the sub-ratings do, so a late joiner is diluted rather than rated only on the rounds they played. Zero match rounds leave both fields 0. The two are in JSON, appended to CSV as `Approx. eKAST (%)` and `Approx. swing (%)` after all existing columns — the CSV's `Rating KAST` and `Rating Round Swing` columns keep carrying the normalized sub-ratings under their existing names for compatibility — and in the `Approximate Rating 3.0 metrics` table that `--details` prints, with swing explicitly signed. The main table is unchanged.
 
 #### Authoritative scored rounds
 
@@ -192,9 +224,9 @@ An HLTV Rating 3.0-style rating. **HLTV's exact formula is proprietary, so this 
 | Kills | `kills` | Eco-adjusted kill points per round, against the baseline. |
 | Damage | `damage` | Eco-adjusted damage per round, against the baseline. |
 | Survival | `survival` | Eco-weighted rounds survived per round, against the baseline. |
-| KAST | `kast` | Eco-weighted rating-KAST rounds per round, against the baseline. See [rating KAST](#rating-kast). |
+| KAST | `kast` | Eco-weighted rating-KAST rounds per round, against the baseline. Displayed as `eKAST sub-rating`; the pre-baseline percentage is `player_map_stats.approx_ekast_percent`. See [rating KAST](#rating-kast). |
 | MultiKill | `multi_kill` | Multi-kill points per round, against the baseline. |
-| RoundSwing | `round_swing` | Round-win-probability swing per round, scaled around 1.00. See [round swing](#round-swing). |
+| RoundSwing | `round_swing` | Round-win-probability swing per round, scaled around 1.00. Displayed as `Round swing sub-rating`; the signed pre-floor percentage is `player_map_stats.approx_round_swing_percent`. See [round swing](#round-swing). |
 
 Every sub-rating is normalized so 1.0 is average on that axis, and `value` is their weighted blend: kills 25%, damage 20%, round swing 20%, KAST 15%, survival 10%, multi-kills 10%. HLTV does not publish its weights; these follow the emphasis of their Rating 3.0 announcement. All constants named below live in `cmd/demo_parser/rating.go`.
 
@@ -210,17 +242,21 @@ Survival and KAST credit use a per-round weight from the player's own buy, captu
 
 The rating's KAST axis differs from the classic `player_map_stats.kast` in its assist rule. Classic KAST counts non-flash demo assists. Rating KAST keeps every demo assist, including flash assists, and additionally credits any player who dealt at least 40 damage to an enemy who died that round — Rating 3.0's threshold, raised from the 25 of Rating 2.0 — whoever or whatever finished them. Kill, survival and traded-death facts are shared. The classic KAST field itself remains separate from this approximate rating logic.
 
+The eco-weighted credits per match round are exposed before the baseline division as `player_map_stats.approx_ekast_percent`; the normalized `rating.kast` — the eKAST sub-rating — is that percentage over 100 divided by the 0.79 baseline. See [KAST and swing side by side](#kast-and-swing-side-by-side).
+
 #### Round swing
 
 Round swing measures how much each kill moved the round towards being won. A win-probability model — a lookup table over both sides' alive counts, with a planted bomb applied as a log-odds shift towards the T side — is evaluated before and after every kill; the killer gains the difference and the victim loses it, so swing sums to zero across each round and, per round, across each 5v5. Diminishing returns are built in: the fifth kill of a wipe moves an almost-decided round far less than an opening kill moves an even one. Post-round kills move nothing. In this first version suicides, teamkills and world deaths move no swing either, and neither does planting or defusing itself — only kills.
 
 The sub-rating is `1 + swing per round × 2.5`, floored at 0. An average player sits at exactly 1.00 by construction, because the swing they gain is swing an opponent lost.
 
+The swing per match round is exposed before that normalization as the signed `player_map_stats.approx_round_swing_percent`, which keeps the negative information the floor discards. See [KAST and swing side by side](#kast-and-swing-side-by-side).
+
 #### Calibration
 
 The per-round baselines that define "average" (0.69 kill points, 70 eco-damage, 0.37 eco-weighted survivals, 0.79 eco-weighted KAST rounds, 0.22 multi-kill points — multi-kill rounds score 1/2/4/7 points for a 2k/3k/4k/5k) were measured over five real matches: the three integration fixtures plus one HLTV pro match and one FACEIT match. Over that set the rounds-weighted mean rating is 1.000 and each sub-rating mean is within 2% of it. The set is small and skews towards standard competitive play; ratings in respawn or wingman modes are computed but not meaningful, since the swing table and the baselines assume 5v5 rounds.
 
-The rating is in JSON, in CSV as `Rating` plus one column per sub-rating, and in the main table as the `Rating` column beside KAST; `--details` prints the full breakdown in the `Rating breakdown` table.
+The rating is in JSON, in CSV as `Rating` plus one column per sub-rating, and in the main table as the `Rating` column beside KAST; `--details` prints the full breakdown in the `Rating breakdown` table, with the KAST and round-swing columns headed `eKAST sub-rating` and `Round swing sub-rating`, and the pre-normalization percentages in the `Approximate Rating 3.0 metrics` table beneath it.
 
 ## Match data
 

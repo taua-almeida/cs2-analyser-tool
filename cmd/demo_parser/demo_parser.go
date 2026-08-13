@@ -743,13 +743,20 @@ func (a *analyser) derive(totalRounds int) {
 			p.AssistStats.ADR = perRound(p.AssistStats.DamageGiven, totalRounds)
 			p.PlayerMapStats.KAST = 100 * perRound(a.kastRounds[id].Total, totalRounds)
 			rounds := float64(totalRounds)
+			// The approximate percentages publish the same per-round
+			// values the rating normalizes, before the KAST baseline
+			// division and before the swing floor can hide a negative.
+			ecoKastPerRound := a.ecoKast[id] / rounds
+			swingPerRound := a.roundSwing[id] / rounds
+			p.PlayerMapStats.ApproxEKASTPercent = 100 * ecoKastPerRound
+			p.PlayerMapStats.ApproxRoundSwingPercent = 100 * swingPerRound
 			p.Rating = blendRating(ratingRound{
 				killPoints: a.ecoKills[id] / rounds,
 				ecoDamage:  a.ecoDamage[id] / rounds,
 				survival:   a.ecoSurvival[id] / rounds,
-				kast:       a.ecoKast[id] / rounds,
+				kast:       ecoKastPerRound,
 				multiKill:  multiKillPoints(p.PlayerMapStats.MultiKills) / rounds,
-				swing:      a.roundSwing[id] / rounds,
+				swing:      swingPerRound,
 			})
 		}
 		// Their side splits cannot: sides swap at halftime, so there is no

@@ -32,6 +32,19 @@ type PlayerMapStats struct {
 	MultiKills  MultiKillRounds `json:"multi_kills"`
 	ClutchesWon int             `json:"clutches_won"`
 	KAST        float64         `json:"kast"`
+	// ApproxEKASTPercent is the Rating 3.0-style approximation behind the
+	// rating's KAST axis, before its baseline normalization: eco-weighted
+	// rating-KAST credits per match round, as a percentage. Economy
+	// weighting makes a qualifying round worth more than 1 on a weak buy,
+	// so the value can exceed 100 and is deliberately not clamped. It is
+	// distinct from the classic KAST above and from the normalized
+	// rating.kast sub-rating.
+	ApproxEKASTPercent float64 `json:"approx_ekast_percent"`
+	// ApproxRoundSwingPercent is the signed pre-normalization value behind
+	// the rating's round-swing axis: summed round-win-probability deltas
+	// per match round, as a percentage. Unlike the rating.round_swing
+	// sub-rating it is never floored, so a negative swing stays visible.
+	ApproxRoundSwingPercent float64 `json:"approx_round_swing_percent"`
 }
 
 // SideCount is a per-round counter split by the side the player was on.
