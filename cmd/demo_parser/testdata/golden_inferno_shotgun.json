@@ -784,9 +784,9 @@
       "user_id": 9,
       "deaths": 16,
       "deaths_traded": {
-        "total": 1,
+        "total": 0,
         "ct": 0,
-        "t": 1
+        "t": 0
       },
       "kill_stats": {
         "total": 11,
@@ -818,7 +818,7 @@
           "k5": 0
         },
         "clutches_won": 1,
-        "kast": 70
+        "kast": 60
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -855,7 +855,7 @@
         },
         "kast": {
           "ct": 50,
-          "t": 83.33333333333334
+          "t": 66.66666666666666
         }
       },
       "utility_stats": {
@@ -880,11 +880,11 @@
         "unused_utility_value": 2500
       },
       "rating": {
-        "value": 0.8921584681408217,
+        "value": 0.8778021853374872,
         "kills": 0.8283065637674779,
         "damage": 1.0674773548452143,
         "survival": 0.5959968297292607,
-        "kast": 0.9797404613969518,
+        "kast": 0.8840319093747225,
         "multi_kill": 0.9090909090909092,
         "round_swing": 0.8705825656917474
       }
@@ -1007,9 +1007,9 @@
       "user_id": 8,
       "deaths": 17,
       "deaths_traded": {
-        "total": 5,
+        "total": 3,
         "ct": 2,
-        "t": 3
+        "t": 1
       },
       "kill_stats": {
         "total": 18,
@@ -1043,7 +1043,7 @@
           "k5": 0
         },
         "clutches_won": 1,
-        "kast": 85
+        "kast": 80
       },
       "opening_duel_stats": {
         "opening_kills": {
@@ -1080,7 +1080,7 @@
         },
         "kast": {
           "ct": 75,
-          "t": 91.66666666666666
+          "t": 83.33333333333334
         }
       },
       "utility_stats": {
@@ -1105,11 +1105,11 @@
         "unused_utility_value": 3500
       },
       "rating": {
-        "value": 1.2584753369160344,
+        "value": 1.2489816660299584,
         "kills": 1.4752082209903699,
         "damage": 1.38974670477514,
         "survival": 0.717977217196374,
-        "kast": 1.1971990688799223,
+        "kast": 1.133907929639416,
         "multi_kill": 1.3636363636363635,
         "round_swing": 1.119913611490759
       }
