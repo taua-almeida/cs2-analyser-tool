@@ -1,6 +1,7 @@
 package demoparser
 
 import (
+	"maps"
 	"math"
 	"testing"
 	"time"
@@ -75,6 +76,16 @@ func (g matchGameState) TeamTerrorists() *common.TeamState {
 func (g matchGameState) Participants() demoinfocs.Participants {
 	return matchParticipants{playing: g.playing}
 }
+
+// Rules reports no recorded ConVars, so finalise resolves the game mode from
+// the primary value alone.
+func (g matchGameState) Rules() demoinfocs.GameRules { return matchRules{} }
+
+type matchRules struct {
+	demoinfocs.GameRules
+}
+
+func (r matchRules) ConVars() map[string]string { return nil }
 
 type matchParticipants struct {
 	demoinfocs.Participants
@@ -1190,6 +1201,76 @@ func TestBotOnBotKillDoesNotStealTheOpeningDuel(t *testing.T) {
 
 	if got := a.players[shooterID].OpeningDuelStats.OpeningKills.Total; got != 0 {
 		t.Errorf("shooter opening kills = %d, want 0: the bot-on-bot kill opened the round first", got)
+	}
+}
+
+func TestResolveGameMode(t *testing.T) {
+	// The explicit ruleset the game-mode fallback needs, as the
+	// Rooster–Mindfreak HLTV demos of issue #31 record it.
+	competitiveConVars := func() map[string]string {
+		return map[string]string{
+			"mp_maxrounds":    "24",
+			"mp_halftime":     "true",
+			"mp_friendlyfire": "true",
+		}
+	}
+	withConVars := func(overrides map[string]string) map[string]string {
+		conVars := competitiveConVars()
+		maps.Copy(conVars, overrides)
+		return conVars
+	}
+	withoutHalftime := competitiveConVars()
+	delete(withoutHalftime, "mp_halftime")
+
+	tests := []struct {
+		name    string
+		primary string
+		conVars map[string]string
+		want    string
+	}{
+		{
+			name:    "primary premier wins over competitive rules",
+			primary: "premier",
+			conVars: competitiveConVars(),
+			want:    "premier",
+		},
+		{
+			name:    "tournament ruleset fills empty primary",
+			conVars: competitiveConVars(),
+			want:    "competitive",
+		},
+		{
+			name:    "numeric boolean spellings qualify",
+			conVars: withConVars(map[string]string{"mp_halftime": "1", "mp_friendlyfire": "1"}),
+			want:    "competitive",
+		},
+		{
+			name: "no metadata stays unknown",
+			want: "",
+		},
+		{
+			name:    "wingman round count stays unknown",
+			conVars: withConVars(map[string]string{"mp_maxrounds": "16"}),
+			want:    "",
+		},
+		{
+			name:    "casual friendly fire stays unknown",
+			conVars: withConVars(map[string]string{"mp_friendlyfire": "false"}),
+			want:    "",
+		},
+		{
+			name:    "unrecorded halftime stays unknown",
+			conVars: withoutHalftime,
+			want:    "",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := resolveGameMode(test.primary, test.conVars); got != test.want {
+				t.Errorf("resolveGameMode(%q, %v) = %q, want %q",
+					test.primary, test.conVars, got, test.want)
+			}
+		})
 	}
 }
 

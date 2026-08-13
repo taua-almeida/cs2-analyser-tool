@@ -10,6 +10,7 @@
       "demo_file": "rooster-vs-mindfreak-m1-inferno.dem",
       "demo_sha256": "60129e983bb529bd77b642d59bd2e172367b6ab0dbe73849bb656f7eb76d43c4",
       "parser_map_name": "de_inferno",
+      "game_mode": "competitive",
       "rounds": 22,
       "score_values": [9, 13],
       "players": [
@@ -32,6 +33,7 @@
       "demo_file": "rooster-vs-mindfreak-m2-anubis.dem",
       "demo_sha256": "7b2a1c89ea0b99be5d4874452716f25cfcbd49353c49b3402cc107f0c5a4bcae",
       "parser_map_name": "de_anubis",
+      "game_mode": "competitive",
       "rounds": 19,
       "score_values": [13, 6],
       "players": [
@@ -54,6 +56,7 @@
       "demo_file": "rooster-vs-mindfreak-m3-mirage.dem",
       "demo_sha256": "53a3ab2814af90cb9898f2e8f3d7d14ae254d94f020de418ec307e57abd7008a",
       "parser_map_name": "de_mirage",
+      "game_mode": "competitive",
       "rounds": 23,
       "score_values": [10, 13],
       "players": [

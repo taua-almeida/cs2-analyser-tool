@@ -115,6 +115,45 @@ func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
 	}, nil
 }
 
+// resolveGameMode picks the game mode to report. GameSessionConfig's gamemode
+// is authoritative whenever the demo names one; the FACEIT, BLAST and ESL
+// servers behind the HLTV fixtures all send the config with an empty
+// gamemode, so an empty primary value falls back to the ruleset recorded in
+// the match's ConVars. The fallback reports "competitive" — the string Valve
+// servers use for classic competitive play — and a demo that satisfies
+// neither source stays "" rather than guessing. Resolution waits for parse
+// end because SetConVar messages accumulate throughout the demo.
+func resolveGameMode(primary string, conVars map[string]string) string {
+	if primary != "" {
+		return primary
+	}
+	if hasCompetitiveRuleset(conVars) {
+		return "competitive"
+	}
+	return ""
+}
+
+// hasCompetitiveRuleset reports whether the demo's recorded ConVars pin the
+// classic competitive ruleset: a regulation MR12 match with a halftime side
+// swap and friendly fire on. Wingman's 16 rounds fail the length check;
+// casual, deathmatch and the other respawn modes fail the friendly-fire or
+// halftime rules. Each value must have been explicitly recorded in the demo —
+// absence reads as unknown, never as a default. Stricter markers were
+// rejected as server quirks rather than mode evidence: FACEIT retransmits
+// the default mp_startmoney 800 but BLAST and ESL tournament servers do not,
+// and freeze time varies between tournaments (15 on FACEIT, 20 on ESL).
+func hasCompetitiveRuleset(conVars map[string]string) bool {
+	return conVars["mp_maxrounds"] == "24" &&
+		conVarOn(conVars["mp_halftime"]) &&
+		conVarOn(conVars["mp_friendlyfire"])
+}
+
+// conVarOn reports whether a boolean ConVar was recorded as enabled; demos
+// spell recorded booleans both as "true"/"false" and as "1"/"0".
+func conVarOn(value string) bool {
+	return value == "true" || value == "1"
+}
+
 func (p DemoPlayer) String() string {
 	return fmt.Sprintf("Player: %s (SteamID: %d)\nKills: %d, Deaths: %d, Headshots: %d, Precision: %.1f%%\n",
 		p.Name, p.SteamID, p.KillStats.Total, p.Deaths, p.KillStats.HeadShots, p.KillStats.Precision*100)
@@ -694,8 +733,8 @@ func (a *analyser) applyScoreboardMVPs(mvps map[uint64]int) {
 	}
 }
 
-// finalise fills in everything that needs the full match: final score and
-// the per-player derived stats.
+// finalise fills in everything that needs the full match: final score, the
+// resolved game mode and the per-player derived stats.
 func (a *analyser) finalise() {
 	a.captureScoreboardMVPs()
 	a.finalizeRoundFacts()
@@ -713,6 +752,7 @@ func (a *analyser) finalise() {
 	a.mapData.TotalRounds = gs.TotalRoundsPlayed()
 	a.mapData.RoundsWonCT = gs.TeamCounterTerrorists().Score()
 	a.mapData.RoundsWonT = gs.TeamTerrorists().Score()
+	a.gameMode = resolveGameMode(a.gameMode, gs.Rules().ConVars())
 
 	a.derive(a.mapData.TotalRounds)
 }

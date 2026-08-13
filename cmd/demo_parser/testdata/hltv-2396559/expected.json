@@ -10,6 +10,7 @@
       "demo_file": "spirit-vs-jijiehao-mirage.dem",
       "demo_sha256": "d68a4453645332f2a1da37acb07b1e4621362145e678e056f5252b213df2dd38",
       "parser_map_name": "de_mirage",
+      "game_mode": "competitive",
       "rounds": 23,
       "score_values": [10, 13],
       "players": [

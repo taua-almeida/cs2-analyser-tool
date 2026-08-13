@@ -10,6 +10,7 @@
       "demo_file": "spirit-vs-mouz-m1-dust2.dem",
       "demo_sha256": "06075d8cd46422ea9cfd989a4eb849556cd87bcce6b5c83c6343d8e031c9ae19",
       "parser_map_name": "de_dust2",
+      "game_mode": "competitive",
       "rounds": 21,
       "score_values": [8, 13],
       "players": [
@@ -32,6 +33,7 @@
       "demo_file": "spirit-vs-mouz-m2-mirage.dem",
       "demo_sha256": "a1d8cc6e2f9e709d17519157fd577f98db98ea80edd2177c12c9b8c666b11c89",
       "parser_map_name": "de_mirage",
+      "game_mode": "competitive",
       "rounds": 17,
       "score_values": [4, 13],
       "players": [
@@ -54,6 +56,7 @@
       "demo_file": "spirit-vs-mouz-m3-ancient.dem",
       "demo_sha256": "4ddc87a2b87ff604ccfeb5ee498f543b45afa1f22e8366163db73e828eeb0785",
       "parser_map_name": "de_ancient",
+      "game_mode": "competitive",
       "rounds": 22,
       "score_values": [9, 13],
       "players": [
@@ -76,6 +79,7 @@
       "demo_file": "spirit-vs-mouz-m4-nuke.dem",
       "demo_sha256": "11596e71c48615b49248b9b3e915ca0b1beaaf29230af90ceb8cbde9267b4337",
       "parser_map_name": "de_nuke",
+      "game_mode": "competitive",
       "rounds": 23,
       "score_values": [10, 13],
       "players": [

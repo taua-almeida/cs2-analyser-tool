@@ -290,4 +290,8 @@ Saved JSON carries two match-level fields beside `players`. `map_data` is an obj
 
 `rounds_won_ct` and `rounds_won_t` are final side scores, not logical team identity. Sides swap at halftime, and the saved record does not map scores to the teams that earned them.
 
-`game_mode` is a top-level string, e.g. `"premier"`. It is written even when empty: a demo whose metadata does not expose the mode saves `"game_mode": ""`.
+`game_mode` is a top-level string, e.g. `"premier"`. The primary source is the demo's `ServerInfo.GameSessionConfig`, whose `gamemode` field names the mode directly on Valve servers; a non-empty value there is always reported as-is and takes precedence over everything below.
+
+Tournament servers (the FACEIT, BLAST and ESL demos behind HLTV downloads) send that config with an empty `gamemode`. When the primary value is empty, the parser falls back to the game rules the demo records as ConVars: a demo that explicitly recorded `mp_maxrounds` `24`, `mp_halftime` on and `mp_friendlyfire` on — the regulation MR12 competitive ruleset — reports `"competitive"`. That is the only value the fallback can produce, chosen to match the string Valve servers use for classic competitive play.
+
+Anything less specific stays empty: a demo that names no mode and does not record that full ruleset saves `"game_mode": ""`. An unrecorded ConVar reads as unknown, never as a default, and the mode is never inferred from context outside the demo's own metadata, such as the filename.
