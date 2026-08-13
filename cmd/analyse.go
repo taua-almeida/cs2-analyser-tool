@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -87,10 +86,9 @@ var analyseCmd = &cobra.Command{
 			players = availablePlayers
 		}
 
-		playersToAnalyse := demoparser.GetPlayersToAnalyse(processedDemoData.Players, players)
-		if len(playersToAnalyse) == 0 {
-			return fmt.Errorf("no players named %s in this demo, available players: %s",
-				strings.Join(players, ", "), strings.Join(availablePlayers, ", "))
+		playersToAnalyse, err := demoparser.GetPlayersToAnalyse(processedDemoData.Players, players)
+		if err != nil {
+			return err
 		}
 
 		dataexport.PrintCLIDataTable(playersToAnalyse, &processedDemoData.Map, processedDemoData.GameMode)

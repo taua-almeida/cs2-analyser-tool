@@ -804,15 +804,39 @@ func GetPlayersName(players map[uint64]*DemoPlayer) []string {
 	return playerNames
 }
 
-func GetPlayersToAnalyse(players map[uint64]*DemoPlayer, playersToAnalyse []string) map[uint64]*DemoPlayer {
-	playersToAnalyseMap := make(map[uint64]*DemoPlayer)
-	for _, player := range players {
-		match := slices.ContainsFunc(playersToAnalyse, func(name string) bool {
-			return strings.EqualFold(name, player.Name)
+// GetPlayersToAnalyse resolves the requested names against the demo players.
+// Names match case-insensitively and duplicate requests count once. Selection
+// is all-or-nothing: if any requested name has no matching player, it returns
+// no selection and an error listing the unmatched names in first-request order
+// along with every available demo name.
+func GetPlayersToAnalyse(players map[uint64]*DemoPlayer, requestedNames []string) (map[uint64]*DemoPlayer, error) {
+	distinct := make([]string, 0, len(requestedNames))
+	for _, name := range requestedNames {
+		duplicate := slices.ContainsFunc(distinct, func(seen string) bool {
+			return strings.EqualFold(seen, name)
 		})
-		if match {
-			playersToAnalyseMap[player.SteamID] = player
+		if !duplicate {
+			distinct = append(distinct, name)
 		}
 	}
-	return playersToAnalyseMap
+
+	selected := make(map[uint64]*DemoPlayer)
+	var unmatched []string
+	for _, name := range distinct {
+		matched := false
+		for _, player := range players {
+			if strings.EqualFold(name, player.Name) {
+				selected[player.SteamID] = player
+				matched = true
+			}
+		}
+		if !matched {
+			unmatched = append(unmatched, name)
+		}
+	}
+	if len(unmatched) > 0 {
+		return nil, fmt.Errorf("players not found in demo: %s; available players: %s",
+			strings.Join(unmatched, ", "), strings.Join(GetPlayersName(players), ", "))
+	}
+	return selected, nil
 }
