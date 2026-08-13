@@ -46,6 +46,7 @@ type hltvKillTrace struct {
 	victim        uint64
 	victimName    string
 	victimTeam    common.Team
+	assister      uint64
 	assisterName  string
 	assistedFlash bool
 	cause         string
@@ -132,6 +133,7 @@ func TestTraceHLTVRoundEvidence(t *testing.T) {
 			victim:        trackerID(e.Victim),
 			victimName:    tracePlayerName(e.Victim),
 			victimTeam:    e.Victim.Team,
+			assister:      trackerID(e.Assister),
 			assisterName:  tracePlayerName(e.Assister),
 			assistedFlash: e.AssistedFlash,
 			cause:         traceKillCause(e),
@@ -248,9 +250,9 @@ func logTraceDeaths(t *testing.T, roundNumber int, player uint64, round *hltvRou
 		if death.victim != player {
 			continue
 		}
-		t.Logf("round=%d death player=%s killer=%s cause=%s frame=%d tick=%d time=%s post_round=%t assister=%s flash=%t",
+		t.Logf("round=%d death player=%s killer=%s cause=%s frame=%d tick=%d time=%s post_round=%t assister=%s assister_steam=%d flash=%t",
 			roundNumber, names[player], death.killerName, death.cause, death.frame, death.tick,
-			death.at, death.postRound, death.assisterName, death.assistedFlash)
+			death.at, death.postRound, death.assisterName, death.assister, death.assistedFlash)
 		for offset, revenge := range round.kills[i+1:] {
 			if death.killer == 0 || revenge.killerTeam != death.victimTeam || revenge.victim != death.killer {
 				continue
