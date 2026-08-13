@@ -12,6 +12,17 @@ import (
 	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
 )
 
+// The flat CSV header contract, pinned independently of playerCSVHeader so
+// accidental production drift fails these tests. New columns are appended
+// after all existing ones so legacy column positions stay stable; the series
+// CSV test asserts the identical concatenation.
+var (
+	legacyCSVHeader  = []string{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Deaths Traded", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "Deaths Traded CT", "Deaths Traded T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon"}
+	utilityCSVHeader = []string{"Enemies Flashed", "Friends Flashed", "Enemy Flash Time (s)", "Average Enemy Flash Time (s)", "Utility Damage Total", "HE Utility Damage", "Fire Utility Damage", "Grenades Thrown Total", "Flashbangs Thrown", "Smokes Thrown", "HE Grenades Thrown", "Molotovs Thrown", "Incendiaries Thrown", "Decoys Thrown", "Unused Utility Value"}
+	ratingCSVHeader  = []string{"Rating", "Rating Kills", "Rating Damage", "Rating Survival", "Rating KAST", "Rating Multi-kill", "Rating Round Swing"}
+	approxCSVHeader  = []string{"Approx. eKAST (%)", "Approx. swing (%)"}
+)
+
 func utilityPlayer() *demoparser.DemoPlayer {
 	return &demoparser.DemoPlayer{
 		SteamID: 1,
@@ -87,27 +98,22 @@ func TestCSVAppendsStableUtilityAndRatingColumns(t *testing.T) {
 		t.Fatalf("CSV records = %d, want header and one player", len(records))
 	}
 
-	legacyHeader := []string{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Deaths Traded", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "Deaths Traded CT", "Deaths Traded T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon"}
-	utilityHeader := []string{"Enemies Flashed", "Friends Flashed", "Enemy Flash Time (s)", "Average Enemy Flash Time (s)", "Utility Damage Total", "HE Utility Damage", "Fire Utility Damage", "Grenades Thrown Total", "Flashbangs Thrown", "Smokes Thrown", "HE Grenades Thrown", "Molotovs Thrown", "Incendiaries Thrown", "Decoys Thrown", "Unused Utility Value"}
-	ratingHeader := []string{"Rating", "Rating Kills", "Rating Damage", "Rating Survival", "Rating KAST", "Rating Multi-kill", "Rating Round Swing"}
-	// Appended last so every legacy column keeps its position.
-	approxHeader := []string{"Approx. eKAST (%)", "Approx. swing (%)"}
-	wantHeader := slices.Concat(legacyHeader, utilityHeader, ratingHeader, approxHeader)
+	wantHeader := slices.Concat(legacyCSVHeader, utilityCSVHeader, ratingCSVHeader, approxCSVHeader)
 	if !reflect.DeepEqual(records[0], wantHeader) {
 		t.Errorf("CSV header = %q, want %q", records[0], wantHeader)
 	}
 	wantUtilityValues := []string{"3", "4", "5.2", "1.8", "60", "40", "20", "21", "1", "2", "3", "4", "5", "6", "700"}
-	utilityValues := records[1][len(legacyHeader) : len(legacyHeader)+len(utilityHeader)]
+	utilityValues := records[1][len(legacyCSVHeader) : len(legacyCSVHeader)+len(utilityCSVHeader)]
 	if !reflect.DeepEqual(utilityValues, wantUtilityValues) {
 		t.Errorf("CSV utility values = %q, want %q", utilityValues, wantUtilityValues)
 	}
 	wantRatingValues := []string{"1.23", "1.10", "0.90", "1.00", "1.05", "0.50", "1.20"}
-	ratingStart := len(legacyHeader) + len(utilityHeader)
-	if got := records[1][ratingStart : ratingStart+len(ratingHeader)]; !reflect.DeepEqual(got, wantRatingValues) {
+	ratingStart := len(legacyCSVHeader) + len(utilityCSVHeader)
+	if got := records[1][ratingStart : ratingStart+len(ratingCSVHeader)]; !reflect.DeepEqual(got, wantRatingValues) {
 		t.Errorf("CSV rating values = %q, want %q", got, wantRatingValues)
 	}
 	wantApproxValues := []string{"104.3", "-4.5"}
-	if got := records[1][ratingStart+len(ratingHeader):]; !reflect.DeepEqual(got, wantApproxValues) {
+	if got := records[1][ratingStart+len(ratingCSVHeader):]; !reflect.DeepEqual(got, wantApproxValues) {
 		t.Errorf("CSV approx metric values = %q, want %q", got, wantApproxValues)
 	}
 }

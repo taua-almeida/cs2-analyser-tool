@@ -123,7 +123,34 @@ func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
 		Teams:    a.teams,
 		Map:      a.mapData,
 		GameMode: a.gameMode,
+		aggFacts: a.exportAggFacts(),
 	}, nil
+}
+
+// exportAggFacts snapshots the raw accumulators behind each player's derived
+// stats, keyed by SteamID64, so series aggregation can recompute rates and
+// the rating from exact numerators. Bots never reach a.players, so their
+// tracker-only IDs are naturally excluded.
+func (a *analyser) exportAggFacts() map[uint64]playerAggFacts {
+	facts := make(map[uint64]playerAggFacts, len(a.players))
+	for id := range a.players {
+		facts[id] = a.factsFor(id)
+	}
+	return facts
+}
+
+// factsFor collects one player's raw accumulators from the analyser's maps.
+func (a *analyser) factsFor(id uint64) playerAggFacts {
+	return playerAggFacts{
+		kastRounds:  a.kastRounds[id],
+		sideDamage:  a.sideDamage[id],
+		openingWins: a.openingWins[id],
+		ecoKills:    a.ecoKills[id],
+		ecoDamage:   a.ecoDamage[id],
+		ecoSurvival: a.ecoSurvival[id],
+		ecoKast:     a.ecoKast[id],
+		roundSwing:  a.roundSwing[id],
+	}
 }
 
 // resolveGameMode picks the game mode to report. GameSessionConfig's gamemode
@@ -586,6 +613,15 @@ func (s *SideCount) count(side common.Team) {
 	s.add(side, 1)
 }
 
+// addCounts sums another counter into this one field by field. It is not
+// add over both sides: Total is carried through, not rederived, so counters
+// whose Total is more than CT+T keep that property when merged.
+func (s *SideCount) addCounts(other SideCount) {
+	s.Total += other.Total
+	s.CT += other.CT
+	s.T += other.T
+}
+
 // addSide credits n to the counter kept under id, which the maps hold by
 // value so a player that has never been counted reads as an empty one.
 func addSide(counters map[uint64]SideCount, id uint64, side common.Team, n int) {
@@ -880,54 +916,89 @@ func perRound(value, rounds int) float64 {
 // count instead of a demo.
 func (a *analyser) derive(totalRounds int) {
 	for id, p := range a.players {
-		if p.KillStats.Total > 0 {
-			p.KillStats.Precision = float64(p.KillStats.HeadShots) / float64(p.KillStats.Total)
-		}
-		// The match-wide ADR and KAST both use the match's round count,
-		// following the convention of HLTV-style stat sites. The rating's
-		// per-round averages share that denominator, so a late joiner is
-		// diluted here exactly as their ADR is.
-		if totalRounds > 0 {
-			p.AssistStats.ADR = perRound(p.AssistStats.DamageGiven, totalRounds)
-			p.PlayerMapStats.KAST = 100 * perRound(a.kastRounds[id].Total, totalRounds)
-			rounds := float64(totalRounds)
-			// The approximate percentages publish the same per-round
-			// values the rating normalizes, before the KAST baseline
-			// division and before the swing floor can hide a negative.
-			ecoKastPerRound := a.ecoKast[id] / rounds
-			swingPerRound := a.roundSwing[id] / rounds
-			p.PlayerMapStats.ApproxEKASTPercent = 100 * ecoKastPerRound
-			p.PlayerMapStats.ApproxRoundSwingPercent = 100 * swingPerRound
-			p.Rating = blendRating(ratingRound{
-				killPoints: a.ecoKills[id] / rounds,
-				ecoDamage:  a.ecoDamage[id] / rounds,
-				survival:   a.ecoSurvival[id] / rounds,
-				kast:       ecoKastPerRound,
-				multiKill:  multiKillPoints(p.PlayerMapStats.MultiKills) / rounds,
-				swing:      swingPerRound,
-			})
-		}
-		// Their side splits cannot: sides swap at halftime, so there is no
-		// match-wide CT or T round count that holds for every player. Each
-		// side is divided by the rounds that player spent on it, which for
-		// anyone who played the whole match adds back up to the same total.
-		rounds := p.SideStats.Rounds
-		damage, kast := a.sideDamage[id], a.kastRounds[id]
-		p.SideStats.ADR = SideRate{
-			CT: perRound(damage.CT, rounds.CT),
-			T:  perRound(damage.T, rounds.T),
-		}
-		p.SideStats.KAST = SideRate{
-			CT: 100 * perRound(kast.CT, rounds.CT),
-			T:  100 * perRound(kast.T, rounds.T),
-		}
-		if kills := p.OpeningDuelStats.OpeningKills.Total; kills > 0 {
-			p.OpeningDuelStats.OpeningSuccessRate = 100 * float64(a.openingWins[id]) / float64(kills)
-		}
-		if flashes := p.UtilityStats.EnemiesFlashed; flashes > 0 {
-			p.UtilityStats.AverageEnemyFlashTimeSeconds = p.UtilityStats.EnemyFlashTimeSeconds / float64(flashes)
+		rating, rated := deriveStats(p.statRefs(), a.factsFor(id), totalRounds)
+		if rated {
+			p.Rating = rating
 		}
 	}
+}
+
+// statRefs points at the stat blocks a player shares between the per-map and
+// series shapes, so one derivation writes both.
+type statRefs struct {
+	kills   *KillStats
+	assists *AssistStats
+	stats   *PlayerMapStats
+	opening *OpeningDuelStats
+	side    *SideStats
+	utility *UtilityStats
+}
+
+func (p *DemoPlayer) statRefs() statRefs {
+	return statRefs{
+		kills:   &p.KillStats,
+		assists: &p.AssistStats,
+		stats:   &p.PlayerMapStats,
+		opening: &p.OpeningDuelStats,
+		side:    &p.SideStats,
+		utility: &p.UtilityStats,
+	}
+}
+
+// deriveStats recomputes every fact-derived rate in place from the exact raw
+// accumulators, and returns the rating, valid only when there were rounds to
+// divide by. It is the one home of these formulas: a map divides by the
+// map's rounds, a series by the player's summed series rounds, and both get
+// identical arithmetic.
+func deriveStats(refs statRefs, facts playerAggFacts, totalRounds int) (rating RatingStats, rated bool) {
+	if refs.kills.Total > 0 {
+		refs.kills.Precision = float64(refs.kills.HeadShots) / float64(refs.kills.Total)
+	}
+	// The match-wide ADR and KAST both use the match's round count,
+	// following the convention of HLTV-style stat sites. The rating's
+	// per-round averages share that denominator, so a late joiner is
+	// diluted here exactly as their ADR is.
+	if totalRounds > 0 {
+		refs.assists.ADR = perRound(refs.assists.DamageGiven, totalRounds)
+		refs.stats.KAST = 100 * perRound(facts.kastRounds.Total, totalRounds)
+		rounds := float64(totalRounds)
+		// The approximate percentages publish the same per-round
+		// values the rating normalizes, before the KAST baseline
+		// division and before the swing floor can hide a negative.
+		ecoKastPerRound := facts.ecoKast / rounds
+		swingPerRound := facts.roundSwing / rounds
+		refs.stats.ApproxEKASTPercent = 100 * ecoKastPerRound
+		refs.stats.ApproxRoundSwingPercent = 100 * swingPerRound
+		rating = blendRating(ratingRound{
+			killPoints: facts.ecoKills / rounds,
+			ecoDamage:  facts.ecoDamage / rounds,
+			survival:   facts.ecoSurvival / rounds,
+			kast:       ecoKastPerRound,
+			multiKill:  multiKillPoints(refs.stats.MultiKills) / rounds,
+			swing:      swingPerRound,
+		})
+		rated = true
+	}
+	// The side splits cannot share that denominator: sides swap at halftime,
+	// so there is no match-wide CT or T round count that holds for every
+	// player. Each side is divided by the rounds that player spent on it,
+	// which for anyone who played every round adds back up to the same total.
+	sideRounds := refs.side.Rounds
+	refs.side.ADR = SideRate{
+		CT: perRound(facts.sideDamage.CT, sideRounds.CT),
+		T:  perRound(facts.sideDamage.T, sideRounds.T),
+	}
+	refs.side.KAST = SideRate{
+		CT: 100 * perRound(facts.kastRounds.CT, sideRounds.CT),
+		T:  100 * perRound(facts.kastRounds.T, sideRounds.T),
+	}
+	if kills := refs.opening.OpeningKills.Total; kills > 0 {
+		refs.opening.OpeningSuccessRate = 100 * float64(facts.openingWins) / float64(kills)
+	}
+	if flashes := refs.utility.EnemiesFlashed; flashes > 0 {
+		refs.utility.AverageEnemyFlashTimeSeconds = refs.utility.EnemyFlashTimeSeconds / float64(flashes)
+	}
+	return rating, rated
 }
 
 func GetPlayerBestWeapon(weaponsKills map[string]int) string {
@@ -958,16 +1029,7 @@ func GetPlayersName(players map[uint64]*DemoPlayer) []string {
 // no selection and an error listing the unmatched names in first-request order
 // along with every available demo name.
 func GetPlayersToAnalyse(players map[uint64]*DemoPlayer, requestedNames []string) (map[uint64]*DemoPlayer, error) {
-	distinct := make([]string, 0, len(requestedNames))
-	for _, name := range requestedNames {
-		duplicate := slices.ContainsFunc(distinct, func(seen string) bool {
-			return strings.EqualFold(seen, name)
-		})
-		if !duplicate {
-			distinct = append(distinct, name)
-		}
-	}
-
+	distinct := distinctNamesFold(requestedNames)
 	selected := make(map[uint64]*DemoPlayer)
 	var unmatched []string
 	for _, name := range distinct {
@@ -987,4 +1049,19 @@ func GetPlayersToAnalyse(players map[uint64]*DemoPlayer, requestedNames []string
 			strings.Join(unmatched, ", "), strings.Join(GetPlayersName(players), ", "))
 	}
 	return selected, nil
+}
+
+// distinctNamesFold removes case-insensitive duplicate requests, keeping the
+// first spelling of each name in request order.
+func distinctNamesFold(names []string) []string {
+	distinct := make([]string, 0, len(names))
+	for _, name := range names {
+		duplicate := slices.ContainsFunc(distinct, func(seen string) bool {
+			return strings.EqualFold(seen, name)
+		})
+		if !duplicate {
+			distinct = append(distinct, name)
+		}
+	}
+	return distinct
 }

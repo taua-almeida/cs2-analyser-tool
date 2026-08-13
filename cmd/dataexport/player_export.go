@@ -22,81 +22,8 @@ func WriteAnalysisToFile(analysis *demoparser.ProcessedDemo, saveType string) (s
 		}
 		defer csvFile.Close()
 
-		// New columns are appended after all existing ones so legacy column
-		// positions stay stable. "Rating KAST" and "Rating Round Swing" keep
-		// their headers for the same reason: they remain the normalized
-		// sub-ratings, while the two appended "Approx." columns carry the
-		// pre-normalization percentages.
-		csvRecords := [][]string{
-			{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Deaths Traded", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "Deaths Traded CT", "Deaths Traded T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon", "Enemies Flashed", "Friends Flashed", "Enemy Flash Time (s)", "Average Enemy Flash Time (s)", "Utility Damage Total", "HE Utility Damage", "Fire Utility Damage", "Grenades Thrown Total", "Flashbangs Thrown", "Smokes Thrown", "HE Grenades Thrown", "Molotovs Thrown", "Incendiaries Thrown", "Decoys Thrown", "Unused Utility Value", "Rating", "Rating Kills", "Rating Damage", "Rating Survival", "Rating KAST", "Rating Multi-kill", "Rating Round Swing", "Approx. eKAST (%)", "Approx. swing (%)"},
-		}
-		for _, player := range sortedByKills(analysis.Players) {
-			csvRecords = append(csvRecords, []string{
-				player.Name,
-				fmt.Sprintf("%d", player.KillStats.Total),
-				fmt.Sprintf("%d", player.Deaths),
-				kdRatio(player.KillStats.Total, player.Deaths),
-				fmt.Sprintf("%d", player.KillStats.HeadShots),
-				fmt.Sprintf("%d", player.AssistStats.Total),
-				fmt.Sprintf("%d", player.AssistStats.FlashedEnemies),
-				fmt.Sprintf("%d", player.AssistStats.DamageGiven),
-				fmt.Sprintf("%.1f", player.AssistStats.ADR),
-				fmt.Sprintf("%.1f", player.PlayerMapStats.KAST),
-				fmt.Sprintf("%.1f", player.KillStats.Precision*100),
-				fmt.Sprintf("%d", player.KillStats.TradeKills),
-				fmt.Sprintf("%d", player.DeathsTraded.Total),
-				fmt.Sprintf("%d", player.OpeningDuelStats.OpeningKills.Total),
-				fmt.Sprintf("%d", player.OpeningDuelStats.OpeningDeaths.Total),
-				fmt.Sprintf("%.1f", player.OpeningDuelStats.OpeningSuccessRate),
-				fmt.Sprintf("%d", player.PlayerMapStats.MVPs),
-				fmt.Sprintf("%d", player.PlayerMapStats.ACEs),
-				fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K2),
-				fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K3),
-				fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K4),
-				fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K5),
-				fmt.Sprintf("%d", player.PlayerMapStats.ClutchesWon),
-				fmt.Sprintf("%d", player.SideStats.Rounds.CT),
-				fmt.Sprintf("%d", player.SideStats.Rounds.T),
-				fmt.Sprintf("%d", player.SideStats.Kills.CT),
-				fmt.Sprintf("%d", player.SideStats.Kills.T),
-				fmt.Sprintf("%d", player.SideStats.Deaths.CT),
-				fmt.Sprintf("%d", player.SideStats.Deaths.T),
-				fmt.Sprintf("%d", player.DeathsTraded.CT),
-				fmt.Sprintf("%d", player.DeathsTraded.T),
-				fmt.Sprintf("%.1f", player.SideStats.ADR.CT),
-				fmt.Sprintf("%.1f", player.SideStats.ADR.T),
-				fmt.Sprintf("%.1f", player.SideStats.KAST.CT),
-				fmt.Sprintf("%.1f", player.SideStats.KAST.T),
-				demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills),
-				fmt.Sprintf("%d", player.UtilityStats.EnemiesFlashed),
-				fmt.Sprintf("%d", player.UtilityStats.FriendsFlashed),
-				fmt.Sprintf("%.1f", player.UtilityStats.EnemyFlashTimeSeconds),
-				fmt.Sprintf("%.1f", player.UtilityStats.AverageEnemyFlashTimeSeconds),
-				fmt.Sprintf("%d", player.UtilityStats.UtilityDamage.Total),
-				fmt.Sprintf("%d", player.UtilityStats.UtilityDamage.HE),
-				fmt.Sprintf("%d", player.UtilityStats.UtilityDamage.Fire),
-				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Total),
-				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Flash),
-				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Smoke),
-				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.HE),
-				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Molotov),
-				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Incendiary),
-				fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Decoy),
-				fmt.Sprintf("%d", player.UtilityStats.UnusedUtilityValue),
-				fmt.Sprintf("%.2f", player.Rating.Value),
-				fmt.Sprintf("%.2f", player.Rating.Kills),
-				fmt.Sprintf("%.2f", player.Rating.Damage),
-				fmt.Sprintf("%.2f", player.Rating.Survival),
-				fmt.Sprintf("%.2f", player.Rating.KAST),
-				fmt.Sprintf("%.2f", player.Rating.MultiKill),
-				fmt.Sprintf("%.2f", player.Rating.RoundSwing),
-				fmt.Sprintf("%.1f", player.PlayerMapStats.ApproxEKASTPercent),
-				fmt.Sprintf("%.1f", player.PlayerMapStats.ApproxRoundSwingPercent),
-			})
-		}
-
 		w := csv.NewWriter(csvFile)
-		if err := w.WriteAll(csvRecords); err != nil {
+		if err := w.WriteAll(playerCSVRecords(analysis.Players)); err != nil {
 			return "", err
 		}
 		return fileName, nil
@@ -113,4 +40,111 @@ func WriteAnalysisToFile(analysis *demoparser.ProcessedDemo, saveType string) (s
 	}
 
 	return fileName, nil
+}
+
+// playerCSVHeader is the flat CSV's single header row. New columns are
+// appended after all existing ones so legacy column positions stay stable.
+// "Rating KAST" and "Rating Round Swing" keep their headers for the same
+// reason: they remain the normalized sub-ratings, while the two appended
+// "Approx." columns carry the pre-normalization percentages.
+func playerCSVHeader() []string {
+	return []string{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "Flash Assists", "Damage Given", "ADR", "KAST (%)", "Precision (%)", "Trade Kills", "Deaths Traded", "Opening Kills", "Opening Deaths", "Opening Success (%)", "MVPs", "ACEs", "2K", "3K", "4K", "5K", "Clutches Won", "Rounds CT", "Rounds T", "Kills CT", "Kills T", "Deaths CT", "Deaths T", "Deaths Traded CT", "Deaths Traded T", "ADR CT", "ADR T", "KAST CT (%)", "KAST T (%)", "Best Weapon", "Enemies Flashed", "Friends Flashed", "Enemy Flash Time (s)", "Average Enemy Flash Time (s)", "Utility Damage Total", "HE Utility Damage", "Fire Utility Damage", "Grenades Thrown Total", "Flashbangs Thrown", "Smokes Thrown", "HE Grenades Thrown", "Molotovs Thrown", "Incendiaries Thrown", "Decoys Thrown", "Unused Utility Value", "Rating", "Rating Kills", "Rating Damage", "Rating Survival", "Rating KAST", "Rating Multi-kill", "Rating Round Swing", "Approx. eKAST (%)", "Approx. swing (%)"}
+}
+
+// ratingCSVColumns is how many rating columns the flat CSV carries — the
+// cells ratingCSVCells formats, in the header's order.
+const ratingCSVColumns = 7
+
+// ratingCSVCells formats the seven rating columns.
+func ratingCSVCells(rating demoparser.RatingStats) []string {
+	return []string{
+		fmt.Sprintf("%.2f", rating.Value),
+		fmt.Sprintf("%.2f", rating.Kills),
+		fmt.Sprintf("%.2f", rating.Damage),
+		fmt.Sprintf("%.2f", rating.Survival),
+		fmt.Sprintf("%.2f", rating.KAST),
+		fmt.Sprintf("%.2f", rating.MultiKill),
+		fmt.Sprintf("%.2f", rating.RoundSwing),
+	}
+}
+
+// omittedRatingCSVCells keeps the seven rating columns empty for a player
+// whose rating was not computed, so an absent rating never prints as a real
+// 0.00 one.
+func omittedRatingCSVCells() []string {
+	return make([]string, ratingCSVColumns)
+}
+
+// playerCSVRecords builds the flat player-only CSV: header plus one row per
+// player, most kills first.
+func playerCSVRecords(players map[uint64]*demoparser.DemoPlayer) [][]string {
+	csvRecords := [][]string{playerCSVHeader()}
+	for _, player := range sortedByKills(players) {
+		csvRecords = append(csvRecords, playerCSVRow(player, ratingCSVCells(player.Rating)))
+	}
+	return csvRecords
+}
+
+// playerCSVRow formats one player row. The rating cells are injected so a
+// series save can blank them for an omitted rating; everything else keeps
+// the existing single-map formatting.
+func playerCSVRow(player *demoparser.DemoPlayer, ratingCells []string) []string {
+	row := []string{
+		player.Name,
+		fmt.Sprintf("%d", player.KillStats.Total),
+		fmt.Sprintf("%d", player.Deaths),
+		kdRatio(player.KillStats.Total, player.Deaths),
+		fmt.Sprintf("%d", player.KillStats.HeadShots),
+		fmt.Sprintf("%d", player.AssistStats.Total),
+		fmt.Sprintf("%d", player.AssistStats.FlashedEnemies),
+		fmt.Sprintf("%d", player.AssistStats.DamageGiven),
+		fmt.Sprintf("%.1f", player.AssistStats.ADR),
+		fmt.Sprintf("%.1f", player.PlayerMapStats.KAST),
+		fmt.Sprintf("%.1f", player.KillStats.Precision*100),
+		fmt.Sprintf("%d", player.KillStats.TradeKills),
+		fmt.Sprintf("%d", player.DeathsTraded.Total),
+		fmt.Sprintf("%d", player.OpeningDuelStats.OpeningKills.Total),
+		fmt.Sprintf("%d", player.OpeningDuelStats.OpeningDeaths.Total),
+		fmt.Sprintf("%.1f", player.OpeningDuelStats.OpeningSuccessRate),
+		fmt.Sprintf("%d", player.PlayerMapStats.MVPs),
+		fmt.Sprintf("%d", player.PlayerMapStats.ACEs),
+		fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K2),
+		fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K3),
+		fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K4),
+		fmt.Sprintf("%d", player.PlayerMapStats.MultiKills.K5),
+		fmt.Sprintf("%d", player.PlayerMapStats.ClutchesWon),
+		fmt.Sprintf("%d", player.SideStats.Rounds.CT),
+		fmt.Sprintf("%d", player.SideStats.Rounds.T),
+		fmt.Sprintf("%d", player.SideStats.Kills.CT),
+		fmt.Sprintf("%d", player.SideStats.Kills.T),
+		fmt.Sprintf("%d", player.SideStats.Deaths.CT),
+		fmt.Sprintf("%d", player.SideStats.Deaths.T),
+		fmt.Sprintf("%d", player.DeathsTraded.CT),
+		fmt.Sprintf("%d", player.DeathsTraded.T),
+		fmt.Sprintf("%.1f", player.SideStats.ADR.CT),
+		fmt.Sprintf("%.1f", player.SideStats.ADR.T),
+		fmt.Sprintf("%.1f", player.SideStats.KAST.CT),
+		fmt.Sprintf("%.1f", player.SideStats.KAST.T),
+		demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills),
+		fmt.Sprintf("%d", player.UtilityStats.EnemiesFlashed),
+		fmt.Sprintf("%d", player.UtilityStats.FriendsFlashed),
+		fmt.Sprintf("%.1f", player.UtilityStats.EnemyFlashTimeSeconds),
+		fmt.Sprintf("%.1f", player.UtilityStats.AverageEnemyFlashTimeSeconds),
+		fmt.Sprintf("%d", player.UtilityStats.UtilityDamage.Total),
+		fmt.Sprintf("%d", player.UtilityStats.UtilityDamage.HE),
+		fmt.Sprintf("%d", player.UtilityStats.UtilityDamage.Fire),
+		fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Total),
+		fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Flash),
+		fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Smoke),
+		fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.HE),
+		fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Molotov),
+		fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Incendiary),
+		fmt.Sprintf("%d", player.UtilityStats.GrenadesThrown.Decoy),
+		fmt.Sprintf("%d", player.UtilityStats.UnusedUtilityValue),
+	}
+	row = append(row, ratingCells...)
+	return append(row,
+		fmt.Sprintf("%.1f", player.PlayerMapStats.ApproxEKASTPercent),
+		fmt.Sprintf("%.1f", player.PlayerMapStats.ApproxRoundSwingPercent),
+	)
 }

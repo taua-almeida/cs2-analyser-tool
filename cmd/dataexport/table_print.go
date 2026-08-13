@@ -13,15 +13,24 @@ import (
 	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
 )
 
-// sortedByKills orders players the way the main table does, most kills
-// first, so every output lists them in the same order. Ties break by name
-// to keep that order stable across runs.
+// killsOrder is the one player ordering every output uses: most kills
+// first, ties broken by name, then by SteamID — without the final unique
+// key, two players sharing a name and kill count would inherit the map's
+// random iteration order and reorder between runs.
+func killsOrder(aKills, bKills int, aName, bName string, aID, bID uint64) int {
+	if c := cmp.Compare(bKills, aKills); c != 0 {
+		return c
+	}
+	if c := cmp.Compare(aName, bName); c != 0 {
+		return c
+	}
+	return cmp.Compare(aID, bID)
+}
+
+// sortedByKills orders players the way the main table does.
 func sortedByKills(players map[uint64]*demoparser.DemoPlayer) []*demoparser.DemoPlayer {
 	return slices.SortedFunc(maps.Values(players), func(a, b *demoparser.DemoPlayer) int {
-		if c := cmp.Compare(b.KillStats.Total, a.KillStats.Total); c != 0 {
-			return c
-		}
-		return cmp.Compare(a.Name, b.Name)
+		return killsOrder(a.KillStats.Total, b.KillStats.Total, a.Name, b.Name, a.SteamID, b.SteamID)
 	})
 }
 
@@ -82,29 +91,49 @@ func PrintCLIDetailTables(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
 	printGrenadesThrownTable(players, os.Stdout)
 }
 
-// printRatingTable breaks the rating into its six sub-ratings, each
+// ratingRow is one line of the rating breakdown. A nil rating means it was
+// not computed — a series aggregate without raw facts — and renders as "-"
+// cells rather than a fabricated zero rating.
+type ratingRow struct {
+	name   string
+	rating *demoparser.RatingStats
+}
+
+// printRatingRows breaks the rating into its six sub-ratings, each
 // normalized so 1.00 is an average performance on that axis. The KAST and
 // round-swing columns are headed as sub-ratings to keep them apart from the
-// approximate percentages printed below them.
-func printRatingTable(players []*demoparser.DemoPlayer, output io.Writer) {
+// approximate percentages printed below them. It is the one rating-breakdown
+// shell, shared by the single-map and series detail tables.
+func printRatingRows(rows []ratingRow, output io.Writer) {
 	t := table.NewWriter()
 	t.SetOutputMirror(output)
 	t.SetTitle("Rating breakdown (1.00 = average)")
 	t.AppendHeader(table.Row{"Name", "Rating", "Kills", "Damage", "Survival", "eKAST sub-rating", "Multi-kill", "Round swing sub-rating"})
-	for _, player := range players {
-		rating := player.Rating
-		t.AppendRow(table.Row{
-			player.Name,
-			fmt.Sprintf("%.2f", rating.Value),
-			fmt.Sprintf("%.2f", rating.Kills),
-			fmt.Sprintf("%.2f", rating.Damage),
-			fmt.Sprintf("%.2f", rating.Survival),
-			fmt.Sprintf("%.2f", rating.KAST),
-			fmt.Sprintf("%.2f", rating.MultiKill),
-			fmt.Sprintf("%.2f", rating.RoundSwing),
-		})
+	for _, row := range rows {
+		cells := table.Row{row.name, "-", "-", "-", "-", "-", "-", "-"}
+		if rating := row.rating; rating != nil {
+			cells = table.Row{
+				row.name,
+				fmt.Sprintf("%.2f", rating.Value),
+				fmt.Sprintf("%.2f", rating.Kills),
+				fmt.Sprintf("%.2f", rating.Damage),
+				fmt.Sprintf("%.2f", rating.Survival),
+				fmt.Sprintf("%.2f", rating.KAST),
+				fmt.Sprintf("%.2f", rating.MultiKill),
+				fmt.Sprintf("%.2f", rating.RoundSwing),
+			}
+		}
+		t.AppendRow(cells)
 	}
 	t.Render()
+}
+
+func printRatingTable(players []*demoparser.DemoPlayer, output io.Writer) {
+	rows := make([]ratingRow, len(players))
+	for i, player := range players {
+		rows[i] = ratingRow{name: player.Name, rating: &player.Rating}
+	}
+	printRatingRows(rows, output)
 }
 
 // printApproxMetricsTable shows the interpretable pre-normalization values

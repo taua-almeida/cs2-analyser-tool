@@ -191,9 +191,29 @@ type DemoTeam struct {
 	Roster []uint64 `json:"roster"`
 }
 
+// playerAggFacts preserves the exact accumulators behind one player's
+// derived rates and rating, so series aggregation (issue #34) can recompute
+// every percentage and the rating from raw numerators instead of combining
+// rounded map-level values. The fields mirror the analyser's own maps and
+// are unexported so the standalone JSON output does not change.
+type playerAggFacts struct {
+	kastRounds  SideCount // rounds with classic KAST credit, total and per side
+	sideDamage  SideCount // damage given, total and per side
+	openingWins int       // rounds won after taking the opening kill
+	ecoKills    float64   // eco-adjusted kill points
+	ecoDamage   float64   // eco-adjusted damage given
+	ecoSurvival float64   // eco-weighted rounds survived
+	ecoKast     float64   // eco-weighted rounds with rating KAST credit
+	roundSwing  float64   // summed round-win-probability swing
+}
+
 type ProcessedDemo struct {
 	Players  map[uint64]*DemoPlayer `json:"players"`
 	Teams    []DemoTeam             `json:"teams"`
 	Map      MapData                `json:"map_data"`
 	GameMode string                 `json:"game_mode"`
+	// aggFacts carries every player's raw aggregation facts, keyed by
+	// SteamID64. It is nil on values not produced by ProcessDemo, which
+	// BuildSeries treats as facts being unavailable rather than zero.
+	aggFacts map[uint64]playerAggFacts
 }

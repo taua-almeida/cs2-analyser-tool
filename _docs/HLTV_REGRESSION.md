@@ -85,6 +85,39 @@ extra/match-128974/nuke-234256
 extra/match-2396559/mirage-234956
 ```
 
+## Series regression
+
+`TestHLTVSeriesRegression` (issue #34) reuses the original Rooster–Mindfreak
+oracle as a BO3 series fixture: it hashes and parses the three demos in
+oracle order, aggregates them with `BuildSeries(3, …)`, and asserts against
+values derived from the audited per-map rows rather than numbers of its own.
+Production code contains no fixture names, rosters, scores, paths or hashes.
+
+The assertions cover:
+
+- `best_of` 3, three ordered maps whose `sha256` and parsed map names match
+  the oracle rows in order (Inferno, Anubis, Mirage).
+- The two series teams matched by exact roster — never by team numbering —
+  with oracle-derived map wins (Mindfreak 2, Rooster 1), round wins (32
+  each), display names, and the completed-series winner (Mindfreak, who
+  clinches on the final map).
+- Total series rounds (64) equal to the sum of the three maps' rounds.
+- Exactly the ten oracle SteamIDs as aggregate players, each matched across
+  all three maps with `maps_played` 3 and the full 64-round denominator.
+- Additive totals (kills, deaths, damage, headshots, assists) equal to the
+  sums of the three standalone map analyses, series ADR and classic KAST
+  recomputed from those exact numerators over 64 rounds, and a recomputed —
+  never omitted — series rating for every player.
+
+It runs under the same environment convention as the original fixture and
+skips when the demos are unconfigured:
+
+```sh
+HLTV_DEMO_DIR=/path/to/match-129241-demos \
+REQUIRE_HLTV_DEMOS=1 \
+  go test -count=1 -v ./cmd/demo_parser -run '^(TestHLTVRegression|TestHLTVSeriesRegression)$'
+```
+
 ## Comparison contract
 
 Each map requires exactly the ten oracle SteamIDs. Map name, game mode, round

@@ -46,18 +46,27 @@ func selectedAnalysis() *demoparser.ProcessedDemo {
 	return analysis
 }
 
-func writeAndRead(t *testing.T, analysis *demoparser.ProcessedDemo, saveType string) []byte {
+// writeToTempAndRead runs a save-file writer inside a fresh temp working
+// directory and returns the produced file's bytes.
+func writeToTempAndRead(t *testing.T, write func() (string, error)) []byte {
 	t.Helper()
 	t.Chdir(t.TempDir())
-	fileName, err := WriteAnalysisToFile(analysis, saveType)
+	fileName, err := write()
 	if err != nil {
-		t.Fatalf("writing %s: %v", saveType, err)
+		t.Fatalf("writing: %v", err)
 	}
 	data, err := os.ReadFile(fileName)
 	if err != nil {
-		t.Fatalf("reading %s: %v", saveType, err)
+		t.Fatalf("reading %s: %v", fileName, err)
 	}
 	return data
+}
+
+func writeAndRead(t *testing.T, analysis *demoparser.ProcessedDemo, saveType string) []byte {
+	t.Helper()
+	return writeToTempAndRead(t, func() (string, error) {
+		return WriteAnalysisToFile(analysis, saveType)
+	})
 }
 
 // TestJSONEnvelopeTopLevelShape pins the saved document contract: exactly
