@@ -1,4 +1,4 @@
-package demoparser
+package analysis
 
 import (
 	"encoding/json"
@@ -27,10 +27,10 @@ var (
 
 // testMapDemo builds a minimal parsed map: the given logical teams, one
 // player per rostered SteamID named "player-<id>", and a round total equal
-// to the score sum. It deliberately has no aggFacts, like any ProcessedDemo
+// to the score sum. It deliberately has no aggFacts, like any MapAnalysis
 // a test constructs by hand.
-func testMapDemo(mapName string, teams ...testTeam) *ProcessedDemo {
-	demo := &ProcessedDemo{
+func testMapDemo(mapName string, teams ...testTeam) *MapAnalysis {
+	demo := &MapAnalysis{
 		Players: map[uint64]*DemoPlayer{},
 		Map:     MapData{MapName: mapName},
 	}
@@ -61,13 +61,13 @@ func testMapDemo(mapName string, teams ...testTeam) *ProcessedDemo {
 
 // abMap is a standard map between the two default lineups: team 1 is A,
 // team 2 is B, named after their lineup.
-func abMap(mapName string, scoreA, scoreB int) *ProcessedDemo {
+func abMap(mapName string, scoreA, scoreB int) *MapAnalysis {
 	return testMapDemo(mapName,
 		testTeam{id: 1, name: "Alpha", roster: rosterA, score: scoreA},
 		testTeam{id: 2, name: "Bravo", roster: rosterB, score: scoreB})
 }
 
-func seriesInputs(demos ...*ProcessedDemo) []SeriesMapInput {
+func seriesInputs(demos ...*MapAnalysis) []SeriesMapInput {
 	inputs := make([]SeriesMapInput, len(demos))
 	for i, demo := range demos {
 		inputs[i] = SeriesMapInput{Demo: demo, SHA256: fmt.Sprintf("digest-%d", i+1)}
@@ -92,7 +92,7 @@ func TestBuildSeriesCompletedPaths(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			demos := make([]*ProcessedDemo, len(test.scores))
+			demos := make([]*MapAnalysis, len(test.scores))
 			for i, score := range test.scores {
 				demos[i] = abMap(fmt.Sprintf("de_map%d", i+1), score[0], score[1])
 			}
@@ -642,7 +642,7 @@ func TestBuildSeriesRecomputesRatesFromExactFacts(t *testing.T) {
 }
 
 // TestBuildSeriesOmitsRatingWithoutRawFacts pins the documented fallback: a
-// map that was not produced by ProcessDemo carries no raw rating facts, so
+// map that was not produced by Analyse carries no raw rating facts, so
 // the series rating is explicitly null instead of being reconstructed from
 // rounded per-map ratings.
 func TestBuildSeriesOmitsRatingWithoutRawFacts(t *testing.T) {
@@ -663,7 +663,7 @@ func TestBuildSeriesDoesNotMutateInputs(t *testing.T) {
 	m3 := abMap("de_three", 10, 13)
 	m1.aggFacts = map[uint64]playerAggFacts{1: {ecoKills: 1.5, kastRounds: SideCount{Total: 3, CT: 2, T: 1}}}
 	inputs := seriesInputs(m1, m2, m3)
-	snapshots := []ProcessedDemo{deepCopyDemo(t, m1), deepCopyDemo(t, m2), deepCopyDemo(t, m3)}
+	snapshots := []MapAnalysis{deepCopyDemo(t, m1), deepCopyDemo(t, m2), deepCopyDemo(t, m3)}
 
 	if _, err := BuildSeries(3, inputs); err != nil {
 		t.Fatalf("BuildSeries: %v", err)
@@ -675,15 +675,15 @@ func TestBuildSeriesDoesNotMutateInputs(t *testing.T) {
 	}
 }
 
-// deepCopyDemo clones a ProcessedDemo including its unexported facts, which
+// deepCopyDemo clones a MapAnalysis including its unexported facts, which
 // json round-tripping would drop.
-func deepCopyDemo(t *testing.T, demo *ProcessedDemo) ProcessedDemo {
+func deepCopyDemo(t *testing.T, demo *MapAnalysis) MapAnalysis {
 	t.Helper()
 	data, err := json.Marshal(demo)
 	if err != nil {
 		t.Fatalf("marshalling demo: %v", err)
 	}
-	var clone ProcessedDemo
+	var clone MapAnalysis
 	if err := json.Unmarshal(data, &clone); err != nil {
 		t.Fatalf("unmarshalling demo: %v", err)
 	}
@@ -692,7 +692,7 @@ func deepCopyDemo(t *testing.T, demo *ProcessedDemo) ProcessedDemo {
 }
 
 func TestBuildSeriesIsDeterministic(t *testing.T) {
-	build := func() *ProcessedSeries {
+	build := func() *SeriesAnalysis {
 		m1 := abMap("de_one", 13, 9)
 		m2 := testMapDemo("de_two",
 			testTeam{id: 1, name: "Bravo", roster: rosterB, score: 9},

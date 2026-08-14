@@ -89,6 +89,54 @@ Read players from `.players`, keyed by SteamID (a JSON string). `map_data`, `tea
 
 The data output showed in the terminal table is not all the analyzed data, to get more info about the available data, go to [PLAYER_DATA](./_docs/PLAYER_DATA.MD). The `Rating` column is an HLTV Rating 3.0-style approximation; how it is calculated, constant by constant, is documented in [RATING](./_docs/RATING.MD).
 
+## Using the engine as a Go library
+
+Everything the CLI computes lives in the importable `analysis` package, which has no CLI, TUI or rendering dependencies of its own:
+
+```go
+import "github.com/taua-almeida/cs2-analyser-tool/analysis"
+```
+
+Add the module to your project with `go get github.com/taua-almeida/cs2-analyser-tool@latest`.
+
+### Analysing one map
+
+`Analyse` reads a complete demo from any `io.Reader` — a file, an uploaded stream, an in-memory buffer, an object-storage reader — and returns the map's players, logical teams, map data and game mode:
+
+```go
+result, err := analysis.Analyse(ctx, reader)
+```
+
+`AnalyseFile` is the file convenience wrapper. It owns the file it opens — open failures name the path, and the file is always closed before returning:
+
+```go
+result, err := analysis.AnalyseFile(ctx, "match.dem")
+```
+
+- **Input ownership**: `Analyse` borrows the reader and never closes it, even when it is an `io.Closer`. No rewindability is assumed and none survives a call: after success, failure or cancellation the reader has been consumed to an unspecified position, so reusing it requires rewinding or reopening it first.
+- **Stream failures**: a failing reader is an error, never a panic. An empty stream's immediate `io.EOF` or a connection dropped mid-demo comes back wrapping the reader's own error, so `errors.Is` still sees its identity.
+- **Cancellation**: cancelling the context interrupts parsing at the next demo frame instead of being checked only before or after the whole demo, and it also unblocks a `Read` currently blocked inside the reader — a stalled upload or network stream cannot pin the call. The returned error wraps the context's error, so `errors.Is(err, context.Canceled)` and `errors.Is(err, context.DeadlineExceeded)` hold as appropriate. A `Read` abandoned by cancellation may still be running inside the reader when `Analyse` returns; its result is discarded, and the reader stays yours to close if that read itself needs releasing.
+- **Team identity**: each map reports two logical teams — the lineups that persist through side swaps — whose IDs are map-local (team 1 played CT in the seeding round). A series numbers its own teams 1 and 2 series-locally, and each series map carries the explicit map-local-to-series translation in `team_assignments`. The two scopes never mix implicitly.
+
+### Building a series
+
+`BuildSeries` aggregates a completed, explicitly-stated BO3 or BO5 from maps parsed with `Analyse`/`AnalyseFile`, supplied in played order with each demo's SHA-256 content digest:
+
+```go
+series, err := analysis.BuildSeries(3, []analysis.SeriesMapInput{
+    {Demo: mapOne, SHA256: digestOne},
+    {Demo: mapTwo, SHA256: digestTwo},
+})
+```
+
+It is pure aggregation — no I/O, inputs never mutated — and enforces the completed-series rule: the final supplied map must be the clinching one. When the two series teams cannot be resolved from rosters alone, the structured `SeriesTeamConflictError` and `SeriesTeamAmbiguityError` carry the competing evidence and match through `errors.As`.
+
+### JSON and stability
+
+Every result type marshals with `encoding/json` into the same envelopes the CLI's `--save` writes, documented in [PLAYER_DATA](./_docs/PLAYER_DATA.MD): `MapAnalysis` is the standalone map document, `SeriesAnalysis` the series document embedding each map's unchanged analysis. A series player whose rating cannot be recomputed from raw per-map facts marshals it as `null` rather than a fabricated value.
+
+While releases remain `v0.x` the Go API is not frozen — exported names and fields may still change between minor versions as the surface settles. The JSON contracts are the stable part. The full API reference is available with `go doc github.com/taua-almeida/cs2-analyser-tool/analysis`.
+
 ## Contributing
 
 The opt-in external-oracle test for HLTV match 129241 is documented in

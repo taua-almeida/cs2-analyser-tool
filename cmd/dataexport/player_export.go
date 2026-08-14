@@ -7,12 +7,12 @@ import (
 	"os"
 	"time"
 
-	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
+	"github.com/taua-almeida/cs2-analyser-tool/analysis"
 )
 
 // WriteAnalysisToFile writes the complete analysis as JSON or its players as
 // the existing flat CSV format.
-func WriteAnalysisToFile(analysis *demoparser.ProcessedDemo, saveType string) (string, error) {
+func WriteAnalysisToFile(record *analysis.MapAnalysis, saveType string) (string, error) {
 	fileName := fmt.Sprintf("%d_data.%s", time.Now().Unix(), saveType)
 
 	if saveType == "csv" {
@@ -23,13 +23,13 @@ func WriteAnalysisToFile(analysis *demoparser.ProcessedDemo, saveType string) (s
 		defer csvFile.Close()
 
 		w := csv.NewWriter(csvFile)
-		if err := w.WriteAll(playerCSVRecords(analysis.Players)); err != nil {
+		if err := w.WriteAll(playerCSVRecords(record.Players)); err != nil {
 			return "", err
 		}
 		return fileName, nil
 	}
 
-	jsonData, err := json.MarshalIndent(analysis, "", " ")
+	jsonData, err := json.MarshalIndent(record, "", " ")
 	if err != nil {
 		return "", err
 	}
@@ -56,7 +56,7 @@ func playerCSVHeader() []string {
 const ratingCSVColumns = 7
 
 // ratingCSVCells formats the seven rating columns.
-func ratingCSVCells(rating demoparser.RatingStats) []string {
+func ratingCSVCells(rating analysis.RatingStats) []string {
 	return []string{
 		fmt.Sprintf("%.2f", rating.Value),
 		fmt.Sprintf("%.2f", rating.Kills),
@@ -77,7 +77,7 @@ func omittedRatingCSVCells() []string {
 
 // playerCSVRecords builds the flat player-only CSV: header plus one row per
 // player, most kills first.
-func playerCSVRecords(players map[uint64]*demoparser.DemoPlayer) [][]string {
+func playerCSVRecords(players map[uint64]*analysis.DemoPlayer) [][]string {
 	csvRecords := [][]string{playerCSVHeader()}
 	for _, player := range sortedByKills(players) {
 		csvRecords = append(csvRecords, playerCSVRow(player, ratingCSVCells(player.Rating)))
@@ -88,7 +88,7 @@ func playerCSVRecords(players map[uint64]*demoparser.DemoPlayer) [][]string {
 // playerCSVRow formats one player row. The rating cells are injected so a
 // series save can blank them for an omitted rating; everything else keeps
 // the existing single-map formatting.
-func playerCSVRow(player *demoparser.DemoPlayer, ratingCells []string) []string {
+func playerCSVRow(player *analysis.DemoPlayer, ratingCells []string) []string {
 	row := []string{
 		player.Name,
 		fmt.Sprintf("%d", player.KillStats.Total),
@@ -125,7 +125,7 @@ func playerCSVRow(player *demoparser.DemoPlayer, ratingCells []string) []string 
 		fmt.Sprintf("%.1f", player.SideStats.ADR.T),
 		fmt.Sprintf("%.1f", player.SideStats.KAST.CT),
 		fmt.Sprintf("%.1f", player.SideStats.KAST.T),
-		demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills),
+		analysis.GetPlayerBestWeapon(player.KillStats.WeaponsKills),
 		fmt.Sprintf("%d", player.UtilityStats.EnemiesFlashed),
 		fmt.Sprintf("%d", player.UtilityStats.FriendsFlashed),
 		fmt.Sprintf("%.1f", player.UtilityStats.EnemyFlashTimeSeconds),

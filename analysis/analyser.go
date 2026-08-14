@@ -1,7 +1,10 @@
-package demoparser
+package analysis
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"slices"
@@ -95,19 +98,77 @@ func newAnalyser(parser demoinfocs.Parser) *analyser {
 	}
 }
 
-func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
-	file, err := os.Open(demoPath)
-	if err != nil {
-		return nil, fmt.Errorf("opening demo file: %w", err)
+// Analyse parses one complete CS2 demo from r and returns the map's analysis.
+//
+// r is borrowed for the duration of the call and never closed, even when it
+// happens to be an io.Closer; the caller keeps ownership. Analyse assumes
+// nothing about rewindability: after any return — success, failure or
+// cancellation — the reader has been consumed to an unspecified position, so
+// reusing it for another call requires the caller to rewind or reopen it.
+//
+// A failing reader is an error, never a panic: when r reports an error —
+// including the immediate io.EOF of an empty stream — Analyse returns an
+// error wrapping the reader's own, so its identity stays visible to
+// errors.Is.
+//
+// Cancelling ctx interrupts the parse at the next demo frame rather than
+// waiting for the demo to finish, and it also unblocks a Read currently
+// blocked inside r, so even a stalled network stream cannot pin the call.
+// The returned error then wraps ctx's error, so
+// errors.Is(err, context.Canceled) and
+// errors.Is(err, context.DeadlineExceeded) hold as appropriate. A Read
+// abandoned by cancellation may still be running inside r when Analyse
+// returns; its result is discarded, and a caller that needs that read
+// itself released can close the underlying source it owns.
+func Analyse(ctx context.Context, r io.Reader) (*MapAnalysis, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("parsing demo: %w", err)
 	}
-	defer file.Close()
 
-	a := newAnalyser(demoinfocs.NewParser(file))
+	src, stopReads := cancelableReads(ctx, r)
+	defer stopReads()
+
+	parser, err := newDemoParser(src)
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil && errors.Is(err, ctxErr) {
+			err = ctxErr
+		}
+		return nil, fmt.Errorf("parsing demo: %w", err)
+	}
+	a := newAnalyser(parser)
 	defer a.parser.Close()
 
 	a.registerHandlers()
 
-	if err := a.parser.ParseToEnd(); err != nil {
+	// Cancel is the parser's goroutine-safe abort: it makes ParseToEnd
+	// return ErrCancelled at the next frame boundary, which is what lets a
+	// context interrupt a demo mid-parse instead of before or after it.
+	// It only takes effect between frames; the cancelable reader above
+	// covers the time spent blocked inside r.Read itself.
+	parseDone := make(chan struct{})
+	watcherDone := make(chan struct{})
+	go func() {
+		defer close(watcherDone)
+		select {
+		case <-ctx.Done():
+			a.parser.Cancel()
+		case <-parseDone:
+		}
+	}()
+
+	err = parseToEnd(a.parser)
+	close(parseDone)
+	<-watcherDone
+
+	if err != nil {
+		// Only the watcher can call Cancel, so ErrCancelled always stands
+		// for the context's own cause; a Read abandoned by the cancelable
+		// reader surfaces that cause directly. Any earlier real parse
+		// failure wins: the parser keeps its first error, never the
+		// cancellation.
+		if ctxErr := ctx.Err(); ctxErr != nil && (errors.Is(err, demoinfocs.ErrCancelled) || errors.Is(err, ctxErr)) {
+			err = ctxErr
+		}
 		return nil, fmt.Errorf("parsing demo: %w", err)
 	}
 	if a.parseErr != nil {
@@ -118,13 +179,69 @@ func ProcessDemo(demoPath string) (*ProcessedDemo, error) {
 		return nil, fmt.Errorf("parsing demo: %w", err)
 	}
 
-	return &ProcessedDemo{
+	return &MapAnalysis{
 		Players:  a.players,
 		Teams:    a.teams,
 		Map:      a.mapData,
 		GameMode: a.gameMode,
 		aggFacts: a.exportAggFacts(),
 	}, nil
+}
+
+// AnalyseFile opens the demo at path and analyses it with Analyse. It owns
+// the file for the whole call: an open failure is reported with the path,
+// and the file is closed before returning whether the analysis succeeded,
+// failed or was cancelled.
+func AnalyseFile(ctx context.Context, path string) (*MapAnalysis, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("opening demo file: %w", err)
+	}
+	defer file.Close()
+
+	return Analyse(ctx, file)
+}
+
+// newDemoParser builds the demoinfocs parser over r. Construction eagerly
+// fills the parser's first buffer, and the bit reader reports a failed fill
+// — an empty stream's immediate io.EOF included — by panicking with the raw
+// read error, so the panic is converted here into the returned error the
+// public API promises.
+//
+// The parser's Close closes its input when the reader is an io.ReadCloser.
+// Hiding every method but Read keeps the documented caller-keeps-ownership
+// contract whatever r is.
+func newDemoParser(r io.Reader) (parser demoinfocs.Parser, err error) {
+	defer func() {
+		if v := recover(); v != nil {
+			err = recoveredParseError(v)
+		}
+	}()
+	return demoinfocs.NewParser(struct{ io.Reader }{r}), nil
+}
+
+// parseToEnd drives ParseToEnd behind the same panic-to-error boundary as
+// construction. The parser translates only EOF-shaped panics into errors
+// itself; any other mid-stream reader failure — a dropped connection, an
+// aborted upload — is repanicked and must be caught here so a failing
+// stream can never crash the embedding process.
+func parseToEnd(parser demoinfocs.Parser) (err error) {
+	defer func() {
+		if v := recover(); v != nil {
+			err = recoveredParseError(v)
+		}
+	}()
+	return parser.ParseToEnd()
+}
+
+// recoveredParseError converts a panic value caught at the parser boundary
+// into the error to return. Reader failures arrive as error values and keep
+// their identity for errors.Is; anything else is spelled out.
+func recoveredParseError(v any) error {
+	if err, ok := v.(error); ok {
+		return fmt.Errorf("demo stream failed: %w", err)
+	}
+	return fmt.Errorf("demo parser panicked: %v", v)
 }
 
 // exportAggFacts snapshots the raw accumulators behind each player's derived
@@ -414,7 +531,7 @@ func (a *analyser) onKill(e events.Kill) {
 			}
 			// The duel is priced loadout against loadout at kill time; the
 			// victim's inventory is still their pre-death one during Kill,
-			// which TestProcessDemoGolden pins for unused utility. Keyed by
+			// which TestAnalyseGolden pins for unused utility. Keyed by
 			// SteamID like ecoDamage, matching how derive reads both back.
 			a.roundEcoKills = append(a.roundEcoKills, playerRatingFact{
 				player: killer.SteamID,

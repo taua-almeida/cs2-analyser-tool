@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
+	"github.com/taua-almeida/cs2-analyser-tool/analysis"
 )
 
 // seriesTeamLabels labels the two series teams for tables, keyed by series
@@ -21,7 +21,7 @@ import (
 // labels and never identity — and a real clan name can equally collide with
 // the other team's generated "Team N". Either way the ID is appended to
 // both so columns and winners stay distinguishable.
-func seriesTeamLabels(series *demoparser.ProcessedSeries) map[int]string {
+func seriesTeamLabels(series *analysis.SeriesAnalysis) map[int]string {
 	labels := make(map[int]string, len(series.Teams))
 	counts := make(map[string]int, len(series.Teams))
 	for _, team := range series.Teams {
@@ -42,19 +42,19 @@ func seriesTeamLabels(series *demoparser.ProcessedSeries) map[int]string {
 
 // sortedSeriesByKills orders aggregate players the way sortedByKills orders
 // map players.
-func sortedSeriesByKills(players map[uint64]*demoparser.SeriesPlayer) []*demoparser.SeriesPlayer {
-	return slices.SortedFunc(maps.Values(players), func(a, b *demoparser.SeriesPlayer) int {
+func sortedSeriesByKills(players map[uint64]*analysis.SeriesPlayer) []*analysis.SeriesPlayer {
+	return slices.SortedFunc(maps.Values(players), func(a, b *analysis.SeriesPlayer) int {
 		return killsOrder(a.KillStats.Total, b.KillStats.Total, a.Name, b.Name, a.SteamID, b.SteamID)
 	})
 }
 
 // selectedSeriesPlayers narrows the aggregate players to the selection; a
 // nil selection means everyone.
-func selectedSeriesPlayers(series *demoparser.ProcessedSeries, selected map[uint64]bool) map[uint64]*demoparser.SeriesPlayer {
+func selectedSeriesPlayers(series *analysis.SeriesAnalysis, selected map[uint64]bool) map[uint64]*analysis.SeriesPlayer {
 	if selected == nil {
 		return series.Players
 	}
-	players := make(map[uint64]*demoparser.SeriesPlayer, len(selected))
+	players := make(map[uint64]*analysis.SeriesPlayer, len(selected))
 	for id, player := range series.Players {
 		if selected[id] {
 			players[id] = player
@@ -70,8 +70,8 @@ func selectedSeriesPlayers(series *demoparser.ProcessedSeries, selected map[uint
 // reads the SeriesPlayer itself instead — printSeriesPlayersTable and
 // printSeriesRatingTable render "-", and seriesCSVRecords injects blank
 // rating cells.
-func seriesPlayerView(player *demoparser.SeriesPlayer) *demoparser.DemoPlayer {
-	return &demoparser.DemoPlayer{
+func seriesPlayerView(player *analysis.SeriesPlayer) *analysis.DemoPlayer {
+	return &analysis.DemoPlayer{
 		SteamID:          player.SteamID,
 		Name:             player.Name,
 		TeamID:           player.TeamID,
@@ -90,12 +90,12 @@ func seriesPlayerView(player *demoparser.SeriesPlayer) *demoparser.DemoPlayer {
 // results with the overall map score, round score and winner, then the
 // aggregate player table for the selected players (everyone when selected
 // is nil).
-func PrintSeriesCLITables(series *demoparser.ProcessedSeries, selected map[uint64]bool) {
+func PrintSeriesCLITables(series *analysis.SeriesAnalysis, selected map[uint64]bool) {
 	printSeriesResultTable(series, os.Stdout)
 	printSeriesPlayersTable(series, selected, os.Stdout)
 }
 
-func printSeriesResultTable(series *demoparser.ProcessedSeries, output io.Writer) {
+func printSeriesResultTable(series *analysis.SeriesAnalysis, output io.Writer) {
 	labels := seriesTeamLabels(series)
 	// BuildSeries emits the teams in series-team-ID order, 1 then 2.
 	teamOne, teamTwo := series.Teams[0], series.Teams[1]
@@ -136,7 +136,7 @@ func printSeriesResultTable(series *demoparser.ProcessedSeries, output io.Writer
 // single-map table, with a Maps column instead of the map footer. Rates are
 // series-wide recomputations; a player whose rating could not be recomputed
 // from raw facts shows "-".
-func printSeriesPlayersTable(series *demoparser.ProcessedSeries, selected map[uint64]bool, output io.Writer) {
+func printSeriesPlayersTable(series *analysis.SeriesAnalysis, selected map[uint64]bool, output io.Writer) {
 	t := table.NewWriter()
 	t.SetOutputMirror(output)
 	t.SetTitle("Series player aggregates")
@@ -159,7 +159,7 @@ func printSeriesPlayersTable(series *demoparser.ProcessedSeries, selected map[ui
 			rating,
 			entryScore(player.OpeningDuelStats),
 			fmt.Sprintf("%.1f", player.KillStats.Precision*100),
-			demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills),
+			analysis.GetPlayerBestWeapon(player.KillStats.WeaponsKills),
 		})
 	}
 	t.Render()
@@ -170,10 +170,10 @@ func printSeriesPlayersTable(series *demoparser.ProcessedSeries, selected map[ui
 // rating breakdown goes through the aggregate players themselves so an
 // omitted rating stays visibly omitted; the per-map detail values remain
 // available through the saved series JSON.
-func PrintSeriesDetailTables(series *demoparser.ProcessedSeries, selected map[uint64]bool) {
+func PrintSeriesDetailTables(series *analysis.SeriesAnalysis, selected map[uint64]bool) {
 	sorted := sortedSeriesByKills(selectedSeriesPlayers(series, selected))
 	printSeriesRatingTable(sorted, os.Stdout)
-	views := make([]*demoparser.DemoPlayer, len(sorted))
+	views := make([]*analysis.DemoPlayer, len(sorted))
 	for i, player := range sorted {
 		views[i] = seriesPlayerView(player)
 	}
@@ -187,7 +187,7 @@ func PrintSeriesDetailTables(series *demoparser.ProcessedSeries, selected map[ui
 
 // printSeriesRatingTable feeds aggregate players to the shared rating
 // breakdown; a nil rating renders as "-" cells there.
-func printSeriesRatingTable(players []*demoparser.SeriesPlayer, output io.Writer) {
+func printSeriesRatingTable(players []*analysis.SeriesPlayer, output io.Writer) {
 	rows := make([]ratingRow, len(players))
 	for i, player := range players {
 		rows[i] = ratingRow{name: player.Name, rating: player.Rating}
@@ -202,7 +202,7 @@ func printSeriesRatingTable(players []*demoparser.SeriesPlayer, output io.Writer
 // so full per-map series data requires JSON. The one series-specific cell
 // rule is that an omitted rating leaves its seven columns empty instead of
 // printing as 0.00.
-func WriteSeriesToFile(series *demoparser.ProcessedSeries, saveType string) (string, error) {
+func WriteSeriesToFile(series *analysis.SeriesAnalysis, saveType string) (string, error) {
 	fileName := fmt.Sprintf("%d_data.%s", time.Now().Unix(), saveType)
 
 	if saveType == "csv" {
@@ -232,7 +232,7 @@ func WriteSeriesToFile(series *demoparser.ProcessedSeries, saveType string) (str
 // seriesCSVRecords builds the aggregate-player rows under the single-map
 // header contract, blanking the rating columns of players whose series
 // rating was not recomputed.
-func seriesCSVRecords(players map[uint64]*demoparser.SeriesPlayer) [][]string {
+func seriesCSVRecords(players map[uint64]*analysis.SeriesPlayer) [][]string {
 	records := [][]string{playerCSVHeader()}
 	for _, player := range sortedSeriesByKills(players) {
 		ratingCells := omittedRatingCSVCells()

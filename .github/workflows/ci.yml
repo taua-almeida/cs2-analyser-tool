@@ -18,8 +18,8 @@ jobs:
         uses: actions/cache@v6
         with:
           path: |
-            cmd/demo_parser/testdata/mirage.dem
-            cmd/demo_parser/testdata/ancient.dem
+            analysis/testdata/mirage.dem
+            analysis/testdata/ancient.dem
           # Keyed on all fixture checksums, so changing any demo rolls
           # the cache instead of restoring a stale one.
           key: test-demos-84a1a4191302bdd2a3bbb5a727842093744b1fb1a228aeec630369e44b622cb2-b29a9cb537a181deef97b15cfed10ee722a37999644a27bb2226fdd77a1337fc

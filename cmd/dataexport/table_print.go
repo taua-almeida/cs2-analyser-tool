@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
+	"github.com/taua-almeida/cs2-analyser-tool/analysis"
 )
 
 // killsOrder is the one player ordering every output uses: most kills
@@ -28,8 +28,8 @@ func killsOrder(aKills, bKills int, aName, bName string, aID, bID uint64) int {
 }
 
 // sortedByKills orders players the way the main table does.
-func sortedByKills(players map[uint64]*demoparser.DemoPlayer) []*demoparser.DemoPlayer {
-	return slices.SortedFunc(maps.Values(players), func(a, b *demoparser.DemoPlayer) int {
+func sortedByKills(players map[uint64]*analysis.DemoPlayer) []*analysis.DemoPlayer {
+	return slices.SortedFunc(maps.Values(players), func(a, b *analysis.DemoPlayer) int {
 		return killsOrder(a.KillStats.Total, b.KillStats.Total, a.Name, b.Name, a.SteamID, b.SteamID)
 	})
 }
@@ -44,16 +44,16 @@ func kdRatio(kills, deaths int) string {
 }
 
 // entryScore formats opening duels as kills:deaths, e.g. "5:3".
-func entryScore(opening demoparser.OpeningDuelStats) string {
+func entryScore(opening analysis.OpeningDuelStats) string {
 	return fmt.Sprintf("%d:%d", opening.OpeningKills.Total, opening.OpeningDeaths.Total)
 }
 
-func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, mapData *demoparser.MapData, gameMode string) {
+func PrintCLIDataTable(playerToAnalyse map[uint64]*analysis.DemoPlayer, mapData *analysis.MapData, gameMode string) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "ADR", "KAST (%)", "Rating", "Entry", "Precision (%)", "Best Weapon"})
 	for _, player := range playerToAnalyse {
-		playerBestWeapon := demoparser.GetPlayerBestWeapon(player.KillStats.WeaponsKills)
+		playerBestWeapon := analysis.GetPlayerBestWeapon(player.KillStats.WeaponsKills)
 		t.AppendRow(table.Row{
 			player.Name,
 			player.KillStats.Total,
@@ -80,7 +80,7 @@ func PrintCLIDataTable(playerToAnalyse map[uint64]*demoparser.DemoPlayer, mapDat
 
 // PrintCLIDetailTables prints the stats that do not fit the main table,
 // each in its own narrow table. Only shown with --details.
-func PrintCLIDetailTables(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
+func PrintCLIDetailTables(playerToAnalyse map[uint64]*analysis.DemoPlayer) {
 	players := sortedByKills(playerToAnalyse)
 	printRatingTable(players, os.Stdout)
 	printApproxMetricsTable(players, os.Stdout)
@@ -96,7 +96,7 @@ func PrintCLIDetailTables(playerToAnalyse map[uint64]*demoparser.DemoPlayer) {
 // cells rather than a fabricated zero rating.
 type ratingRow struct {
 	name   string
-	rating *demoparser.RatingStats
+	rating *analysis.RatingStats
 }
 
 // printRatingRows breaks the rating into its six sub-ratings, each
@@ -128,7 +128,7 @@ func printRatingRows(rows []ratingRow, output io.Writer) {
 	t.Render()
 }
 
-func printRatingTable(players []*demoparser.DemoPlayer, output io.Writer) {
+func printRatingTable(players []*analysis.DemoPlayer, output io.Writer) {
 	rows := make([]ratingRow, len(players))
 	for i, player := range players {
 		rows[i] = ratingRow{name: player.Name, rating: &player.Rating}
@@ -140,7 +140,7 @@ func printRatingTable(players []*demoparser.DemoPlayer, output io.Writer) {
 // behind the eKAST and round-swing sub-ratings. Both are Rating 3.0-style
 // approximations: eKAST weights qualifying rounds by economy, so it can
 // exceed 100%, and swing keeps its sign instead of the sub-rating's floor.
-func printApproxMetricsTable(players []*demoparser.DemoPlayer, output io.Writer) {
+func printApproxMetricsTable(players []*analysis.DemoPlayer, output io.Writer) {
 	t := table.NewWriter()
 	t.SetOutputMirror(output)
 	t.SetTitle("Approximate Rating 3.0 metrics")
@@ -157,19 +157,19 @@ func printApproxMetricsTable(players []*demoparser.DemoPlayer, output io.Writer)
 }
 
 // countSplit formats a side-split count as "ct / t".
-func countSplit(count demoparser.SideCount) string {
+func countSplit(count analysis.SideCount) string {
 	return fmt.Sprintf("%d / %d", count.CT, count.T)
 }
 
 // rateSplit formats a side-split rate as "ct / t".
-func rateSplit(rate demoparser.SideRate) string {
+func rateSplit(rate analysis.SideRate) string {
 	return fmt.Sprintf("%.1f / %.1f", rate.CT, rate.T)
 }
 
 // printTradeTable puts the two sides of a trade next to each other: the
 // kill that avenged a teammate and the player's own deaths that were
 // avenged. One kill can trade more than one death, so the totals may differ.
-func printTradeTable(players []*demoparser.DemoPlayer, output io.Writer) {
+func printTradeTable(players []*analysis.DemoPlayer, output io.Writer) {
 	t := table.NewWriter()
 	t.SetOutputMirror(output)
 	t.SetTitle("Trade stats")
@@ -188,7 +188,7 @@ func printTradeTable(players []*demoparser.DemoPlayer, output io.Writer) {
 // printSideSplitTable lists the core stats split by side. Rounds are in
 // there because per-side ADR and KAST are divided by them, which makes a
 // lopsided split worth seeing next to the rates it produced.
-func printSideSplitTable(players []*demoparser.DemoPlayer, output io.Writer) {
+func printSideSplitTable(players []*analysis.DemoPlayer, output io.Writer) {
 	t := table.NewWriter()
 	t.SetOutputMirror(output)
 	t.SetTitle("Side splits (CT / T)")
@@ -209,7 +209,7 @@ func printSideSplitTable(players []*demoparser.DemoPlayer, output io.Writer) {
 
 // printMultiKillTable lists the multi-kill rounds per player. The buckets
 // are exclusive, so each round shows up in exactly one column.
-func printMultiKillTable(players []*demoparser.DemoPlayer, output io.Writer) {
+func printMultiKillTable(players []*analysis.DemoPlayer, output io.Writer) {
 	t := table.NewWriter()
 	t.SetOutputMirror(output)
 	t.SetTitle("Multi-kill rounds")
@@ -221,7 +221,7 @@ func printMultiKillTable(players []*demoparser.DemoPlayer, output io.Writer) {
 	t.Render()
 }
 
-func printUtilityEffectivenessTable(players []*demoparser.DemoPlayer, output io.Writer) {
+func printUtilityEffectivenessTable(players []*analysis.DemoPlayer, output io.Writer) {
 	t := table.NewWriter()
 	t.SetOutputMirror(output)
 	t.SetTitle("Utility effectiveness")
@@ -244,7 +244,7 @@ func printUtilityEffectivenessTable(players []*demoparser.DemoPlayer, output io.
 	t.Render()
 }
 
-func printGrenadesThrownTable(players []*demoparser.DemoPlayer, output io.Writer) {
+func printGrenadesThrownTable(players []*analysis.DemoPlayer, output io.Writer) {
 	t := table.NewWriter()
 	t.SetOutputMirror(output)
 	t.SetTitle("Grenades thrown")

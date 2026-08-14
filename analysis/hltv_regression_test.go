@@ -1,6 +1,7 @@
-package demoparser
+package analysis
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -343,7 +344,7 @@ func hltvSeriesExpectations(t *testing.T, oracle hltvOracle) []hltvSeriesTeamExp
 	return expectations
 }
 
-func assertHLTVSeriesMapsInOrder(t *testing.T, series *ProcessedSeries, oracle hltvOracle) {
+func assertHLTVSeriesMapsInOrder(t *testing.T, series *SeriesAnalysis, oracle hltvOracle) {
 	t.Helper()
 	if len(series.Maps) != len(oracle.Maps) {
 		t.Fatalf("series has %d maps, want %d", len(series.Maps), len(oracle.Maps))
@@ -358,7 +359,7 @@ func assertHLTVSeriesMapsInOrder(t *testing.T, series *ProcessedSeries, oracle h
 	}
 }
 
-func assertHLTVSeriesTeams(t *testing.T, series *ProcessedSeries, oracle hltvOracle) {
+func assertHLTVSeriesTeams(t *testing.T, series *SeriesAnalysis, oracle hltvOracle) {
 	t.Helper()
 	if len(series.Teams) != 2 {
 		t.Fatalf("series has %d teams, want 2", len(series.Teams))
@@ -407,7 +408,7 @@ func findSeriesTeamByRoster(teams []SeriesTeam, steamIDs []uint64) (SeriesTeam, 
 // full series-round denominator, their additive totals equal the sums of
 // the standalone analyses, their rates divide exact numerators by that
 // denominator, and their rating was recomputed rather than omitted.
-func assertHLTVSeriesPlayers(t *testing.T, series *ProcessedSeries, inputs []SeriesMapInput, oracle hltvOracle) {
+func assertHLTVSeriesPlayers(t *testing.T, series *SeriesAnalysis, inputs []SeriesMapInput, oracle hltvOracle) {
 	t.Helper()
 	totalRounds := 0
 	for _, input := range inputs {
@@ -471,10 +472,10 @@ func assertHLTVSeriesPlayers(t *testing.T, series *ProcessedSeries, inputs []Ser
 // documents that it does not mutate its inputs.
 var hltvParsedDemos = struct {
 	sync.Mutex
-	byPath map[string]*ProcessedDemo
-}{byPath: map[string]*ProcessedDemo{}}
+	byPath map[string]*MapAnalysis
+}{byPath: map[string]*MapAnalysis{}}
 
-func parseVerifiedHLTVDemo(t *testing.T, path, wantSHA256 string) *ProcessedDemo {
+func parseVerifiedHLTVDemo(t *testing.T, path, wantSHA256 string) *MapAnalysis {
 	t.Helper()
 	hltvParsedDemos.Lock()
 	defer hltvParsedDemos.Unlock()
@@ -484,9 +485,9 @@ func parseVerifiedHLTVDemo(t *testing.T, path, wantSHA256 string) *ProcessedDemo
 	if err := verifyDemoChecksum(path, wantSHA256); err != nil {
 		t.Fatalf("verifying HLTV demo: %v", err)
 	}
-	demo, err := ProcessDemo(path)
+	demo, err := AnalyseFile(context.Background(), path)
 	if err != nil {
-		t.Fatalf("ProcessDemo(%s): %v", path, err)
+		t.Fatalf("AnalyseFile(%s): %v", path, err)
 	}
 	hltvParsedDemos.byPath[path] = demo
 	return demo
@@ -825,7 +826,7 @@ func verifyDemoChecksum(path, want string) error {
 	return nil
 }
 
-func assertHLTVMap(t *testing.T, fixtureID string, result *ProcessedDemo, expected hltvMapExpected) {
+func assertHLTVMap(t *testing.T, fixtureID string, result *MapAnalysis, expected hltvMapExpected) {
 	t.Helper()
 	label := fmt.Sprintf("%s/%d/%s", fixtureID, expected.MapID, expected.Name)
 	if result.Map.MapName != expected.ParserMapName {
@@ -877,7 +878,7 @@ func assertHLTVRoster(t *testing.T, fixtureID string, players map[uint64]*DemoPl
 // the final side-based scoreboard, and whose players reference them through
 // team_id. Parsed teams are matched to the fixture rows by exact roster, so
 // the assertion is independent of the parser's map-local team numbering.
-func assertHLTVTeams(t *testing.T, fixtureID string, result *ProcessedDemo, expected hltvMapExpected) {
+func assertHLTVTeams(t *testing.T, fixtureID string, result *MapAnalysis, expected hltvMapExpected) {
 	t.Helper()
 	label := fmt.Sprintf("%s/%d/%s", fixtureID, expected.MapID, expected.Name)
 	if len(result.Teams) != 2 {

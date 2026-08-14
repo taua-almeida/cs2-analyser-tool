@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
+	"github.com/taua-almeida/cs2-analyser-tool/analysis"
 )
 
 // The flat CSV header contract, pinned independently of playerCSVHeader so
@@ -23,22 +23,22 @@ var (
 	approxCSVHeader  = []string{"Approx. eKAST (%)", "Approx. swing (%)"}
 )
 
-func utilityPlayer() *demoparser.DemoPlayer {
-	return &demoparser.DemoPlayer{
+func utilityPlayer() *analysis.DemoPlayer {
+	return &analysis.DemoPlayer{
 		SteamID: 1,
 		Name:    "utility-player",
-		KillStats: demoparser.KillStats{
+		KillStats: analysis.KillStats{
 			Total:        1,
 			WeaponsKills: map[string]int{"AK-47": 1},
 		},
-		AssistStats: demoparser.AssistStats{FlashedEnemies: 2},
-		UtilityStats: demoparser.UtilityStats{
+		AssistStats: analysis.AssistStats{FlashedEnemies: 2},
+		UtilityStats: analysis.UtilityStats{
 			EnemiesFlashed:               3,
 			FriendsFlashed:               4,
 			EnemyFlashTimeSeconds:        5.25,
 			AverageEnemyFlashTimeSeconds: 1.75,
-			UtilityDamage:                demoparser.UtilityDamageStats{Total: 60, HE: 40, Fire: 20},
-			GrenadesThrown:               demoparser.GrenadesThrownStats{Total: 21, Flash: 1, Smoke: 2, HE: 3, Molotov: 4, Incendiary: 5, Decoy: 6},
+			UtilityDamage:                analysis.UtilityDamageStats{Total: 60, HE: 40, Fire: 20},
+			GrenadesThrown:               analysis.GrenadesThrownStats{Total: 21, Flash: 1, Smoke: 2, HE: 3, Molotov: 4, Incendiary: 5, Decoy: 6},
 			UnusedUtilityValue:           700,
 		},
 	}
@@ -56,11 +56,11 @@ func TestJSONExportsUtilityStatsAndExistingFlashAssists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading JSON: %v", err)
 	}
-	var analysis demoparser.ProcessedDemo
-	if err := json.Unmarshal(data, &analysis); err != nil {
+	var record analysis.MapAnalysis
+	if err := json.Unmarshal(data, &record); err != nil {
 		t.Fatalf("unmarshalling JSON: %v", err)
 	}
-	got := analysis.Players[want.SteamID]
+	got := record.Players[want.SteamID]
 	if got == nil {
 		t.Fatal("exported player missing")
 	}
@@ -75,7 +75,7 @@ func TestJSONExportsUtilityStatsAndExistingFlashAssists(t *testing.T) {
 func TestCSVAppendsStableUtilityAndRatingColumns(t *testing.T) {
 	t.Chdir(t.TempDir())
 	player := utilityPlayer()
-	player.Rating = demoparser.RatingStats{
+	player.Rating = analysis.RatingStats{
 		Value: 1.234, Kills: 1.1, Damage: 0.9, Survival: 1, KAST: 1.05, MultiKill: 0.5, RoundSwing: 1.2,
 	}
 	player.PlayerMapStats.ApproxEKASTPercent = 104.3
@@ -120,7 +120,7 @@ func TestCSVAppendsStableUtilityAndRatingColumns(t *testing.T) {
 
 func TestUtilityDetailTables(t *testing.T) {
 	player := utilityPlayer()
-	players := map[uint64]*demoparser.DemoPlayer{player.SteamID: player}
+	players := map[uint64]*analysis.DemoPlayer{player.SteamID: player}
 	sorted := sortedByKills(players)
 
 	var effectiveness strings.Builder
@@ -142,8 +142,8 @@ func TestUtilityDetailTables(t *testing.T) {
 
 func TestRatingDetailTable(t *testing.T) {
 	player := utilityPlayer()
-	player.Rating = demoparser.RatingStats{Value: 1.23, Kills: 1.1}
-	sorted := sortedByKills(map[uint64]*demoparser.DemoPlayer{player.SteamID: player})
+	player.Rating = analysis.RatingStats{Value: 1.23, Kills: 1.1}
+	sorted := sortedByKills(map[uint64]*analysis.DemoPlayer{player.SteamID: player})
 
 	var breakdown strings.Builder
 	printRatingTable(sorted, &breakdown)
@@ -160,15 +160,15 @@ func TestApproxMetricsDetailTable(t *testing.T) {
 	up := utilityPlayer()
 	up.PlayerMapStats.ApproxEKASTPercent = 104.3
 	up.PlayerMapStats.ApproxRoundSwingPercent = 4
-	down := &demoparser.DemoPlayer{
+	down := &analysis.DemoPlayer{
 		SteamID: 2,
 		Name:    "down-player",
-		PlayerMapStats: demoparser.PlayerMapStats{
+		PlayerMapStats: analysis.PlayerMapStats{
 			ApproxEKASTPercent:      51.9,
 			ApproxRoundSwingPercent: -4,
 		},
 	}
-	sorted := sortedByKills(map[uint64]*demoparser.DemoPlayer{up.SteamID: up, down.SteamID: down})
+	sorted := sortedByKills(map[uint64]*analysis.DemoPlayer{up.SteamID: up, down.SteamID: down})
 
 	var out strings.Builder
 	printApproxMetricsTable(sorted, &out)
@@ -185,12 +185,12 @@ func TestApproxMetricsDetailTable(t *testing.T) {
 func TestJSONExportsApproxMetricsAndPreservesRatingKeys(t *testing.T) {
 	t.Chdir(t.TempDir())
 	player := utilityPlayer()
-	player.PlayerMapStats = demoparser.PlayerMapStats{
+	player.PlayerMapStats = analysis.PlayerMapStats{
 		KAST:                    75,
 		ApproxEKASTPercent:      104.3,
 		ApproxRoundSwingPercent: -4.5,
 	}
-	player.Rating = demoparser.RatingStats{KAST: 1.32, RoundSwing: 0.89}
+	player.Rating = analysis.RatingStats{KAST: 1.32, RoundSwing: 0.89}
 
 	fileName, err := WriteAnalysisToFile(analysisWith(player), "json")
 	if err != nil {

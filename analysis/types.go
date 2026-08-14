@@ -1,4 +1,4 @@
-package demoparser
+package analysis
 
 type KillStats struct {
 	Total        int            `json:"total"`
@@ -141,7 +141,7 @@ type DemoPlayer struct {
 	SteamID uint64 `json:"steam_id"`
 	Name    string `json:"name"`
 	UserID  int    `json:"user_id"`
-	// TeamID references the logical team in ProcessedDemo.Teams the player
+	// TeamID references the logical team in MapAnalysis.Teams the player
 	// participated for, or 0 for a player who never played an accepted
 	// scored round (and so belongs to no team).
 	TeamID           int              `json:"team_id"`
@@ -207,13 +207,13 @@ type playerAggFacts struct {
 	roundSwing  float64   // summed round-win-probability swing
 }
 
-type ProcessedDemo struct {
+type MapAnalysis struct {
 	Players  map[uint64]*DemoPlayer `json:"players"`
 	Teams    []DemoTeam             `json:"teams"`
 	Map      MapData                `json:"map_data"`
 	GameMode string                 `json:"game_mode"`
 	// aggFacts carries every player's raw aggregation facts, keyed by
-	// SteamID64. It is nil on values not produced by ProcessDemo, which
+	// SteamID64. It is nil on values not produced by Analyse, which
 	// BuildSeries treats as facts being unavailable rather than zero.
 	aggFacts map[uint64]playerAggFacts
 }

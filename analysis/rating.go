@@ -2,7 +2,7 @@
 // proprietary. Every constant here is a calibration choice, not a published
 // value, except where a comment cites one of HLTV's own examples. The
 // methodology and its limits are documented in _docs/PLAYER_DATA.MD.
-package demoparser
+package analysis
 
 import (
 	"math"

@@ -7,8 +7,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
+	"github.com/taua-almeida/cs2-analyser-tool/analysis"
 	dataexport "github.com/taua-almeida/cs2-analyser-tool/cmd/dataexport"
-	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
 	filepicker "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/file-picker"
 	multiselect "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/multi-select"
 	printstyle "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/print-style"
@@ -49,7 +49,7 @@ var analyseCmd = &cobra.Command{
 			return err
 		}
 		if bestOfSet {
-			return runSeriesAnalysis(bestOf, demoPaths)
+			return runSeriesAnalysis(cmd.Context(), bestOf, demoPaths)
 		}
 
 		demoPath := ""
@@ -71,15 +71,15 @@ var analyseCmd = &cobra.Command{
 		lipgloss.Println(printstyle.StyleInfo.Render("Processing CS2 demo, hang tight... \n"))
 
 		startTime := time.Now()
-		processedDemoData, err := demoparser.ProcessDemo(demoPath)
+		processedDemoData, err := analysis.AnalyseFile(cmd.Context(), demoPath)
 		if err != nil {
 			return err
 		}
 
 		lipgloss.Println(printstyle.StyleSuccess.Render("\n\nProcessing is done! \n"))
-		fmt.Printf("Time taken for ProcessDemo: %s\n\n", time.Since(startTime))
+		fmt.Printf("Time taken for the analysis: %s\n\n", time.Since(startTime))
 
-		availablePlayers := demoparser.GetPlayersName(processedDemoData.Players)
+		availablePlayers := analysis.GetPlayersName(processedDemoData.Players)
 		if len(availablePlayers) == 0 {
 			return fmt.Errorf("no players found in demo %s", demoPath)
 		}
@@ -101,7 +101,7 @@ var analyseCmd = &cobra.Command{
 			players = availablePlayers
 		}
 
-		playersToAnalyse, err := demoparser.GetPlayersToAnalyse(processedDemoData.Players, players)
+		playersToAnalyse, err := analysis.GetPlayersToAnalyse(processedDemoData.Players, players)
 		if err != nil {
 			return err
 		}

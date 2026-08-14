@@ -1,4 +1,4 @@
-package demoparser
+package analysis
 
 import (
 	"fmt"
