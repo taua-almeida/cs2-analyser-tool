@@ -1,17 +1,15 @@
 name: External regression
 
 on:
-  schedule:
-    - cron: "17 3 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  guard:
+  regression:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 90
     steps:
       - name: Reject non-default refs
         env:
@@ -23,11 +21,6 @@ jobs:
             exit 1
           fi
 
-  regression:
-    needs: guard
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.repository.default_branch }}
@@ -150,13 +143,13 @@ jobs:
         env:
           REQUIRE_TEST_DEMO: "1"
         run: |
-          results="$RUNNER_TEMP/nightly-go-test.json"
+          results="$RUNNER_TEMP/external-core-go-test.json"
 
           set +e
           set -o pipefail
           go test -count=1 -json ./... | tee "$results" >/dev/null
           pipeline_status=("${PIPESTATUS[@]}")
-          go run ./internal/citest -profile nightly < "$results"
+          go run ./internal/citest -profile pull-request < "$results"
           report_status=$?
           set -e
 

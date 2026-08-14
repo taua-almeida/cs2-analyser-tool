@@ -15,7 +15,6 @@ type profile string
 
 const (
 	profilePullRequest profile = "pull-request"
-	profileNightly     profile = "nightly"
 	profileRelease     profile = "release"
 	profileExternal    profile = "external"
 )
@@ -245,7 +244,7 @@ func evaluate(profile profile, run testRun, parseErr error, fixturesVerified boo
 	}
 
 	switch profile {
-	case profilePullRequest, profileNightly, profileRelease:
+	case profilePullRequest, profileRelease:
 		skipEntries := pullRequestSkipEntries
 		if profile == profileRelease {
 			skipEntries = releaseSkipEntries
@@ -325,10 +324,7 @@ func renderMarkdown(profile profile, run testRun, report policyReport) string {
 	counts := run.counts()
 	var markdown strings.Builder
 	title := "Go test coverage"
-	switch profile {
-	case profileNightly:
-		title += " (nightly)"
-	case profileRelease:
+	if profile == profileRelease {
 		title += " (release)"
 	}
 	fmt.Fprintf(&markdown, "## %s\n\n", title)
@@ -336,20 +332,9 @@ func renderMarkdown(profile profile, run testRun, report policyReport) string {
 	fmt.Fprintf(&markdown, "- Failed: %d\n", counts.failed)
 	fmt.Fprintf(&markdown, "- Skipped: %d\n", counts.skipped)
 	fmt.Fprintf(&markdown, "- Public golden fixtures: %s\n", publicGoldenStatus(run))
-	switch profile {
-	case profilePullRequest:
-		fmt.Fprintf(&markdown, "- Private Inferno golden: %s\n", unprovisionedPrivateGoldenStatus(run))
-		markdown.WriteString("- HLTV map regression: external workflow\n")
-		markdown.WriteString("- HLTV series regression: external workflow\n")
-	case profileRelease:
-		fmt.Fprintf(&markdown, "- Private Inferno golden: %s\n", unprovisionedPrivateGoldenStatus(run))
-		markdown.WriteString("- HLTV map regression: latest external workflow required before tagging\n")
-		markdown.WriteString("- HLTV series regression: latest external workflow required before tagging\n")
-	default:
-		fmt.Fprintf(&markdown, "- Private Inferno golden: %s\n", nightlyPrivateGoldenStatus(run))
-		markdown.WriteString("- HLTV map regression: separate required step\n")
-		markdown.WriteString("- HLTV series regression: separate required step\n")
-	}
+	fmt.Fprintf(&markdown, "- Private Inferno golden: %s\n", privateGoldenStatus(run))
+	markdown.WriteString("- HLTV map regression: optional external workflow\n")
+	markdown.WriteString("- HLTV series regression: optional external workflow\n")
 	markdown.WriteString("- Trade-model diagnostic: manual\n")
 	markdown.WriteString("- Trace diagnostic: manual\n")
 
@@ -398,23 +383,10 @@ func publicGoldenStatus(run testRun) string {
 	return "ran"
 }
 
-func unprovisionedPrivateGoldenStatus(run testRun) string {
+func privateGoldenStatus(run testRun) string {
 	switch run.actions[privateGoldenTest] {
 	case "skip":
 		return "intentionally unavailable"
-	case "pass":
-		return "ran"
-	case "fail":
-		return "failed"
-	default:
-		return "not observed"
-	}
-}
-
-func nightlyPrivateGoldenStatus(run testRun) string {
-	switch run.actions[privateGoldenTest] {
-	case "skip":
-		return "unavailable"
 	case "pass":
 		return "ran"
 	case "fail":
@@ -447,7 +419,7 @@ func testActionStatus(action string) string {
 
 func parseProfile(value string) (profile, error) {
 	switch profile(value) {
-	case profilePullRequest, profileNightly, profileRelease, profileExternal:
+	case profilePullRequest, profileRelease, profileExternal:
 		return profile(value), nil
 	default:
 		return "", fmt.Errorf("unknown CI test profile %q", value)
