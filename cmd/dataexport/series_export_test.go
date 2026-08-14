@@ -9,53 +9,53 @@ import (
 	"strings"
 	"testing"
 
-	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
+	"github.com/taua-almeida/cs2-analyser-tool/analysis"
 )
 
 // seriesFixture is a hand-built completed BO3 for export tests: two series
 // teams, one aggregate player per team — "sharp" with a recomputed rating,
 // "quiet" with the rating explicitly omitted — and two maps whose analyses
 // carry the standalone envelope.
-func seriesFixture() *demoparser.ProcessedSeries {
-	rating := demoparser.RatingStats{Value: 1.23, Kills: 1.1, Damage: 0.9, Survival: 1, KAST: 1.05, MultiKill: 0.5, RoundSwing: 1.2}
-	sharp := &demoparser.SeriesPlayer{
+func seriesFixture() *analysis.SeriesAnalysis {
+	rating := analysis.RatingStats{Value: 1.23, Kills: 1.1, Damage: 0.9, Survival: 1, KAST: 1.05, MultiKill: 0.5, RoundSwing: 1.2}
+	sharp := &analysis.SeriesPlayer{
 		SteamID: 76561198000000001, Name: "sharp", Aliases: []string{"sharp"},
 		TeamID: 1, MapsPlayed: 2, Rounds: 45, Deaths: 25,
-		KillStats:   demoparser.KillStats{Total: 40, HeadShots: 22, Precision: 0.55, WeaponsKills: map[string]int{"AK-47": 30}},
-		AssistStats: demoparser.AssistStats{Total: 9, DamageGiven: 3600, ADR: 80},
-		PlayerStats: demoparser.PlayerMapStats{KAST: 71.1},
+		KillStats:   analysis.KillStats{Total: 40, HeadShots: 22, Precision: 0.55, WeaponsKills: map[string]int{"AK-47": 30}},
+		AssistStats: analysis.AssistStats{Total: 9, DamageGiven: 3600, ADR: 80},
+		PlayerStats: analysis.PlayerMapStats{KAST: 71.1},
 		Rating:      &rating,
 	}
-	quiet := &demoparser.SeriesPlayer{
+	quiet := &analysis.SeriesPlayer{
 		SteamID: 76561198000000002, Name: "quiet", Aliases: []string{"quiet"},
 		TeamID: 2, MapsPlayed: 2, Rounds: 45, Deaths: 30,
-		KillStats:   demoparser.KillStats{Total: 12, HeadShots: 4, WeaponsKills: map[string]int{"M4A1": 8}},
-		AssistStats: demoparser.AssistStats{Total: 14, DamageGiven: 1500, ADR: 33.3},
+		KillStats:   analysis.KillStats{Total: 12, HeadShots: 4, WeaponsKills: map[string]int{"M4A1": 8}},
+		AssistStats: analysis.AssistStats{Total: 14, DamageGiven: 1500, ADR: 33.3},
 	}
-	mapAnalysis := func(name string, scoreOne, scoreTwo int) *demoparser.ProcessedDemo {
-		return &demoparser.ProcessedDemo{
-			Players: map[uint64]*demoparser.DemoPlayer{},
-			Teams: []demoparser.DemoTeam{
+	mapAnalysis := func(name string, scoreOne, scoreTwo int) *analysis.MapAnalysis {
+		return &analysis.MapAnalysis{
+			Players: map[uint64]*analysis.DemoPlayer{},
+			Teams: []analysis.DemoTeam{
 				{TeamID: 1, Name: "RedSquad", Aliases: []string{"RedSquad"}, Score: scoreOne, Roster: []uint64{sharp.SteamID}},
 				{TeamID: 2, Name: "BlueCrew", Aliases: []string{"BlueCrew"}, Score: scoreTwo, Roster: []uint64{quiet.SteamID}},
 			},
-			Map:      demoparser.MapData{MapName: name, TotalRounds: scoreOne + scoreTwo},
+			Map:      analysis.MapData{MapName: name, TotalRounds: scoreOne + scoreTwo},
 			GameMode: "competitive",
 		}
 	}
-	return &demoparser.ProcessedSeries{
+	return &analysis.SeriesAnalysis{
 		BestOf:       3,
 		WinnerTeamID: 1,
-		Teams: []demoparser.SeriesTeam{
+		Teams: []analysis.SeriesTeam{
 			{TeamID: 1, Name: "RedSquad", Aliases: []string{"RedSquad"}, MapsWon: 2, RoundsWon: 26, Roster: []uint64{sharp.SteamID}},
 			{TeamID: 2, Name: "BlueCrew", Aliases: []string{"BlueCrew"}, MapsWon: 0, RoundsWon: 19, Roster: []uint64{quiet.SteamID}},
 		},
-		Players: map[uint64]*demoparser.SeriesPlayer{sharp.SteamID: sharp, quiet.SteamID: quiet},
-		Maps: []demoparser.SeriesMap{
+		Players: map[uint64]*analysis.SeriesPlayer{sharp.SteamID: sharp, quiet.SteamID: quiet},
+		Maps: []analysis.SeriesMap{
 			{
 				SHA256:       "digest-one",
 				WinnerTeamID: 1,
-				TeamAssignments: []demoparser.SeriesTeamAssignment{
+				TeamAssignments: []analysis.SeriesTeamAssignment{
 					{MapTeamID: 1, SeriesTeamID: 1}, {MapTeamID: 2, SeriesTeamID: 2},
 				},
 				Analysis: mapAnalysis("de_first", 13, 9),
@@ -63,7 +63,7 @@ func seriesFixture() *demoparser.ProcessedSeries {
 			{
 				SHA256:       "digest-two",
 				WinnerTeamID: 1,
-				TeamAssignments: []demoparser.SeriesTeamAssignment{
+				TeamAssignments: []analysis.SeriesTeamAssignment{
 					{MapTeamID: 1, SeriesTeamID: 1}, {MapTeamID: 2, SeriesTeamID: 2},
 				},
 				Analysis: mapAnalysis("de_second", 13, 10),
@@ -141,11 +141,11 @@ func TestSeriesJSONEnvelope(t *testing.T) {
 		if got := string(seriesMaps[i]["sha256"]); got != want {
 			t.Errorf("maps[%d].sha256 = %s, want %s; supplied order must be kept", i, got, want)
 		}
-		var analysis map[string]json.RawMessage
-		if err := json.Unmarshal(seriesMaps[i]["analysis"], &analysis); err != nil {
+		var envelope map[string]json.RawMessage
+		if err := json.Unmarshal(seriesMaps[i]["analysis"], &envelope); err != nil {
 			t.Fatalf("unmarshalling maps[%d].analysis: %v", i, err)
 		}
-		gotAnalysisKeys := slices.Sorted(maps.Keys(analysis))
+		gotAnalysisKeys := slices.Sorted(maps.Keys(envelope))
 		wantAnalysisKeys := []string{"game_mode", "map_data", "players", "teams"}
 		if !reflect.DeepEqual(gotAnalysisKeys, wantAnalysisKeys) {
 			t.Errorf("maps[%d].analysis keys = %q, want the standalone envelope %q", i, gotAnalysisKeys, wantAnalysisKeys)
@@ -173,12 +173,12 @@ func TestSeriesJSONEnvelope(t *testing.T) {
 		t.Errorf("maps_played = %s, want 2", got)
 	}
 
-	var roundTrip demoparser.ProcessedSeries
+	var roundTrip analysis.SeriesAnalysis
 	if err := json.Unmarshal(data, &roundTrip); err != nil {
 		t.Fatalf("round-tripping series JSON: %v", err)
 	}
 	if !reflect.DeepEqual(&roundTrip, series) {
-		t.Error("series JSON does not round-trip through ProcessedSeries")
+		t.Error("series JSON does not round-trip through SeriesAnalysis")
 	}
 }
 
@@ -273,9 +273,9 @@ func TestSeriesTeamLabelCollisions(t *testing.T) {
 // two players sharing a kill count and display name must not inherit the
 // map's random iteration order.
 func TestSortedSeriesByKillsTieBreaksBySteamID(t *testing.T) {
-	players := map[uint64]*demoparser.SeriesPlayer{
-		11: {SteamID: 11, Name: "twin", KillStats: demoparser.KillStats{Total: 7}},
-		5:  {SteamID: 5, Name: "twin", KillStats: demoparser.KillStats{Total: 7}},
+	players := map[uint64]*analysis.SeriesPlayer{
+		11: {SteamID: 11, Name: "twin", KillStats: analysis.KillStats{Total: 7}},
+		5:  {SteamID: 5, Name: "twin", KillStats: analysis.KillStats{Total: 7}},
 	}
 	sorted := sortedSeriesByKills(players)
 	if sorted[0].SteamID != 5 || sorted[1].SteamID != 11 {

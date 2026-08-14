@@ -56,7 +56,7 @@ The original fixture still runs with:
 ```sh
 HLTV_DEMO_DIR=/path/to/match-129241-demos \
 REQUIRE_HLTV_DEMOS=1 \
-  go test -count=1 -v ./cmd/demo_parser -run '^TestHLTVRegression$'
+  go test -count=1 -v ./analysis -run '^TestHLTVRegression$'
 ```
 
 Run the complete eight-map harness with:
@@ -66,7 +66,7 @@ HLTV_DEMO_DIR=/path/to/match-129241-demos \
 REQUIRE_HLTV_DEMOS=1 \
 HLTV_EXTRA_DEMO_DIRS=/path/to/match-128974-demos:/path/to/map-234956-demo \
 REQUIRE_HLTV_EXTRA_DEMOS=1 \
-  go test -count=1 -v ./cmd/demo_parser -run '^TestHLTVRegression$'
+  go test -count=1 -v ./analysis -run '^TestHLTVRegression$'
 ```
 
 `REQUIRE_HLTV_DEMOS=1` applies only to the original fixture;
@@ -115,7 +115,7 @@ skips when the demos are unconfigured:
 ```sh
 HLTV_DEMO_DIR=/path/to/match-129241-demos \
 REQUIRE_HLTV_DEMOS=1 \
-  go test -count=1 -v ./cmd/demo_parser -run '^(TestHLTVRegression|TestHLTVSeriesRegression)$'
+  go test -count=1 -v ./analysis -run '^(TestHLTVRegression|TestHLTVSeriesRegression)$'
 ```
 
 ## Comparison contract
@@ -305,7 +305,7 @@ Run the model matrix with the same demo paths plus:
 
 ```sh
 HLTV_EVALUATE_TRADE_MODELS=1 \
-  go test -count=1 -v ./cmd/demo_parser -run '^TestEvaluateHLTVTradeModels$'
+  go test -count=1 -v ./analysis -run '^TestEvaluateHLTVTradeModels$'
 ```
 
 For event-level evidence on one player, set a demo and optional SteamID:
@@ -313,7 +313,7 @@ For event-level evidence on one player, set a demo and optional SteamID:
 ```sh
 HLTV_TRACE_DEMO=/path/to/map.dem \
 HLTV_TRACE_STEAM_ID=76561199063238565 \
-  go test -count=1 -v ./cmd/demo_parser -run '^TestTraceHLTVRoundEvidence$'
+  go test -count=1 -v ./analysis -run '^TestTraceHLTVRoundEvidence$'
 ```
 
 The trace records participation, side, kills, normal/flash assists, death

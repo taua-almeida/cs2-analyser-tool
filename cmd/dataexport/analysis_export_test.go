@@ -10,40 +10,40 @@ import (
 	"strings"
 	"testing"
 
-	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
+	"github.com/taua-almeida/cs2-analyser-tool/analysis"
 )
 
 // analysisWith wraps players into the analysis record the writer takes,
 // standing in for the selected copy cmd/analyse.go builds.
-func analysisWith(players ...*demoparser.DemoPlayer) *demoparser.ProcessedDemo {
-	byID := make(map[uint64]*demoparser.DemoPlayer, len(players))
+func analysisWith(players ...*analysis.DemoPlayer) *analysis.MapAnalysis {
+	byID := make(map[uint64]*analysis.DemoPlayer, len(players))
 	for _, player := range players {
 		byID[player.SteamID] = player
 	}
-	return &demoparser.ProcessedDemo{Players: byID}
+	return &analysis.MapAnalysis{Players: byID}
 }
 
 // selectedAnalysis is a one-player analysis with full match-level data, as
 // the writer receives it after player selection. The teams keep describing
 // the whole match: selection narrows players only, so the roster references
 // a SteamID that is not among the selected players.
-func selectedAnalysis() *demoparser.ProcessedDemo {
+func selectedAnalysis() *analysis.MapAnalysis {
 	selected := utilityPlayer()
 	selected.SteamID = 76561198000000000
 	selected.TeamID = 1
-	analysis := analysisWith(selected)
-	analysis.Teams = []demoparser.DemoTeam{
+	record := analysisWith(selected)
+	record.Teams = []analysis.DemoTeam{
 		{TeamID: 1, Name: "AlphaSquad", Aliases: []string{"AlphaSquad"}, Score: 11, Roster: []uint64{76561198000000000}},
 		{TeamID: 2, Name: "BravoCrew", Aliases: []string{"BravoCrew", "BravoCrew GG"}, Score: 13, Roster: []uint64{76561198000000001}},
 	}
-	analysis.Map = demoparser.MapData{
+	record.Map = analysis.MapData{
 		MapName:     "de_mirage",
 		TotalRounds: 24,
 		RoundsWonCT: 11,
 		RoundsWonT:  13,
 	}
-	analysis.GameMode = "premier"
-	return analysis
+	record.GameMode = "premier"
+	return record
 }
 
 // writeToTempAndRead runs a save-file writer inside a fresh temp working
@@ -62,10 +62,10 @@ func writeToTempAndRead(t *testing.T, write func() (string, error)) []byte {
 	return data
 }
 
-func writeAndRead(t *testing.T, analysis *demoparser.ProcessedDemo, saveType string) []byte {
+func writeAndRead(t *testing.T, record *analysis.MapAnalysis, saveType string) []byte {
 	t.Helper()
 	return writeToTempAndRead(t, func() (string, error) {
-		return WriteAnalysisToFile(analysis, saveType)
+		return WriteAnalysisToFile(record, saveType)
 	})
 }
 
@@ -93,17 +93,17 @@ func TestJSONEnvelopeTopLevelShape(t *testing.T) {
 	}
 }
 
-// TestJSONEnvelopeDecodesAsProcessedDemo round-trips the selected player and
+// TestJSONEnvelopeDecodesAsMapAnalysis round-trips the selected player and
 // match-level data through the shared struct.
-func TestJSONEnvelopeDecodesAsProcessedDemo(t *testing.T) {
-	analysis := selectedAnalysis()
-	data := writeAndRead(t, analysis, "json")
+func TestJSONEnvelopeDecodesAsMapAnalysis(t *testing.T) {
+	record := selectedAnalysis()
+	data := writeAndRead(t, record, "json")
 
-	var got demoparser.ProcessedDemo
+	var got analysis.MapAnalysis
 	if err := json.Unmarshal(data, &got); err != nil {
-		t.Fatalf("unmarshalling as ProcessedDemo: %v", err)
+		t.Fatalf("unmarshalling as MapAnalysis: %v", err)
 	}
-	want := analysis.Players[76561198000000000]
+	want := record.Players[76561198000000000]
 	gotPlayer := got.Players[want.SteamID]
 	if gotPlayer == nil {
 		t.Fatal("selected player missing from players")
@@ -114,14 +114,14 @@ func TestJSONEnvelopeDecodesAsProcessedDemo(t *testing.T) {
 	if len(got.Players) != 1 {
 		t.Errorf("players = %d entries, want only the selected player", len(got.Players))
 	}
-	if !reflect.DeepEqual(got.Map, analysis.Map) {
-		t.Errorf("map_data = %+v, want %+v", got.Map, analysis.Map)
+	if !reflect.DeepEqual(got.Map, record.Map) {
+		t.Errorf("map_data = %+v, want %+v", got.Map, record.Map)
 	}
 	if got.GameMode != "premier" {
 		t.Errorf("game_mode = %q, want %q", got.GameMode, "premier")
 	}
-	if !reflect.DeepEqual(got.Teams, analysis.Teams) {
-		t.Errorf("teams = %+v, want %+v", got.Teams, analysis.Teams)
+	if !reflect.DeepEqual(got.Teams, record.Teams) {
+		t.Errorf("teams = %+v, want %+v", got.Teams, record.Teams)
 	}
 	if gotPlayer.TeamID != 1 {
 		t.Errorf("selected player team_id = %d, want 1", gotPlayer.TeamID)
@@ -130,9 +130,9 @@ func TestJSONEnvelopeDecodesAsProcessedDemo(t *testing.T) {
 
 // TestJSONEnvelopeKeepsEmptyGameMode pins that an empty mode is written as "".
 func TestJSONEnvelopeKeepsEmptyGameMode(t *testing.T) {
-	analysis := selectedAnalysis()
-	analysis.GameMode = ""
-	data := writeAndRead(t, analysis, "json")
+	record := selectedAnalysis()
+	record.GameMode = ""
+	data := writeAndRead(t, record, "json")
 
 	var topLevel map[string]json.RawMessage
 	if err := json.Unmarshal(data, &topLevel); err != nil {

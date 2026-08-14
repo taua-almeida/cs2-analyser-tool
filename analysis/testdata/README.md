@@ -12,7 +12,7 @@ downloaded fixtures are repeated in the `Makefile`. Without the demo bytes,
 
 The `hltv-*` directories contain JSON oracles only. Their audited demos stay
 outside Git and are selected with `HLTV_DEMO_DIR` or the OS path-list
-`HLTV_EXTRA_DEMO_DIRS`; see [`_docs/HLTV_REGRESSION.md`](../../../_docs/HLTV_REGRESSION.md).
+`HLTV_EXTRA_DEMO_DIRS`; see [`_docs/HLTV_REGRESSION.md`](../../_docs/HLTV_REGRESSION.md).
 
 ## mirage.dem
 
@@ -45,7 +45,7 @@ joining a side between `RoundStart` and the end of freeze time.
 
 - Original Valve replay: `match730_003835545804819398890_1582373632_202`
 - Source: optional local fixture; the repository does not distribute the demo
-- Setup: place the exact replay at `cmd/demo_parser/testdata/inferno-shotgun.dem`
+- Setup: place the exact replay at `analysis/testdata/inferno-shotgun.dem`
 - Golden output redistribution is approved by the repository owner, including
   the player names and Steam IDs it contains
 - Size: 288,711,083 bytes
@@ -57,5 +57,5 @@ Only when a behaviour change is intentional — a diff here is a stat
 regression until proven otherwise:
 
 ```sh
-go test ./cmd/demo_parser -run TestProcessDemoGolden -update
+go test ./analysis -run TestAnalyseGolden -update
 ```

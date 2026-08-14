@@ -19,8 +19,8 @@ PLATFORMS := windows linux darwin
 os = $(word 1, $@)
 
 # Public integration test fixtures. Both are real CS2 demos pinned by SHA-256.
-# Sources, licenses and attribution are in cmd/demo_parser/testdata/README.md.
-TESTDATA_DIR := cmd/demo_parser/testdata
+# Sources, licenses and attribution are in analysis/testdata/README.md.
+TESTDATA_DIR := analysis/testdata
 
 MIRAGE_DEMO_URL := https://raw.githubusercontent.com/LaihoE/demoparser/4131a4fc02fda291b22421c20e1ca33f149535a7/src/parser/test_demo.dem
 MIRAGE_DEMO_SHA256 := 84a1a4191302bdd2a3bbb5a727842093744b1fb1a228aeec630369e44b622cb2

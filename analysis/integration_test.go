@@ -1,6 +1,7 @@
-package demoparser
+package analysis
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -64,17 +65,17 @@ var demoFixtures = []demoFixture{
 	},
 }
 
-var updateGolden = flag.Bool("update", false, "rewrite the golden files from current ProcessDemo output")
+var updateGolden = flag.Bool("update", false, "rewrite the golden files from current analysis output")
 
-// TestProcessDemoGolden runs the full parser pipeline on each fixture demo
-// and compares the marshalled ProcessedDemo against its golden file. The
+// TestAnalyseGolden runs the full parser pipeline on each fixture demo
+// and compares the marshalled MapAnalysis against its golden file. The
 // golden output is a snapshot of behaviour that was validated against the
 // in-game scoreboard (see issue #9), so any diff here means a stat
 // regression, not a test problem. To accept an intentional behaviour
 // change, regenerate with:
 //
-//	go test ./cmd/demo_parser -run TestProcessDemoGolden -update
-func TestProcessDemoGolden(t *testing.T) {
+//	go test ./analysis -run TestAnalyseGolden -update
+func TestAnalyseGolden(t *testing.T) {
 	for _, f := range demoFixtures {
 		t.Run(f.name, func(t *testing.T) {
 			demoBytes, err := os.ReadFile(f.demo)
@@ -97,9 +98,9 @@ func TestProcessDemoGolden(t *testing.T) {
 					f.demo, got, f.sha256)
 			}
 
-			result, err := ProcessDemo(f.demo)
+			result, err := AnalyseFile(context.Background(), f.demo)
 			if err != nil {
-				t.Fatalf("ProcessDemo: %v", err)
+				t.Fatalf("AnalyseFile: %v", err)
 			}
 			if f.expectsUnusedUtility {
 				// A positive aggregate proves Kill still exposes pre-death
@@ -151,7 +152,7 @@ func TestProcessDemoGolden(t *testing.T) {
 				t.Fatalf("reading golden file: %v", err)
 			}
 			if diff := diffLines(string(want), string(got)); diff != "" {
-				t.Errorf("ProcessDemo output drifted from %s:\n%s", f.golden, diff)
+				t.Errorf("analysis output drifted from %s:\n%s", f.golden, diff)
 			}
 		})
 	}

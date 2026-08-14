@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -9,8 +10,8 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/taua-almeida/cs2-analyser-tool/analysis"
 	dataexport "github.com/taua-almeida/cs2-analyser-tool/cmd/dataexport"
-	demoparser "github.com/taua-almeida/cs2-analyser-tool/cmd/demo_parser"
 	printstyle "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/print-style"
 )
 
@@ -20,7 +21,7 @@ import (
 // path, or none for the picker), so an explicit --best-of 0 is rejected like
 // any other value outside 3 and 5 instead of silently reading as absent. A
 // series is never inferred from the file count; with the flag set,
-// demoparser owns the format rule and this only rewords it in flag terms.
+// the analysis package owns the format rule and this only rewords it in flag terms.
 func validateSeriesFlags(bestOf int, bestOfSet bool, demoCount int) error {
 	if !bestOfSet {
 		if demoCount > 1 {
@@ -28,7 +29,7 @@ func validateSeriesFlags(bestOf int, bestOfSet bool, demoCount int) error {
 		}
 		return nil
 	}
-	minDemos, maxDemos, err := demoparser.SeriesMapCountRange(bestOf)
+	minDemos, maxDemos, err := analysis.SeriesMapCountRange(bestOf)
 	if err != nil {
 		return fmt.Errorf("invalid --best-of %d, must be 3 or 5", bestOf)
 	}
@@ -81,7 +82,7 @@ func hashDemoFile(path string) (string, error) {
 // identity, then render and optionally save. It never opens the demo file
 // picker or the interactive player selector; without --players every player
 // is analysed.
-func runSeriesAnalysis(bestOf int, paths []string) error {
+func runSeriesAnalysis(ctx context.Context, bestOf int, paths []string) error {
 	digests, err := hashDemoFiles(paths)
 	if err != nil {
 		return err
@@ -89,17 +90,17 @@ func runSeriesAnalysis(bestOf int, paths []string) error {
 
 	lipgloss.Println(printstyle.StyleInfo.Render("Processing CS2 series, hang tight... \n"))
 	startTime := time.Now()
-	inputs := make([]demoparser.SeriesMapInput, len(paths))
+	inputs := make([]analysis.SeriesMapInput, len(paths))
 	for i, path := range paths {
 		fmt.Printf("Parsing map %d/%d: %s\n", i+1, len(paths), path)
-		demo, err := demoparser.ProcessDemo(path)
+		demo, err := analysis.AnalyseFile(ctx, path)
 		if err != nil {
 			return err
 		}
-		inputs[i] = demoparser.SeriesMapInput{Demo: demo, SHA256: digests[i]}
+		inputs[i] = analysis.SeriesMapInput{Demo: demo, SHA256: digests[i]}
 	}
 
-	series, err := demoparser.BuildSeries(bestOf, inputs)
+	series, err := analysis.BuildSeries(bestOf, inputs)
 	if err != nil {
 		return err
 	}
@@ -110,7 +111,7 @@ func runSeriesAnalysis(bestOf int, paths []string) error {
 	// scores and aggregates above were already resolved from everyone.
 	var selected map[uint64]bool
 	if len(players) > 0 {
-		selected, err = demoparser.SelectSeriesPlayers(series, players)
+		selected, err = analysis.SelectSeriesPlayers(series, players)
 		if err != nil {
 			return err
 		}
@@ -124,7 +125,7 @@ func runSeriesAnalysis(bestOf int, paths []string) error {
 	if save {
 		seriesToSave := series
 		if selected != nil {
-			seriesToSave = demoparser.FilterSeriesPlayers(series, selected)
+			seriesToSave = analysis.FilterSeriesPlayers(series, selected)
 		}
 		return saveAndReport(func() (string, error) {
 			return dataexport.WriteSeriesToFile(seriesToSave, saveType)

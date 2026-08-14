@@ -1,10 +1,10 @@
-// Series analysis (issue #34) aggregates an explicit, completed BO3 or BO5
-// from maps that were each parsed with ProcessDemo. Everything in this file
-// is pure — no flag handling, rendering or filesystem access — so the
-// aggregation can later move into the planned public Go library unchanged.
-// The series is never inferred: the caller states the format, and the maps
+// This file is the series aggregation (issue #34): an explicit, completed
+// BO3 or BO5 built from maps that were each parsed with Analyse. Everything
+// in it is pure — no flag handling, rendering or filesystem access. The
+// series is never inferred: the caller states the format, and the maps
 // arrive in supplied order.
-package demoparser
+
+package analysis
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ import (
 // --demo flags — and it is preserved everywhere downstream.
 type SeriesMapInput struct {
 	// Demo is the parsed map. BuildSeries never mutates it.
-	Demo *ProcessedDemo
+	Demo *MapAnalysis
 	// SHA256 is the lowercase hex digest of the demo file's bytes. It
 	// identifies the map's content, so two inputs with equal digests are
 	// rejected as the same demo regardless of their file paths.
@@ -41,7 +41,7 @@ type SeriesMap struct {
 	SHA256          string                 `json:"sha256"`
 	WinnerTeamID    int                    `json:"winner_team_id"`
 	TeamAssignments []SeriesTeamAssignment `json:"team_assignments"`
-	Analysis        *ProcessedDemo         `json:"analysis"`
+	Analysis        *MapAnalysis           `json:"analysis"`
 }
 
 // SeriesTeam is one of the two series-scoped teams. TeamID is series-local —
@@ -94,15 +94,15 @@ type SeriesPlayer struct {
 	// summed raw facts (eco-adjusted kills and damage, eco-weighted survival
 	// and rating-KAST, signed swing, multi-kill buckets) with the series
 	// round denominator. It is null — never approximated from map ratings —
-	// when a map was not produced by ProcessDemo and so carries no raw
+	// when a map was not produced by Analyse and so carries no raw
 	// facts, or when the player has no series rounds.
 	Rating *RatingStats `json:"rating"`
 }
 
-// ProcessedSeries is a completed BO3/BO5: the winner, the two series-scoped
+// SeriesAnalysis is a completed BO3/BO5: the winner, the two series-scoped
 // teams, the aggregate players keyed by SteamID, and the ordered per-map
 // results with their unchanged standalone analyses.
-type ProcessedSeries struct {
+type SeriesAnalysis struct {
 	BestOf       int                      `json:"best_of"`
 	WinnerTeamID int                      `json:"winner_team_id"`
 	Teams        []SeriesTeam             `json:"teams"`
@@ -205,7 +205,7 @@ func (e *PlayerAliasAmbiguityError) Error() string {
 // duplicate demo content by digest, resolves the two series teams through a
 // unique joint roster assignment, and requires the series to be clinched
 // exactly on the final supplied map. The inputs are never mutated.
-func BuildSeries(bestOf int, maps []SeriesMapInput) (*ProcessedSeries, error) {
+func BuildSeries(bestOf int, maps []SeriesMapInput) (*SeriesAnalysis, error) {
 	// The minimum played-map count doubles as the clinch threshold: a series
 	// is complete exactly when one team has won that many maps.
 	threshold, maxMaps, err := SeriesMapCountRange(bestOf)
@@ -230,7 +230,7 @@ func BuildSeries(bestOf int, maps []SeriesMapInput) (*ProcessedSeries, error) {
 	}
 
 	teams := buildSeriesTeams(maps, orientation, tally)
-	return &ProcessedSeries{
+	return &SeriesAnalysis{
 		BestOf:       bestOf,
 		WinnerTeamID: tally.winner,
 		Teams:        teams,
@@ -262,7 +262,7 @@ func seriesMapCountChoices(bestOf int) string {
 
 // seriesMapLabel names a map in errors by its 1-based supplied position and,
 // when known, its map name.
-func seriesMapLabel(index int, demo *ProcessedDemo) string {
+func seriesMapLabel(index int, demo *MapAnalysis) string {
 	if demo != nil && demo.Map.MapName != "" {
 		return fmt.Sprintf("map %d (%s)", index+1, demo.Map.MapName)
 	}
@@ -318,7 +318,7 @@ var seriesGameModes = map[string]bool{
 // up to the map's rounds, players that reference only those teams (or team
 // 0, the no-team marker), and no more per-round participants than a 5v5
 // lobby can produce.
-func validateSeriesMap(index int, demo *ProcessedDemo) error {
+func validateSeriesMap(index int, demo *MapAnalysis) error {
 	label := seriesMapLabel(index, demo)
 	if !seriesGameModes[demo.GameMode] {
 		return fmt.Errorf("%s reports game mode %q; series aggregation supports only the competitive 5v5 format", label, demo.GameMode)
@@ -575,7 +575,7 @@ type seriesPlayerAgg struct {
 	names  nameTally
 	facts  playerAggFacts
 	// factsKnown stays true only while every map the player appears in
-	// carries raw aggregation facts, i.e. was produced by ProcessDemo.
+	// carries raw aggregation facts, i.e. was produced by Analyse.
 	factsKnown bool
 }
 
@@ -707,7 +707,7 @@ func (sp *SeriesPlayer) statRefs() statRefs {
 
 // deriveSeriesStats runs the same deriveStats formulas a single map's derive
 // uses, with the player's series round count as the match-wide denominator.
-// When raw facts are unavailable (a map not produced by ProcessDemo), the
+// When raw facts are unavailable (a map not produced by Analyse), the
 // fact-based values read 0 and the rating stays nil rather than being
 // reconstructed from rounded per-map output.
 func (sp *SeriesPlayer) deriveSeriesStats(facts playerAggFacts, factsKnown bool) {
@@ -725,7 +725,7 @@ func (sp *SeriesPlayer) deriveSeriesStats(facts playerAggFacts, factsKnown bool)
 // PlayerAliasAmbiguityError carrying the sorted candidates. The returned set
 // only narrows rendering and saving; it never feeds back into team
 // resolution or aggregation.
-func SelectSeriesPlayers(series *ProcessedSeries, requestedNames []string) (map[uint64]bool, error) {
+func SelectSeriesPlayers(series *SeriesAnalysis, requestedNames []string) (map[uint64]bool, error) {
 	selected := make(map[uint64]bool)
 	var unmatched []string
 	for _, name := range distinctNamesFold(requestedNames) {
@@ -757,7 +757,7 @@ func SelectSeriesPlayers(series *ProcessedSeries, requestedNames []string) (map[
 
 // seriesPlayerNames lists every aggregate player for selection errors,
 // sorted; a player the demos never named is listed by SteamID.
-func seriesPlayerNames(series *ProcessedSeries) []string {
+func seriesPlayerNames(series *SeriesAnalysis) []string {
 	names := make([]string, 0, len(series.Players))
 	for id, player := range series.Players {
 		if player.Name != "" {
@@ -774,7 +774,7 @@ func seriesPlayerNames(series *ProcessedSeries) []string {
 // SteamIDs: the aggregate players and each map's standalone players are
 // filtered, while teams, rosters, scores, map results and team assignments
 // stay complete. The input series and its maps are not mutated.
-func FilterSeriesPlayers(series *ProcessedSeries, selected map[uint64]bool) *ProcessedSeries {
+func FilterSeriesPlayers(series *SeriesAnalysis, selected map[uint64]bool) *SeriesAnalysis {
 	filtered := *series
 	filtered.Players = make(map[uint64]*SeriesPlayer, len(selected))
 	for id, player := range series.Players {

@@ -1,6 +1,6 @@
 # Rating methodology
 
-This document is the full calculation reference for the `rating` field: every formula, every constant and where it came from. The field-by-field output reference lives in [PLAYER_DATA](./PLAYER_DATA.MD#rating-rating); the constants themselves live in `cmd/demo_parser/rating.go`.
+This document is the full calculation reference for the `rating` field: every formula, every constant and where it came from. The field-by-field output reference lives in [PLAYER_DATA](./PLAYER_DATA.MD#rating-rating); the constants themselves live in `analysis/rating.go`.
 
 ## Which HLTV rating this targets, and how closely
 
