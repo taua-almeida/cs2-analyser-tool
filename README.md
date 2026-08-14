@@ -1,5 +1,67 @@
 # cs2-analyser-tool
+
 Designed specifically for players and coaches, this command-line interface tool provides a simple display and easy data ready to analyse, compare and start your journey towards improving your team and your personal CS2 skills.
+
+## Installation
+
+### Prebuilt archives
+
+Prebuilt archives are published for each release from `v0.1.0` onward at [GitHub Releases](https://github.com/taua-almeida/cs2-analyser-tool/releases). Download `checksums.txt` and the archive for your system from the same release:
+
+| System | Archive |
+| --- | --- |
+| Linux, 64-bit Intel/AMD | `cs2-analyser-tool-linux-amd64.tar.gz` |
+| Windows, 64-bit Intel/AMD | `cs2-analyser-tool-windows-amd64.zip` |
+| macOS, Intel | `cs2-analyser-tool-darwin-amd64.tar.gz` |
+| macOS, Apple silicon | `cs2-analyser-tool-darwin-arm64.tar.gz` |
+
+Verify the downloaded archive before extracting it. On Linux, replace the archive name if needed:
+
+```sh
+grep 'cs2-analyser-tool-linux-amd64.tar.gz$' checksums.txt | sha256sum --check -
+```
+
+On macOS:
+
+```sh
+grep 'cs2-analyser-tool-darwin-arm64.tar.gz$' checksums.txt | shasum -a 256 --check -
+```
+
+On Windows PowerShell:
+
+```powershell
+$archive = "cs2-analyser-tool-windows-amd64.zip"
+$expected = ((Get-Content checksums.txt | Where-Object { $_ -match ([regex]::Escape($archive) + '$') }) -split '\s+')[0]
+$actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw "checksum mismatch" }
+```
+
+Extract a Linux or macOS archive into its own directory and run the binary:
+
+```sh
+mkdir cs2-analyser-tool-release
+tar -xzf cs2-analyser-tool-linux-amd64.tar.gz -C cs2-analyser-tool-release
+./cs2-analyser-tool-release/cs2-analyser-tool version
+```
+
+For Windows:
+
+```powershell
+Expand-Archive cs2-analyser-tool-windows-amd64.zip -DestinationPath cs2-analyser-tool-release
+.\cs2-analyser-tool-release\cs2-analyser-tool.exe version
+```
+
+Each archive also contains `README.md` and `LICENSE`.
+
+### Install with Go
+
+Install the latest available CLI version with a supported Go toolchain:
+
+```sh
+go install github.com/taua-almeida/cs2-analyser-tool@latest
+```
+
+`@latest` resolves a pseudo-version of `main` until the first tag is published; after that it selects the latest tagged release.
 
 ## Usage
 
@@ -131,7 +193,7 @@ series, err := analysis.BuildSeries(3, []analysis.SeriesMapInput{
 
 It is pure aggregation — no I/O, inputs never mutated — and enforces the completed-series rule: the final supplied map must be the clinching one. When the two series teams cannot be resolved from rosters alone, the structured `SeriesTeamConflictError` and `SeriesTeamAmbiguityError` carry the competing evidence and match through `errors.As`.
 
-### JSON and stability
+### JSON contract and v0.x API stability
 
 Every result type marshals with `encoding/json` into the same envelopes the CLI's `--save` writes, documented in [PLAYER_DATA](./_docs/PLAYER_DATA.MD): `MapAnalysis` is the standalone map document, `SeriesAnalysis` the series document embedding each map's unchanged analysis. A series player whose rating cannot be recomputed from raw per-map facts marshals it as `null` rather than a fabricated value.
 
@@ -165,6 +227,18 @@ For a local run of the ordinary suite:
 make download-test-demos
 REQUIRE_TEST_DEMO=1 go test -count=1 ./...
 ```
+
+### Publishing a release
+
+Releases are maintainer-triggered and remain a human-approved operation:
+
+1. Confirm the normal CI workflow passed on the commit to release.
+2. Confirm the latest external-regression workflow run passed.
+3. Create an annotated, v-prefixed semantic-version tag, for example `git tag -a v0.1.0 -m "v0.1.0"`.
+4. Push only that tag, for example `git push origin v0.1.0`.
+5. Watch the release workflow until its verification and publishing jobs finish.
+6. In the GitHub release, verify all four platform archives, `checksums.txt`, each archive's contents, and the binary's `version` output.
+7. Never move a published tag. Publish a new patch release to correct a release.
 
 ### Clone the repo
 
