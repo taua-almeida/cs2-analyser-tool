@@ -21,10 +21,15 @@ type demoFixture struct {
 	demo                 string
 	sha256               string
 	golden               string
-	requiredInCI         bool
+	requiredBy           string
 	expectsUnusedUtility bool
 	expectsSideSwap      bool
 }
+
+const (
+	requirePublicTestDemoEnv  = "REQUIRE_TEST_DEMO"
+	requirePrivateTestDemoEnv = "REQUIRE_PRIVATE_TEST_DEMO"
+)
 
 // The fixtures cover the two ways a CS2 demo reports round MVPs, which
 // matters because the parser has to handle both, plus event sequences the
@@ -46,21 +51,22 @@ var demoFixtures = []demoFixture{
 		demo:                 "testdata/mirage.dem",
 		sha256:               "84a1a4191302bdd2a3bbb5a727842093744b1fb1a228aeec630369e44b622cb2",
 		golden:               "testdata/golden_mirage.json",
-		requiredInCI:         true,
+		requiredBy:           requirePublicTestDemoEnv,
 		expectsUnusedUtility: true,
 	},
 	{
-		name:         "ancient_scoreboard_mvps",
-		demo:         "testdata/ancient.dem",
-		sha256:       "b29a9cb537a181deef97b15cfed10ee722a37999644a27bb2226fdd77a1337fc",
-		golden:       "testdata/golden_ancient.json",
-		requiredInCI: true,
+		name:       "ancient_scoreboard_mvps",
+		demo:       "testdata/ancient.dem",
+		sha256:     "b29a9cb537a181deef97b15cfed10ee722a37999644a27bb2226fdd77a1337fc",
+		golden:     "testdata/golden_ancient.json",
+		requiredBy: requirePublicTestDemoEnv,
 	},
 	{
 		name:            "inferno_shotgun_halftime_and_freeze_join",
 		demo:            "testdata/inferno-shotgun.dem",
 		sha256:          "095625b47c2cc6ace12414a6bbc987ea254904d969ae39fb95c7d54e085f7f93",
 		golden:          "testdata/golden_inferno_shotgun.json",
+		requiredBy:      requirePrivateTestDemoEnv,
 		expectsSideSwap: true,
 	},
 }
@@ -80,12 +86,11 @@ func TestAnalyseGolden(t *testing.T) {
 		t.Run(f.name, func(t *testing.T) {
 			demoBytes, err := os.ReadFile(f.demo)
 			if os.IsNotExist(err) {
-				// CI sets REQUIRE_TEST_DEMO so a fixture that silently
-				// fails to land in the expected place is a red build
-				// rather than a skip that leaves the integration test
-				// unrun and unnoticed.
-				if f.requiredInCI && os.Getenv("REQUIRE_TEST_DEMO") != "" {
-					t.Fatalf("fixture %s is missing and REQUIRE_TEST_DEMO is set", f.demo)
+				// CI sets the fixture's requirement flag after provisioning,
+				// turning a missing expected demo into a failure instead of an
+				// unnoticed skip.
+				if fixtureIsRequired(f, os.Getenv) {
+					t.Fatalf("fixture %s is missing and %s is set", f.demo, f.requiredBy)
 				}
 				t.Skipf("fixture %s not present; see testdata/README.md", f.demo)
 			}
@@ -153,6 +158,35 @@ func TestAnalyseGolden(t *testing.T) {
 			}
 			if diff := diffLines(string(want), string(got)); diff != "" {
 				t.Errorf("analysis output drifted from %s:\n%s", f.golden, diff)
+			}
+		})
+	}
+}
+
+func fixtureIsRequired(fixture demoFixture, getenv func(string) string) bool {
+	return fixture.requiredBy != "" && getenv(fixture.requiredBy) != ""
+}
+
+func TestFixtureRequirementFlagsAreIndependent(t *testing.T) {
+	publicFixture := demoFixture{requiredBy: requirePublicTestDemoEnv}
+	privateFixture := demoFixture{requiredBy: requirePrivateTestDemoEnv}
+
+	for _, test := range []struct {
+		name    string
+		fixture demoFixture
+		env     map[string]string
+		want    bool
+	}{
+		{name: "public required", fixture: publicFixture, env: map[string]string{requirePublicTestDemoEnv: "1"}, want: true},
+		{name: "private required", fixture: privateFixture, env: map[string]string{requirePrivateTestDemoEnv: "1"}, want: true},
+		{name: "public flag does not require private", fixture: privateFixture, env: map[string]string{requirePublicTestDemoEnv: "1"}},
+		{name: "private flag does not require public", fixture: publicFixture, env: map[string]string{requirePrivateTestDemoEnv: "1"}},
+		{name: "unset", fixture: privateFixture},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			getenv := func(name string) string { return test.env[name] }
+			if got := fixtureIsRequired(test.fixture, getenv); got != test.want {
+				t.Fatalf("fixtureIsRequired() = %t, want %t", got, test.want)
 			}
 		})
 	}
