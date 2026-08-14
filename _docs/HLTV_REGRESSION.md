@@ -9,6 +9,49 @@ The test never contacts HLTV or downloads demos. The committed JSON records
 source URLs, reviewed SteamID64 mappings, expected values, demo filenames, and
 SHA-256 digests. Demo bytes remain external, read-only inputs.
 
+## CI coverage
+
+| Suite | Pull request | Nightly | Manual |
+| --- | --- | --- | --- |
+| Unit and synthetic tests | Required | Required | Available |
+| Public golden demos | Required | Required | Available |
+| HLTV map regression | Allowlisted skip | Required | Available |
+| HLTV series regression | Allowlisted skip | Required | Available |
+| Private Inferno golden | Explicit status | Required if provisioned | Available |
+| Trade-model diagnostic | Allowlisted skip | Not required | Available |
+| Trace diagnostic | Allowlisted skip | Not required | Available |
+
+Pull-request CI runs `go test -count=1 -json ./...`; `-count=1` prevents a
+cached result from standing in for a test execution. The repository-local
+`internal/citest` command turns the JSON events back into readable Go output,
+counts final pass, fail, and skip actions, and appends a **Go test coverage**
+section to the Actions summary. Parent tests and subtests each count when Go
+emits a final action for them. A package that fails without a failing test
+name — a `TestMain` exit, an `init` panic, or a build failure — counts as one
+failure.
+
+The pull-request skip policy permits only these names:
+
+```text
+analysis/TestAnalyseGolden/inferno_shotgun_halftime_and_freeze_join
+analysis/TestHLTVRegression/*
+analysis/TestHLTVSeriesRegression
+analysis/TestEvaluateHLTVTradeModels
+analysis/TestTraceHLTVRoundEvidence
+```
+
+The `TestHLTVRegression/*` rule matches children of that one top-level test,
+including the nested `extra/...` map names. It does not match the parent,
+another package, or another `TestHLTV...` test. Every observed skip appears in
+the summary as a package-relative full test name. A new `t.Skip` fails CI until
+the same pull request makes a narrow, reviewed allowlist change.
+
+To verify a run, open its Actions summary and check the pass/fail/skip counts,
+the public-golden status line, and the complete allowed-skip list. The test step
+still returns the original `go test` failure status independently of summary
+generation, and the log contains the readable failure output reconstructed from
+each JSON `Output` event.
+
 ## Demo setup
 
 The original commands and directory layout are unchanged:
@@ -42,6 +85,73 @@ spirit-vs-jijiehao-mirage.dem
 | Spirit–MOUZ | Ancient | 234238 | `4ddc87a2b87ff604ccfeb5ee498f543b45afa1f22e8366163db73e828eeb0785` |
 | Spirit–MOUZ | Nuke | 234256 | `11596e71c48615b49248b9b3e915ca0b1beaaf29230af90ceb8cbde9267b4337` |
 | Spirit–JiJieHao | Mirage | 234956 | `d68a4453645332f2a1da37acb07b1e4621362145e678e056f5252b213df2dd38` |
+
+## External regression workflow
+
+`.github/workflows/external-regression.yml` runs at 03:17 UTC each night and
+through `workflow_dispatch`. It has no pull-request trigger, grants only
+`contents: read`, fails a manual dispatch whose ref is not the repository's
+default branch through an explicit guard job, and explicitly checks out that
+default branch. The required map
+and series tests run together so their checksum-verified parse cache is shared:
+
+```sh
+HLTV_DEMO_DIR=/ephemeral/hltv-original \
+HLTV_EXTRA_DEMO_DIRS=/ephemeral/hltv-extra \
+REQUIRE_HLTV_DEMOS=1 \
+REQUIRE_HLTV_EXTRA_DEMOS=1 \
+  go test -count=1 -json ./analysis \
+    -run '^(TestHLTVRegression|TestHLTVSeriesRegression)$'
+```
+
+The external summary reports whether all eight map subtests completed and how
+many passed, whether the series test ran and its final action, whether
+provisioning verified every fixture checksum, whether any required test
+skipped, and the final result. Any skip is a failure in this profile.
+
+### Owner-approved archive contract
+
+The workflow deliberately has no built-in private source. A repository owner
+must approve an HTTPS storage location and then configure both:
+
+- Secret `EXTERNAL_FIXTURE_ARCHIVE_URL`: one HTTPS GET URL for the approved
+  gzip-compressed tar archive. A signed URL belongs in the secret, never in a
+  repository variable or workflow input.
+- Variable `EXTERNAL_FIXTURE_ARCHIVE_SHA256`: the lowercase SHA-256 digest of
+  that complete archive.
+
+The archive must use these exact relative directories and filenames:
+
+```text
+hltv-original/
+├── rooster-vs-mindfreak-m1-inferno.dem
+├── rooster-vs-mindfreak-m2-anubis.dem
+└── rooster-vs-mindfreak-m3-mirage.dem
+hltv-extra/
+├── spirit-vs-mouz-m1-dust2.dem
+├── spirit-vs-mouz-m2-mirage.dem
+├── spirit-vs-mouz-m3-ancient.dem
+├── spirit-vs-mouz-m4-nuke.dem
+└── spirit-vs-jijiehao-mirage.dem
+private-golden/
+└── inferno-shotgun.dem  # optional
+```
+
+The committed `.github/external-fixtures.sha256` manifest pins the eight
+required HLTV demos and the optional private Inferno golden. Provisioning
+downloads the archive to `$RUNNER_TEMP` without printing the URL or curl error
+body, verifies the archive digest, extracts only exact manifest members to a
+temp directory, and verifies each demo before a test can parse it. Missing or
+invalid HLTV files fail provisioning. If the Inferno member exists, it must
+verify and `REQUIRE_PRIVATE_TEST_DEMO=1` makes its golden subtest mandatory. If
+it is absent, the nightly core-test summary says **Private Inferno golden:
+unavailable**.
+
+No private demo path is passed to `actions/cache` or an artifact upload step.
+The workflow does not create secrets, and the pull-request workflow neither
+references this secret nor provisions external files. Until an owner approves a
+source and creates both settings, scheduled/manual runs fail immediately with a
+fixture-provisioning blocker instead of reporting unrun regressions as success.
 
 ## Commands and missing-demo behavior
 
@@ -315,6 +425,12 @@ HLTV_TRACE_DEMO=/path/to/map.dem \
 HLTV_TRACE_STEAM_ID=76561199063238565 \
   go test -count=1 -v ./analysis -run '^TestTraceHLTVRoundEvidence$'
 ```
+
+These two tests stay manual. The trade-model matrix compares exploratory rules
+and has no accepted production gate; running it nightly would spend time
+reproducing diagnostic evidence. The trace test prints investigator-selected
+event evidence and has no regression oracle. Neither is evidence that the eight
+map or BO3 regression passed.
 
 The trace records participation, side, kills, normal/flash assists, death
 cause/frame/time/tick, the assister's name and SteamID64, every direct trade

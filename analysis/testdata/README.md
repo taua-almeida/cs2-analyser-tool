@@ -8,7 +8,9 @@ make download-test-demos
 
 All demos are pinned by SHA-256 in `integration_test.go`; checksums for the two
 downloaded fixtures are repeated in the `Makefile`. Without the demo bytes,
-`go test ./...` skips the affected integration subtest.
+`go test ./...` skips the affected integration subtest. CI sets
+`REQUIRE_TEST_DEMO=1`, which makes missing Mirage or Ancient bytes fail instead.
+That public-fixture requirement is independent of the private fixture flag.
 
 The `hltv-*` directories contain JSON oracles only. Their audited demos stay
 outside Git and are selected with `HLTV_DEMO_DIR` or the OS path-list
@@ -50,6 +52,21 @@ joining a side between `RoundStart` and the end of freeze time.
   the player names and Steam IDs it contains
 - Size: 288,711,083 bytes
 - SHA-256: `095625b47c2cc6ace12414a6bbc987ea254904d969ae39fb95c7d54e085f7f93`
+
+By default a missing private replay produces an explicit skip. Set
+`REQUIRE_PRIVATE_TEST_DEMO=1` when the exact bytes have been provisioned; the
+test then fails if the file is missing, and a checksum mismatch always fails.
+`REQUIRE_TEST_DEMO=1` never makes this private fixture required and
+`REQUIRE_PRIVATE_TEST_DEMO=1` never weakens or replaces the two public fixture
+requirements.
+
+The scheduled/manual external workflow can accept this replay only as the
+optional `private-golden/inferno-shotgun.dem` member of the owner-approved
+archive documented in
+[`_docs/HLTV_REGRESSION.md`](../../_docs/HLTV_REGRESSION.md#owner-approved-archive-contract).
+It verifies the archive and replay before linking the temp-only file into this
+directory for the test process. Private demos are never stored in the GitHub
+Actions cache or uploaded as workflow artifacts.
 
 ## Regenerating the goldens
 

@@ -144,6 +144,28 @@ The opt-in external-oracle test for HLTV match 129241 is documented in
 repository's self-golden integration fixtures and never downloads demos or
 scrapes HLTV during a test run.
 
+### CI and test coverage
+
+Pull-request CI restores the two public golden demos, keeps `go vet ./...` and
+`go build ./...` as separate checks, and runs uncached tests with
+`go test -count=1 -json ./...`. Its Actions summary gives pass, fail, and skip
+counts plus every package-relative skipped test. An unlisted skip fails the
+workflow, so adding `t.Skip` requires an intentional allowlist review.
+
+The scheduled/manual external workflow is separate from pull requests. It runs
+the eight checksum-pinned HLTV map regressions and the original BO3 series from
+an owner-approved private archive; absent provisioning configuration is a hard
+failure. The complete coverage matrix, private archive contract, summary fields,
+and manual diagnostic commands are in
+[HLTV_REGRESSION.md](./_docs/HLTV_REGRESSION.md#ci-coverage).
+
+For a local run of the ordinary suite:
+
+```sh
+make download-test-demos
+REQUIRE_TEST_DEMO=1 go test -count=1 ./...
+```
+
 ### Clone the repo
 
 ```bash
