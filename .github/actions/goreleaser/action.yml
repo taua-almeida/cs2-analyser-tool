@@ -1,0 +1,16 @@
+name: Pinned GoReleaser
+description: Run the repository's pinned GoReleaser release tool.
+
+inputs:
+  args:
+    description: Arguments passed to GoReleaser.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+      with:
+        distribution: goreleaser
+        version: v2.17.1
+        args: ${{ inputs.args }}

@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	profileName := flag.String("profile", string(profilePullRequest), "summary and skip policy: pull-request, nightly, or external")
+	profileName := flag.String("profile", string(profilePullRequest), "summary and skip policy: pull-request, nightly, release, or external")
 	fixturesVerified := flag.Bool("fixtures-verified", false, "report that the external provisioning step verified every fixture checksum")
 	flag.Parse()
 

@@ -1,0 +1,63 @@
+version: 2
+
+project_name: cs2-analyser-tool
+
+builds:
+  - id: cs2-analyser-tool
+    main: .
+    binary: cs2-analyser-tool
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: linux
+        goarch: arm64
+      - goos: windows
+        goarch: arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/taua-almeida/cs2-analyser-tool/cmd.CS2AnalyserVersion=v{{ .Version }}
+
+archives:
+  - ids:
+      - cs2-analyser-tool
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+release:
+  prerelease: auto
+
+changelog:
+  use: git
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^feat(\([^)]*\))?!?:.+$'
+      order: 0
+    - title: Fixes
+      regexp: '^fix(\([^)]*\))?!?:.+$'
+      order: 1
+    - title: Maintenance
+      regexp: '^chore(\([^)]*\))?!?:.+$'
+      order: 2
+    - title: Other
+      order: 999

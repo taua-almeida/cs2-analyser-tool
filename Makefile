@@ -14,9 +14,11 @@ GOCLEAN := $(GOCMD) clean
 GOTIDY := $(GOCMD) mod tidy
 GOTEST := $(GOCMD) test
 
-# Platforms
-PLATFORMS := windows linux darwin
-os = $(word 1, $@)
+# Build targets. A target without an explicit architecture defaults to amd64.
+BUILD_TARGETS := windows linux darwin darwin-arm64
+target_parts = $(subst -, ,$@)
+os = $(word 1,$(target_parts))
+arch = $(if $(word 2,$(target_parts)),$(word 2,$(target_parts)),amd64)
 
 # Public integration test fixtures. Both are real CS2 demos pinned by SHA-256.
 # Sources, licenses and attribution are in analysis/testdata/README.md.
@@ -53,12 +55,12 @@ endef
 # Ensure GOBIN is not set, which can conflict with cross compilation
 unexport GOBIN
 
-.PHONY: build-all clean tidy test download-test-demos $(PLATFORMS)
+.PHONY: build-all clean tidy test download-test-demos $(BUILD_TARGETS)
 
-build-all: windows linux darwin
+build-all: $(BUILD_TARGETS)
 
-$(PLATFORMS):
-	GOOS=$(os) GOARCH=amd64 $(GOBUILD) -o '$(BUILD_DIR)/$(PROJECT_NAME)-$(os)-amd64' .
+$(BUILD_TARGETS):
+	GOOS=$(os) GOARCH=$(arch) $(GOBUILD) -o '$(BUILD_DIR)/$(PROJECT_NAME)-$(os)-$(arch)' .
 
 test:
 	$(GOTEST) ./...
@@ -74,3 +76,4 @@ tidy:
 clean:
 	$(GOCLEAN)
 	rm -f $(BUILD_DIR)/*
+	rm -rf ./dist

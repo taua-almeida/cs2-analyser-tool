@@ -24,6 +24,9 @@ go.work.sum
 # Build output (see Makefile BUILD_DIR)
 build/
 
+# GoReleaser output
+dist/
+
 # Ignore downloaded and locally supplied demo fixtures.
 # See cmd/demo_parser/testdata/README.md.
 *.dem

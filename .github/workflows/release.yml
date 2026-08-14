@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  pull_request:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    name: Snapshot
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      release_mode: snapshot
+
+  verify-tag:
+    name: Verify tag and test
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      release_mode: tag
+
+  publish:
+    name: Publish
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: verify-tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Publish GitHub release
+        uses: ./.github/actions/goreleaser
+        with:
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download published release artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/published-release"
+          gh release download "$GITHUB_REF_NAME" --dir "$RUNNER_TEMP/published-release"
+      - name: Verify downloaded release artifacts
+        env:
+          EXPECTED_RELEASE_VERSION: ${{ github.ref_name }}
+        run: bash .github/scripts/verify-release-artifacts.sh "$RUNNER_TEMP/published-release"

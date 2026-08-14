@@ -201,6 +201,46 @@ func TestPullRequestMarkdownIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestReleasePolicyUsesItsOwnSkipRulesAndSummary(t *testing.T) {
+	run := passingPublicGoldenRun()
+	run.actions[privateGoldenTest] = "skip"
+	run.actions["analysis/TestTraceHLTVRoundEvidence"] = "skip"
+
+	report := evaluate(profileRelease, run, nil, false)
+	if len(report.problems) != 0 {
+		t.Fatalf("release policy problems = %#v, want none", report.problems)
+	}
+	markdown := renderMarkdown(profileRelease, run, report)
+	for _, want := range []string{
+		"## Go test coverage (release)",
+		"- Private Inferno golden: intentionally unavailable",
+		"- HLTV map regression: latest external workflow required before tagging",
+		"- HLTV series regression: latest external workflow required before tagging",
+	} {
+		if !strings.Contains(markdown, want) {
+			t.Fatalf("release summary does not contain %q:\n%s", want, markdown)
+		}
+	}
+}
+
+func TestReleasePolicyRejectsPullRequestOnlySkip(t *testing.T) {
+	const pullRequestOnlySkip = "analysis/TestPullRequestOnlyDiagnostic"
+	originalPullRequestSkips := pullRequestSkipEntries
+	pullRequestSkipEntries = append(append([]string(nil), pullRequestSkipEntries...), pullRequestOnlySkip)
+	t.Cleanup(func() {
+		pullRequestSkipEntries = originalPullRequestSkips
+	})
+
+	run := passingPublicGoldenRun()
+	run.actions[pullRequestOnlySkip] = "skip"
+	if report := evaluate(profilePullRequest, run, nil, false); len(report.problems) != 0 {
+		t.Fatalf("pull-request policy problems = %#v, want none", report.problems)
+	}
+	if report := evaluate(profileRelease, run, nil, false); !containsProblem(report.problems, "unexpected skipped test "+pullRequestOnlySkip) {
+		t.Fatalf("release policy problems = %#v, want pull-request-only skip rejected", report.problems)
+	}
+}
+
 func TestExternalPolicyRequiresEightMapsSeriesAndNoSkips(t *testing.T) {
 	run := testRun{actions: map[string]string{hltvMapRegression: "pass", hltvSeriesRegression: "pass"}}
 	for i := 1; i <= externalMapCount; i++ {
