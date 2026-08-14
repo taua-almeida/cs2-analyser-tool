@@ -11,7 +11,7 @@ SHA-256 digests. Demo bytes remain external, read-only inputs.
 
 ## CI coverage
 
-| Suite | Pull request | Nightly | Manual |
+| Suite | Pull request | External workflow | Local |
 | --- | --- | --- | --- |
 | Unit and synthetic tests | Required | Required | Available |
 | Public golden demos | Required | Required | Available |
@@ -88,11 +88,10 @@ spirit-vs-jijiehao-mirage.dem
 
 ## External regression workflow
 
-`.github/workflows/external-regression.yml` runs at 03:17 UTC each night and
-through `workflow_dispatch`. It has no pull-request trigger, grants only
-`contents: read`, fails a manual dispatch whose ref is not the repository's
-default branch through an explicit guard job, and explicitly checks out that
-default branch. The required map
+`.github/workflows/external-regression.yml` runs only through
+`workflow_dispatch`. It has no pull-request or release trigger, grants only
+`contents: read`, rejects a manual dispatch whose ref is not the repository's
+default branch, and explicitly checks out that default branch. The required map
 and series tests run together so their checksum-verified parse cache is shared:
 
 ```sh
@@ -144,13 +143,13 @@ body, verifies the archive digest, extracts only exact manifest members to a
 temp directory, and verifies each demo before a test can parse it. Missing or
 invalid HLTV files fail provisioning. If the Inferno member exists, it must
 verify and `REQUIRE_PRIVATE_TEST_DEMO=1` makes its golden subtest mandatory. If
-it is absent, the nightly core-test summary says **Private Inferno golden:
-unavailable**.
+it is absent, the external workflow's core-test summary says **Private Inferno
+golden: intentionally unavailable**.
 
 No private demo path is passed to `actions/cache` or an artifact upload step.
 The workflow does not create secrets, and the pull-request workflow neither
 references this secret nor provisions external files. Until an owner approves a
-source and creates both settings, scheduled/manual runs fail immediately with a
+source and creates both settings, manual runs fail immediately with a
 fixture-provisioning blocker instead of reporting unrun regressions as success.
 
 ## Commands and missing-demo behavior
@@ -427,10 +426,10 @@ HLTV_TRACE_STEAM_ID=76561199063238565 \
 ```
 
 These two tests stay manual. The trade-model matrix compares exploratory rules
-and has no accepted production gate; running it nightly would spend time
-reproducing diagnostic evidence. The trace test prints investigator-selected
-event evidence and has no regression oracle. Neither is evidence that the eight
-map or BO3 regression passed.
+and has no accepted production gate; running it in the external workflow would
+spend time reproducing diagnostic evidence. The trace test prints
+investigator-selected event evidence and has no regression oracle. Neither is
+evidence that the eight map or BO3 regression passed.
 
 The trace records participation, side, kills, normal/flash assists, death
 cause/frame/time/tick, the assister's name and SteamID64, every direct trade

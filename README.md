@@ -214,11 +214,12 @@ Pull-request CI restores the two public golden demos, keeps `go vet ./...` and
 counts plus every package-relative skipped test. An unlisted skip fails the
 workflow, so adding `t.Skip` requires an intentional allowlist review.
 
-The scheduled/manual external workflow is separate from pull requests. It runs
-the eight checksum-pinned HLTV map regressions and the original BO3 series from
-an owner-approved private archive; absent provisioning configuration is a hard
-failure. The complete coverage matrix, private archive contract, summary fields,
-and manual diagnostic commands are in
+The optional External regression workflow is manually dispatched and separate
+from pull requests and releases. When its owner-approved private archive is
+configured, it runs the eight checksum-pinned HLTV map regressions and the
+original BO3 series; absent provisioning configuration is a hard failure. It is
+not a release prerequisite. The complete coverage matrix, private archive
+contract, summary fields, and manual diagnostic commands are in
 [HLTV_REGRESSION.md](./_docs/HLTV_REGRESSION.md#ci-coverage).
 
 For a local run of the ordinary suite:
@@ -233,12 +234,11 @@ REQUIRE_TEST_DEMO=1 go test -count=1 ./...
 Releases are maintainer-triggered and remain a human-approved operation:
 
 1. Confirm the normal CI workflow passed on the commit to release.
-2. Confirm the latest external-regression workflow run passed.
-3. Create an annotated, v-prefixed semantic-version tag, for example `git tag -a v0.1.0 -m "v0.1.0"`.
-4. Push only that tag, for example `git push origin v0.1.0`.
-5. Watch the release workflow until its verification and publishing jobs finish.
-6. In the GitHub release, verify all four platform archives, `checksums.txt`, each archive's contents, and the binary's `version` output.
-7. Never move a published tag. Publish a new patch release to correct a release.
+2. Create an annotated, v-prefixed semantic-version tag, for example `git tag -a v0.1.0 -m "v0.1.0"`.
+3. Push only that tag, for example `git push origin v0.1.0`.
+4. Watch the release workflow until its verification and publishing jobs finish.
+5. In the GitHub release, verify all four platform archives, `checksums.txt`, each archive's contents, and the binary's `version` output.
+6. Never move a published tag. Publish a new patch release to correct a release.
 
 ### Clone the repo
 

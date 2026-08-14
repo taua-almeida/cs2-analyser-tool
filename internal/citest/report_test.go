@@ -183,8 +183,8 @@ func TestPullRequestMarkdownIsDeterministic(t *testing.T) {
 - Skipped: 2
 - Public golden fixtures: ran
 - Private Inferno golden: intentionally unavailable
-- HLTV map regression: external workflow
-- HLTV series regression: external workflow
+- HLTV map regression: optional external workflow
+- HLTV series regression: optional external workflow
 - Trade-model diagnostic: manual
 - Trace diagnostic: manual
 
@@ -214,8 +214,8 @@ func TestReleasePolicyUsesItsOwnSkipRulesAndSummary(t *testing.T) {
 	for _, want := range []string{
 		"## Go test coverage (release)",
 		"- Private Inferno golden: intentionally unavailable",
-		"- HLTV map regression: latest external workflow required before tagging",
-		"- HLTV series regression: latest external workflow required before tagging",
+		"- HLTV map regression: optional external workflow",
+		"- HLTV series regression: optional external workflow",
 	} {
 		if !strings.Contains(markdown, want) {
 			t.Fatalf("release summary does not contain %q:\n%s", want, markdown)
