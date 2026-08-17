@@ -11,6 +11,8 @@ VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 GOCMD := go
 GOBUILD := $(GOCMD) build -ldflags "-X github.com/taua-almeida/cs2-analyser-tool/cmd.CS2AnalyserVersion=$(VERSION)"
 GOCLEAN := $(GOCMD) clean
+GOFILES = $(GOCMD) list -f '{{range .GoFiles}}{{$$.Dir}}/{{.}} {{end}}{{range .CgoFiles}}{{$$.Dir}}/{{.}} {{end}}{{range .IgnoredGoFiles}}{{$$.Dir}}/{{.}} {{end}}{{range .TestGoFiles}}{{$$.Dir}}/{{.}} {{end}}{{range .XTestGoFiles}}{{$$.Dir}}/{{.}} {{end}}' ./...
+GOFMT := gofmt
 GOTIDY := $(GOCMD) mod tidy
 GOTEST := $(GOCMD) test
 
@@ -55,7 +57,7 @@ endef
 # Ensure GOBIN is not set, which can conflict with cross compilation
 unexport GOBIN
 
-.PHONY: build-all clean tidy test download-test-demos $(BUILD_TARGETS)
+.PHONY: build-all check clean download-test-demos fmt fmt-check lint test tidy tidy-check $(BUILD_TARGETS)
 
 build-all: $(BUILD_TARGETS)
 
@@ -65,6 +67,31 @@ $(BUILD_TARGETS):
 test:
 	$(GOTEST) ./...
 
+fmt:
+	@files="$$($(GOFILES))" || exit $$?; \
+	if [ -z "$$files" ]; then echo "No Go package files found." >&2; exit 1; fi; \
+	$(GOFMT) -w $$files
+
+fmt-check:
+	@files="$$($(GOFILES))" || exit $$?; \
+	if [ -z "$$files" ]; then echo "No Go package files found." >&2; exit 1; fi; \
+	unformatted="$$($(GOFMT) -l $$files)" || exit $$?; \
+	if [ -n "$$unformatted" ]; then \
+		echo "Go files must be formatted with gofmt:" >&2; \
+		printf '%s\n' "$$unformatted" >&2; \
+		echo "Run 'make fmt' and commit the resulting changes." >&2; \
+		exit 1; \
+	fi
+
+lint:
+	$(GOCMD) tool -modfile=tools/go.mod staticcheck ./...
+
+tidy-check:
+	$(GOTIDY) -diff
+	$(GOCMD) -C tools mod tidy -diff
+
+check: fmt-check tidy-check lint test
+
 # Fetch the demos the integration test runs against.
 download-test-demos:
 	@$(call fetch_demo,$(TESTDATA_DIR)/mirage.dem,$(MIRAGE_DEMO_URL),$(MIRAGE_DEMO_SHA256))
@@ -72,6 +99,7 @@ download-test-demos:
 
 tidy:
 	$(GOTIDY)
+	$(GOCMD) -C tools mod tidy
 
 clean:
 	$(GOCLEAN)

@@ -39,6 +39,8 @@ Use Go 1.26 or later, as required by `go.mod` and the installation guide.
 - `internal/history/` contains the local SQLite history implementation.
 - `internal/citest/` validates CI test results and the repository's explicit
   skip policy.
+- `tools/` pins development tools in a separate Go module so their dependencies
+  cannot change the application module's build list.
 - `_docs/` contains the CLI, public package, data-contract, rating, testing, and
   release documentation.
 - `analysis/testdata/` contains checked-in golden JSON and documentation for
@@ -81,11 +83,34 @@ its fixture contract.
 
 ## Format and check Go changes
 
-Format each changed Go file with `gofmt`, then run the separate vet, build, and
-test checks used by pull-request CI:
+Apply canonical Go formatting, then run the same non-mutating formatting and
+static-analysis checks used by pull-request CI:
 
 ```sh
-gofmt -w path/to/changed.go
+make fmt
+make fmt-check
+make tidy-check
+make lint
+```
+
+`make fmt-check` uses `go list` to find package source and test files, lists
+every file that needs formatting, and fails without editing it.
+`make tidy-check` verifies both the application and tool module files without
+changing them. `make lint` runs
+`go tool -modfile=tools/go.mod staticcheck ./...` using the
+`honnef.co/go/tools` version pinned in `tools/go.mod` (Staticcheck 2026.1,
+module version `v0.7.0`). The first run may download that pinned tool and its
+isolated module dependencies through Go's tool dependency mechanism.
+
+Run all non-mutating checks above plus the ordinary test suite with:
+
+```sh
+make check
+```
+
+Run the existing vet, build, and uncached test checks separately:
+
+```sh
 go vet ./...
 go build ./...
 go test -count=1 ./...
