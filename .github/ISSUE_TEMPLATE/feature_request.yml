@@ -1,0 +1,61 @@
+name: Feature request
+description: Propose an improvement to the CLI, Go package, exported data, or local history
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the use case without attaching private demo files, sensitive filesystem paths, private player data, raw logs, or SteamIDs.
+
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Area to improve
+      options:
+        - CLI
+        - Public Go analysis package
+        - JSON or CSV export
+        - Local history or compare command
+        - Documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do, and what prevents it today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_change
+    attributes:
+      label: Proposed change
+      description: Describe the behavior or interface you would like.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe current workarounds or other designs you considered.
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility effects
+      description: Would this change CLI flags or output, JSON/CSV data, or the public Go analysis API? State "none" or "unknown" when appropriate.
+    validations:
+      required: true
+
+  - type: textarea
+    id: data_privacy
+    attributes:
+      label: Demo-data and privacy considerations
+      description: Explain whether this would read, write, display, or store demo files, filesystem paths, player data, logs, or SteamIDs. Do not include the private data itself.
+    validations:
+      required: true

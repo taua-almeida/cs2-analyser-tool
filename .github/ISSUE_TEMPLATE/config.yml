@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and usage help
+    url: https://github.com/taua-almeida/cs2-analyser-tool/discussions
+    about: Ask how to use the CLI or public Go package in GitHub Discussions.
+  - name: Security vulnerability
+    url: https://github.com/taua-almeida/cs2-analyser-tool/security/policy
+    about: Read the security policy and report vulnerabilities privately.
