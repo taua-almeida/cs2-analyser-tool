@@ -1,8 +1,13 @@
 package cmd
 
 import (
+	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -71,42 +76,99 @@ func TestRepeatedDemoFlagPreservesOrder(t *testing.T) {
 	}
 }
 
-func TestHashDemoFilesRejectsDuplicateContent(t *testing.T) {
-	dir := t.TempDir()
-	first := filepath.Join(dir, "map1.dem")
-	second := filepath.Join(dir, "renamed-copy.dem")
-	for _, path := range []string{first, second} {
-		if err := os.WriteFile(path, []byte("identical demo bytes"), 0o644); err != nil {
-			t.Fatalf("writing fixture: %v", err)
+// TestDemoHasherDigestsWholeStream pins the hash-while-parse contract: the
+// digest always covers the complete stream, whether the consumer read all of
+// it, part of it — trailing bytes are drained — or none of it.
+func TestDemoHasherDigestsWholeStream(t *testing.T) {
+	content := []byte("demo header, frames, and trailing bytes no parser reads")
+	sum := sha256.Sum256(content)
+	want := hex.EncodeToString(sum[:])
+
+	for _, consumed := range []int{0, 10, len(content)} {
+		hasher := newDemoHasher(bytes.NewReader(content))
+		if _, err := io.CopyN(io.Discard, hasher, int64(consumed)); err != nil {
+			t.Fatalf("consuming %d bytes: %v", consumed, err)
 		}
-	}
-	_, err := hashDemoFiles([]string{first, second})
-	if err == nil || !strings.Contains(err.Error(), "repeats the content") {
-		t.Fatalf("hashDemoFiles error = %v, want duplicate-content rejection", err)
-	}
-	if !strings.Contains(err.Error(), first) || !strings.Contains(err.Error(), second) {
-		t.Errorf("duplicate error %q does not name both paths", err)
+		digest, err := hasher.digest()
+		if err != nil {
+			t.Fatalf("digest after consuming %d bytes: %v", consumed, err)
+		}
+		if digest != want {
+			t.Errorf("digest after consuming %d bytes = %s, want the full-content %s", consumed, digest, want)
+		}
 	}
 }
 
-func TestHashDemoFilesStreamsExactDigests(t *testing.T) {
+// TestAnalyseAndHashDemoFileFailures pins that a missing path reports the
+// open failure and that a stream failing to parse returns the parse error
+// with no digest, since a digest of unparsed content identifies nothing.
+func TestAnalyseAndHashDemoFileFailures(t *testing.T) {
 	dir := t.TempDir()
-	contents := []string{"map one bytes", "map two bytes"}
-	paths := make([]string, len(contents))
-	for i, content := range contents {
-		paths[i] = filepath.Join(dir, strings.ReplaceAll(content, " ", "-"))
-		if err := os.WriteFile(paths[i], []byte(content), 0o644); err != nil {
-			t.Fatalf("writing fixture: %v", err)
-		}
+	if _, _, err := analyseAndHashDemoFile(context.Background(), filepath.Join(dir, "missing.dem")); err == nil ||
+		!strings.Contains(err.Error(), "opening demo file") {
+		t.Errorf("missing file error = %v, want an opening failure", err)
 	}
-	digests, err := hashDemoFiles(paths)
+
+	garbage := filepath.Join(dir, "garbage.dem")
+	if err := os.WriteFile(garbage, []byte("not a demo"), 0o644); err != nil {
+		t.Fatalf("writing fixture: %v", err)
+	}
+	demo, digest, err := analyseAndHashDemoFile(context.Background(), garbage)
+	if err == nil {
+		t.Fatal("analyseAndHashDemoFile parsed garbage without error")
+	}
+	if demo != nil || digest != "" {
+		t.Errorf("failed parse returned demo %v digest %q, want neither", demo, digest)
+	}
+}
+
+// TestAnalyseAndHashDemoFile parses the public mirage fixture once and
+// requires the digest to equal an independent SHA-256 of the same file: the
+// stream fed to the parser and the stream that was hashed are the same bytes,
+// trailing ones included.
+func TestAnalyseAndHashDemoFile(t *testing.T) {
+	const fixture = "../analysis/testdata/mirage.dem"
+	data, err := os.ReadFile(fixture)
+	if errors.Is(err, fs.ErrNotExist) {
+		t.Skipf("fixture %s not present; run make download-test-demos", fixture)
+	}
 	if err != nil {
-		t.Fatalf("hashDemoFiles: %v", err)
+		t.Fatalf("reading fixture: %v", err)
 	}
-	for i, content := range contents {
-		sum := sha256.Sum256([]byte(content))
-		if want := hex.EncodeToString(sum[:]); digests[i] != want {
-			t.Errorf("digest[%d] = %s, want %s", i, digests[i], want)
-		}
+	sum := sha256.Sum256(data)
+
+	demo, digest, err := analyseAndHashDemoFile(context.Background(), fixture)
+	if err != nil {
+		t.Fatalf("analyseAndHashDemoFile: %v", err)
+	}
+	if want := hex.EncodeToString(sum[:]); digest != want {
+		t.Errorf("digest = %s, want %s", digest, want)
+	}
+	if demo.Map.MapName != "de_mirage" {
+		t.Errorf("map name = %q, want de_mirage", demo.Map.MapName)
+	}
+	if demo.PlayerAggregationFacts() == nil {
+		t.Error("parsed demo carries no aggregation facts")
+	}
+}
+
+// TestRecordSeriesDigestRejectsDuplicates pins the in-series duplicate rule:
+// the first repeated digest fails naming both supplied paths, while distinct
+// digests register freely.
+func TestRecordSeriesDigestRejectsDuplicates(t *testing.T) {
+	paths := []string{"a/map1.dem", "b/map2.dem", "c/renamed-copy.dem"}
+	seen := make(map[string]int)
+	if err := recordSeriesDigest(seen, paths, 0, "1111"); err != nil {
+		t.Fatalf("first digest: %v", err)
+	}
+	if err := recordSeriesDigest(seen, paths, 1, "2222"); err != nil {
+		t.Fatalf("second digest: %v", err)
+	}
+	err := recordSeriesDigest(seen, paths, 2, "1111")
+	if err == nil || !strings.Contains(err.Error(), "repeats the content") {
+		t.Fatalf("repeated digest error = %v, want duplicate-content rejection", err)
+	}
+	if !strings.Contains(err.Error(), paths[0]) || !strings.Contains(err.Error(), paths[2]) {
+		t.Errorf("duplicate error %q does not name both paths", err)
 	}
 }

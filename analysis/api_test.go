@@ -513,6 +513,55 @@ func TestSelectSeriesPlayersAliasAmbiguity(t *testing.T) {
 	}
 }
 
+// TestPlayerAggregationFactsAPI exercises the exact-facts snapshot the way an
+// importer would: parse a real demo, snapshot the facts, and require them to
+// cover exactly the players, reconcile with the published derived rates, and
+// stay defensive against mutation. A hand-built MapAnalysis must instead
+// report its facts as unavailable.
+func TestPlayerAggregationFactsAPI(t *testing.T) {
+	demo, err := analysis.Analyse(context.Background(), bytes.NewReader(mirageDemo(t)))
+	if err != nil {
+		t.Fatalf("Analyse: %v", err)
+	}
+
+	facts := demo.PlayerAggregationFacts()
+	if len(facts) != len(demo.Players) {
+		t.Fatalf("facts for %d players, want %d", len(facts), len(demo.Players))
+	}
+	rounds := demo.Map.TotalRounds
+	if rounds == 0 {
+		t.Fatal("fixture reports 0 rounds")
+	}
+	for id, player := range demo.Players {
+		playerFacts, ok := facts[id]
+		if !ok {
+			t.Fatalf("player %d has no facts", id)
+		}
+		if playerFacts.SideDamage.Total != player.AssistStats.DamageGiven {
+			t.Errorf("player %d side damage total = %d, want damage given %d",
+				id, playerFacts.SideDamage.Total, player.AssistStats.DamageGiven)
+		}
+		if kast := 100 * float64(playerFacts.KASTRounds.Total) / float64(rounds); kast != player.PlayerMapStats.KAST {
+			t.Errorf("player %d KAST from facts = %v, want published %v", id, kast, player.PlayerMapStats.KAST)
+		}
+	}
+
+	// Mutating the snapshot must not reach the analysis.
+	for id := range facts {
+		facts[id] = analysis.PlayerAggregationFacts{}
+	}
+	for id, fresh := range demo.PlayerAggregationFacts() {
+		if fresh.SideDamage.Total != demo.Players[id].AssistStats.DamageGiven {
+			t.Fatalf("player %d facts changed after mutating an earlier snapshot", id)
+		}
+	}
+
+	handBuilt := seriesFixtureMap("de_mirage", rosterA, rosterB, 13, 7)
+	if got := handBuilt.PlayerAggregationFacts(); got != nil {
+		t.Errorf("hand-built MapAnalysis facts = %v, want nil (unavailable)", got)
+	}
+}
+
 // TestExportedSurfaceHidesDemoinfocs parses the package source and fails if
 // any exported type, field, function or method signature references a
 // demoinfocs import. The parser dependency must stay replaceable without

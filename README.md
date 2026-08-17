@@ -151,6 +151,60 @@ Read players from `.players`, keyed by SteamID (a JSON string). `map_data`, `tea
 
 The data output showed in the terminal table is not all the analyzed data, to get more info about the available data, go to [PLAYER_DATA](./_docs/PLAYER_DATA.MD). The `Rating` column is an HLTV Rating 3.0-style approximation; how it is calculated, constant by constant, is documented in [RATING](./_docs/RATING.MD).
 
+### Match history
+
+Every successful analysis is also stored automatically in a local SQLite history — single maps and each played map of a `--best-of` series alike. No flag is needed; `--save` remains the separate, explicit file export it always was. If storing fails, the analysis you just saw is still valid: the command prints it, then reports the storage error.
+
+#### Where the history lives, and what it contains
+
+The database is `history.db` inside:
+
+- `$CS2_ANALYSER_HISTORY_DIR` when that environment variable is set, otherwise
+- `<user config dir>/cs2-analyser-tool/history` (on Linux `~/.config/cs2-analyser-tool/history`, on macOS `~/Library/Application Support/cs2-analyser-tool/history`, on Windows `%AppData%\cs2-analyser-tool\history`).
+
+Everything is local and private: nothing is ever uploaded, the directory and database are created owner-only where the platform supports it, and the history never stores the original demo bytes nor any demo file path. A match is identified by the SHA-256 of the exact demo bytes that were parsed, so re-analysing the same demo — from any path or filename — never creates a duplicate: the canonical record is kept unchanged and only your player display selection is updated. The stored record is always the complete, unfiltered analysis in the same JSON envelope `--save json` writes; `--players` only chooses who is displayed.
+
+Timestamps in the history are **analysis times** — when you ran the analysis, stored in UTC and displayed in your local time zone. Demos carry no trustworthy record of when the match was played, so no match time is invented.
+
+The schema is versioned with SQLite's `user_version` and every history database is stamped with the tool's `application_id`. A newer database (created by a newer release) is refused with a clear error instead of being downgraded, and a corrupt file, a database another application put at that path, a stranded WAL or journal beside a missing or empty database file, or any file the tool did not create is refused — inspected on a private temporary copy first, so the refused file, its journal and its directory keep their exact bytes: never modified, deleted, recreated or converted.
+
+#### history
+
+```bash
+cs2-analyser history
+```
+
+Lists stored matches, newest analysis first: a stable 12-character ID (the digest prefix), the local analysis time, map, score and game mode. Logical-team scores are preferred; maps without two resolved teams fall back to the final CT/T side scores. An empty history prints a message and exits successfully.
+
+#### history show
+
+```bash
+cs2-analyser history show <id>
+cs2-analyser history show <id> --details
+```
+
+Re-renders a stored match from the database alone — the original demo is not needed and is never opened. `<id>` is the full SHA-256 or any unique prefix of at least 8 hexadecimal characters; an ambiguous prefix fails listing the candidate IDs. The player selection stored with the match narrows the view exactly as the live rendering did, and the stored record itself always keeps everyone: without a stored selection everyone is shown, and a series map where none of the selected players appeared keeps its explicit empty view rather than falling back to everyone. `--details` adds the same extra stat tables `analyse --details` prints.
+
+#### compare
+
+```bash
+cs2-analyser compare --player <steam-id-or-name>
+```
+
+Shows a player's Premier trend across the stored history: one row per stored map that is explicitly recorded as `premier` game mode and contains that player, chronologically by analysis time, plus an aggregate totals row. Other modes are never inferred into the trend, and a series is stored only as its individual maps, so nothing is ever counted twice.
+
+`--player` is resolved as a nonzero decimal SteamID64 first; anything else must match exactly one alias observed in the stored matches, compared case-insensitively under Unicode simple case folding: one-to-one case pairs match (`Ö` finds `ö`, Cyrillic `И` finds `и`), while multi-character expansions do not (`STRASSE` does not find `Straße`). Aliases accumulate across matches — a player who renamed still resolves under either name — and an alias shared by several SteamIDs fails with each candidate's SteamID and known aliases so you can pass the SteamID64 instead.
+
+Aggregate values are calculated additively from exact stored facts, never by averaging the per-map numbers you see displayed:
+
+- K/D = sum(kills) / sum(deaths) — a deathless run divides by one
+- ADR = sum(damage given) / sum(map rounds)
+- KAST = 100 × sum(KAST-credited rounds) / sum(map rounds)
+- HS% = 100 × sum(headshots) / sum(kills)
+- Opening success = 100 × sum(opening rounds won) / sum(opening kills)
+
+Counts (opening duels, trade kills, deaths traded, utility damage, flashes, grenades thrown) are summed directly. No aggregate rating is fabricated by averaging map ratings.
+
 ## Using the engine as a Go library
 
 Everything the CLI computes lives in the importable `analysis` package, which has no CLI, TUI or rendering dependencies of its own:
