@@ -22,6 +22,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: ${{ (inputs.release_mode == 'snapshot' || inputs.release_mode == 'tag') && '0' || '1' }}
+          persist-credentials: false
       - name: Validate release tag and default-branch ancestry
         if: inputs.release_mode == 'tag'
         shell: bash
@@ -59,6 +60,15 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      - name: Check canonical Go formatting
+        if: inputs.release_mode != 'tag'
+        run: make fmt-check
+      - name: Check Go module files are tidy
+        if: inputs.release_mode != 'tag'
+        run: make tidy-check
+      - name: Run pinned Staticcheck
+        if: inputs.release_mode != 'tag'
+        run: make lint
       - name: Restore test demo fixtures
         if: inputs.release_mode != 'snapshot'
         uses: actions/cache@v6
