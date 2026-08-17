@@ -31,7 +31,9 @@ func clearErrorAfter(t time.Duration) tea.Cmd {
 func PickDemoFile() (string, error) {
 	fp := filepicker.New()
 	fp.AllowedTypes = []string{".dem"}
-	fp.CurrentDirectory, _ = os.UserHomeDir()
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		fp.CurrentDirectory = homeDir
+	}
 
 	m := model{
 		filepicker: fp,

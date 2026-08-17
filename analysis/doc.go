@@ -1,6 +1,6 @@
 // Package analysis parses Counter-Strike 2 demos and aggregates completed
 // best-of-3 and best-of-5 series, exposing both as plain Go values. It is the
-// engine behind the cs2-analyser CLI and is importable on its own: it never
+// engine behind the cs2-analyser-tool CLI and is importable on its own: it never
 // renders, prompts, writes files or exits the process.
 //
 // # Analysing a map

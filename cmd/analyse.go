@@ -42,7 +42,7 @@ func init() {
 var analyseCmd = &cobra.Command{
 	Use:          "analyse",
 	Short:        "Analyse a CS2 game demo.",
-	Long:         "This command will parse your cs2 demo and give you some stats about it. Use history to see your previous demos.",
+	Long:         "Parse a CS2 demo and display its statistics. Run '" + rootCmd.Name() + " history' to list previous analyses.",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if saveType != "json" && saveType != "csv" {

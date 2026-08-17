@@ -47,7 +47,18 @@ else
   exit 1
 fi
 
-expected_unix_contents=(LICENSE README.md cs2-analyser-tool)
+expected_documentation=(
+  LICENSE
+  README.md
+  _docs/CLI.md
+  _docs/DEVELOPMENT.md
+  _docs/GO_LIBRARY.md
+  _docs/HLTV_REGRESSION.md
+  _docs/INSTALLATION.md
+  _docs/PLAYER_DATA.MD
+  _docs/RATING.MD
+)
+expected_unix_contents=("${expected_documentation[@]}" cs2-analyser-tool)
 for archive in "$dist_dir"/*.tar.gz; do
   if ! diff -u \
     <(printf '%s\n' "${expected_unix_contents[@]}") \
@@ -57,7 +68,7 @@ for archive in "$dist_dir"/*.tar.gz; do
   fi
 done
 if ! diff -u \
-  <(printf '%s\n' LICENSE README.md cs2-analyser-tool.exe) \
+  <(printf '%s\n' "${expected_documentation[@]}" cs2-analyser-tool.exe) \
   <(unzip -Z1 "$dist_dir/cs2-analyser-tool-windows-amd64.zip" | sort); then
   echo "::error::Windows archive does not contain the expected release files"
   exit 1
@@ -99,14 +110,16 @@ assert_binary_format "Windows AMD64" "$inspect_dir/windows-amd64/cs2-analyser-to
 assert_binary_format "macOS AMD64" "$inspect_dir/darwin-amd64/cs2-analyser-tool" 'Mach-O 64-bit x86_64'
 assert_binary_format "macOS ARM64" "$inspect_dir/darwin-arm64/cs2-analyser-tool" 'Mach-O 64-bit arm64'
 
-version_output=$("$inspect_dir/linux-amd64/cs2-analyser-tool" version)
+linux_binary="$inspect_dir/linux-amd64/cs2-analyser-tool"
+binary_name=${linux_binary##*/}
+version_output=$("$linux_binary" version)
 if [[ -n "${EXPECTED_RELEASE_VERSION:-}" ]]; then
-  expected_version_output="CS2 Analyser Tool version $EXPECTED_RELEASE_VERSION"
+  expected_version_output="$binary_name version $EXPECTED_RELEASE_VERSION"
   if [[ "$version_output" != "$expected_version_output" ]]; then
     echo "::error::release binary reported $version_output, expected $expected_version_output"
     exit 1
   fi
-elif [[ ! "$version_output" =~ ^CS2\ Analyser\ Tool\ version\ v.+$ ]]; then
+elif [[ ! "$version_output" =~ ^${binary_name}\ version\ v.+$ ]]; then
   echo "::error::snapshot binary reported an invalid version: $version_output"
   exit 1
 fi
