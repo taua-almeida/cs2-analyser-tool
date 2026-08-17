@@ -357,7 +357,7 @@ Players keep their existing CT/T side splits (`side_stats`), which remain attrib
 
 ## Series analysis (BO3/BO5)
 
-`analyse --best-of 3|5` with repeated `--demo` flags aggregates a *completed* series. The format is always explicit: multiple demos without `--best-of` are rejected, a series is never inferred from the file count, and history never infers one either. The demos are the played maps in order, and that order is preserved everywhere — parsing, output, errors and JSON. Every file is streamed through SHA-256 while it is parsed, so the digest covers exactly the bytes that were analysed; two inputs with the same digest are rejected as the same demo regardless of their paths, as soon as the repeated copy has been parsed and hashed.
+`cs2-analyser-tool analyse --best-of 3|5` with repeated `--demo` flags aggregates a *completed* series. The format is always explicit: multiple demos without `--best-of` are rejected, a series is never inferred from the file count, and history never infers one either. The demos are the played maps in order, and that order is preserved everywhere — parsing, output, errors and JSON. Every file is streamed through SHA-256 while it is parsed, so the digest covers exactly the bytes that were analysed; two inputs with the same digest are rejected as the same demo regardless of their paths, as soon as the repeated copy has been parsed and hashed.
 
 ### Completed series only
 

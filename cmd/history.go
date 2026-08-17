@@ -72,7 +72,7 @@ func runHistoryList(ctx context.Context, db *history.DB, output io.Writer) error
 		return err
 	}
 	if len(matches) == 0 {
-		fmt.Fprintln(output, "No matches in history yet. Run 'cs2-analyser analyse' and successful analyses are stored automatically.")
+		fmt.Fprintf(output, "No matches in history yet. Run '%s analyse' and successful analyses are stored automatically.\n", rootCmd.Name())
 		return nil
 	}
 	t := table.NewWriter()

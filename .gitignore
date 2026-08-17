@@ -28,5 +28,5 @@ build/
 dist/
 
 # Ignore downloaded and locally supplied demo fixtures.
-# See cmd/demo_parser/testdata/README.md.
+# See analysis/testdata/README.md.
 *.dem

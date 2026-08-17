@@ -52,7 +52,7 @@ func TestVersionCommandOutput(t *testing.T) {
 		t.Fatalf("executing version command: %v", err)
 	}
 
-	const want = "CS2 Analyser Tool version v0.1.0\n"
+	const want = "cs2-analyser-tool version v0.1.0\n"
 	if got := output.String(); got != want {
 		t.Fatalf("version output = %q, want %q", got, want)
 	}

@@ -10,9 +10,9 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "cs2-analyser",
-	Short: "A CLI tool to analyse cs2 games demos",
-	Long:  "CS2 Analyser Tool is a CLI tool that allows players and coaches to parse demos from CS2 games and analyse them.",
+	Use:   "cs2-analyser-tool",
+	Short: "Analyse Counter-Strike 2 demos.",
+	Long:  "Parse Counter-Strike 2 demo files, display player and team statistics, export results, and review local match history.",
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},

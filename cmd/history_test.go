@@ -114,8 +114,9 @@ func TestRunHistoryListEmpty(t *testing.T) {
 	if err := runHistoryList(context.Background(), db, &out); err != nil {
 		t.Fatalf("runHistoryList: %v", err)
 	}
-	if !strings.Contains(out.String(), "No matches in history yet") {
-		t.Errorf("output %q lacks the empty-history message", out.String())
+	const want = "No matches in history yet. Run 'cs2-analyser-tool analyse' and successful analyses are stored automatically.\n"
+	if got := out.String(); got != want {
+		t.Errorf("output = %q, want %q", got, want)
 	}
 }
 

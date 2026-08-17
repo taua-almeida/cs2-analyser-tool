@@ -1,6 +1,3 @@
-/*
-CS2 Analyser Tool version.
-*/
 package cmd
 
 import (
@@ -16,7 +13,7 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Display application version information.",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprintf(cmd.OutOrStdout(), "CS2 Analyser Tool version %s\n", currentVersion())
+		fmt.Fprintf(cmd.OutOrStdout(), "%s version %s\n", cmd.Root().Name(), currentVersion())
 	},
 }
 
