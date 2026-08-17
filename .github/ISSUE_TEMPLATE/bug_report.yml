@@ -1,0 +1,109 @@
+name: Bug report
+description: Report a problem with the CLI, Go package, exported data, or local history
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach private demo files or paste sensitive filesystem paths, private player data, raw logs, or SteamIDs. Redact those details from commands and output. Do not use a public issue to report a suspected vulnerability.
+
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Affected area
+      description: Which interface shows the problem?
+      options:
+        - CLI
+        - Public Go analysis package
+        - JSON or CSV export
+        - Local history or compare command
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Tool version
+      description: Paste the output of `cs2-analyser-tool version`, or the module version used by your Go program.
+      placeholder: cs2-analyser-tool version v0.2.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method
+      options:
+        - Prebuilt GitHub release archive
+        - Installed with `go install`
+        - Built from source
+        - Imported as a Go module
+    validations:
+      required: true
+
+  - type: input
+    id: operating_system
+    attributes:
+      label: Operating system
+      placeholder: Ubuntu 24.04, macOS 15, or Windows 11
+    validations:
+      required: true
+
+  - type: input
+    id: architecture
+    attributes:
+      label: Architecture
+      placeholder: amd64 or arm64
+    validations:
+      required: true
+
+  - type: textarea
+    id: command_or_call
+    attributes:
+      label: Exact command or Go call
+      description: Paste the command that failed or the smallest relevant Go call. Replace personal and demo paths with redacted values.
+      placeholder: cs2-analyser-tool analyse --demo /redacted/match.dem
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: List the smallest repeatable sequence. Describe the demo or data shape without uploading private data.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Relevant output
+      description: Include only the useful excerpt after removing secrets, sensitive paths, private player data, SteamIDs, and unrelated log lines.
+      render: text
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I have not attached a private demo, export, history database, or raw log.
+          required: true
+        - label: I have removed secrets, sensitive paths, private player data, and SteamIDs from this report.
+          required: true

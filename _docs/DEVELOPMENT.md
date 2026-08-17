@@ -1,4 +1,4 @@
-# Development, contributing, and releases
+# Development and releases
 
 ## Tests and CI
 
@@ -34,6 +34,5 @@ cd cs2-analyser-tool
 go build
 ```
 
-## Contributing
-
-Fork the repository and open a focused pull request to the `main` branch. Include the tests and documentation needed to explain the change.
+Contributing guidance, build and test instructions, and pull-request
+requirements live in [CONTRIBUTING.md](../CONTRIBUTING.md).

@@ -89,11 +89,14 @@ History: stored match 84a1a4191302
 - [Rating methodology](./_docs/RATING.MD): every formula, constant, limitation, and worked example.
 - [Go package guide](./_docs/GO_LIBRARY.md) and [generated API reference](https://pkg.go.dev/github.com/taua-almeida/cs2-analyser-tool/analysis).
 - [Testing and HLTV regression](./_docs/HLTV_REGRESSION.md): fixture contracts, coverage, and diagnostics.
-- [Development, contributing, and releases](./_docs/DEVELOPMENT.md): local build/test commands, pull requests, and the maintainer release checklist.
+- [Contributing](./CONTRIBUTING.md): repository layout, privacy guidance, local checks, fixtures, and pull requests.
+- [Security policy](./SECURITY.md): supported versions and private vulnerability reporting.
+- [Code of conduct](./CODE_OF_CONDUCT.md): community standards and private enforcement reporting.
+- [Development and releases](./_docs/DEVELOPMENT.md): CI behavior and the maintainer release checklist.
 
 ## Contributing
 
-See [Development, contributing, and releases](./_docs/DEVELOPMENT.md) for the repository setup, test suites, pull-request entry point, and release process.
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a pull request. It covers the supported Go version, repository setup, tests, fixture handling, privacy, compatibility, and the pull-request process. Participation is governed by the [code of conduct](./CODE_OF_CONDUCT.md), and suspected vulnerabilities use the private process in [SECURITY.md](./SECURITY.md).
 
 ## License
 
