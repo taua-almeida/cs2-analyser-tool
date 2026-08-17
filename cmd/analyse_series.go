@@ -2,17 +2,17 @@ package cmd
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
+	"errors"
 	"fmt"
-	"io"
 	"os"
+	"slices"
 	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/taua-almeida/cs2-analyser-tool/analysis"
 	dataexport "github.com/taua-almeida/cs2-analyser-tool/cmd/dataexport"
 	printstyle "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/print-style"
+	"github.com/taua-almeida/cs2-analyser-tool/internal/history"
 )
 
 // validateSeriesFlags rejects invalid --best-of/--demo combinations before
@@ -43,62 +43,54 @@ func validateSeriesFlags(bestOf int, bestOfSet bool, demoCount int) error {
 	return nil
 }
 
-// hashDemoFiles streams every demo through SHA-256 — never loading a demo
-// into memory — and rejects duplicate content before anything is parsed, so
-// the same map supplied under two paths fails fast.
-func hashDemoFiles(paths []string) ([]string, error) {
-	digests := make([]string, len(paths))
+// parseSeriesMaps parses every series demo in supplied order through the
+// shared hash-while-parse helper, so each file is opened once and its digest
+// covers exactly the bytes that were analysed. Repeated demo content is
+// rejected as soon as the second copy's digest is known, before any further
+// map is parsed.
+func parseSeriesMaps(ctx context.Context, paths []string) ([]analysis.SeriesMapInput, error) {
+	inputs := make([]analysis.SeriesMapInput, len(paths))
 	seen := make(map[string]int, len(paths))
 	for i, path := range paths {
-		digest, err := hashDemoFile(path)
+		fmt.Printf("Parsing map %d/%d: %s\n", i+1, len(paths), path)
+		demo, digest, err := analyseAndHashDemoFile(ctx, path)
 		if err != nil {
 			return nil, err
 		}
-		if first, duplicate := seen[digest]; duplicate {
-			return nil, fmt.Errorf("--demo %s repeats the content of %s (SHA-256 %s)", path, paths[first], digest)
+		if err := recordSeriesDigest(seen, paths, i, digest); err != nil {
+			return nil, err
 		}
-		seen[digest] = i
-		digests[i] = digest
+		inputs[i] = analysis.SeriesMapInput{Demo: demo, SHA256: digest}
 	}
-	return digests, nil
+	return inputs, nil
 }
 
-func hashDemoFile(path string) (string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", fmt.Errorf("opening demo file: %w", err)
+// recordSeriesDigest registers one parsed map's content digest, rejecting a
+// digest already supplied earlier in the series so the same map under two
+// paths fails before any further parsing.
+func recordSeriesDigest(seen map[string]int, paths []string, index int, digest string) error {
+	if first, duplicate := seen[digest]; duplicate {
+		return fmt.Errorf("--demo %s repeats the content of %s (SHA-256 %s)", paths[index], paths[first], digest)
 	}
-	defer file.Close()
-
-	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
-		return "", fmt.Errorf("hashing %s: %w", path, err)
-	}
-	return hex.EncodeToString(hash.Sum(nil)), nil
+	seen[digest] = index
+	return nil
 }
 
-// runSeriesAnalysis is the multi-demo path: hash, parse in command-line
+// runSeriesAnalysis is the multi-demo path: parse and hash in command-line
 // order, build the series, resolve the player selection against cross-map
 // identity, then render and optionally save. It never opens the demo file
 // picker or the interactive player selector; without --players every player
 // is analysed.
 func runSeriesAnalysis(ctx context.Context, bestOf int, paths []string) error {
-	digests, err := hashDemoFiles(paths)
+	lipgloss.Println(printstyle.StyleInfo.Render("Processing CS2 series, hang tight... \n"))
+	startTime := time.Now()
+	inputs, err := parseSeriesMaps(ctx, paths)
 	if err != nil {
 		return err
 	}
-
-	lipgloss.Println(printstyle.StyleInfo.Render("Processing CS2 series, hang tight... \n"))
-	startTime := time.Now()
-	inputs := make([]analysis.SeriesMapInput, len(paths))
-	for i, path := range paths {
-		fmt.Printf("Parsing map %d/%d: %s\n", i+1, len(paths), path)
-		demo, err := analysis.AnalyseFile(ctx, path)
-		if err != nil {
-			return err
-		}
-		inputs[i] = analysis.SeriesMapInput{Demo: demo, SHA256: digests[i]}
-	}
+	// The stored analysis time is when parsing finished, captured before
+	// rendering and export can add their own delay.
+	analysedAt := time.Now().UTC()
 
 	series, err := analysis.BuildSeries(bestOf, inputs)
 	if err != nil {
@@ -122,16 +114,56 @@ func runSeriesAnalysis(ctx context.Context, bestOf int, paths []string) error {
 		dataexport.PrintSeriesDetailTables(series, selected)
 	}
 
+	var exportErr error
 	if save {
 		seriesToSave := series
 		if selected != nil {
 			seriesToSave = analysis.FilterSeriesPlayers(series, selected)
 		}
-		return saveAndReport(func() (string, error) {
+		exportErr = saveAndReport(func() (string, error) {
 			return dataexport.WriteSeriesToFile(seriesToSave, saveType)
 		})
 	}
-	return nil
+
+	// Every complete map is stored individually — the validated series
+	// aggregate itself is never stored, so trends cannot double count. The
+	// storage error joins the export one so neither hides the other, and
+	// the rendered series above stays valid either way.
+	storeErr := storeAnalysedMaps(ctx, os.Stdout, seriesStoreInputs(inputs, selected, analysedAt))
+	return errors.Join(exportErr, storeErr)
+}
+
+// seriesStoreInputs assembles the history record of each played map once
+// BuildSeries has accepted the series: the complete unfiltered analysis with
+// its digest and exact facts, and — per map — the selected players that
+// actually appear in it. With an explicit series selection the per-map IDs
+// stay non-nil even when nobody selected played that map, so the stored
+// view is the same empty one the live series rendering shows, never a
+// fallback to everyone.
+func seriesStoreInputs(inputs []analysis.SeriesMapInput, selected map[uint64]bool,
+	analysedAt time.Time) []history.StoreMatchInput {
+	stores := make([]history.StoreMatchInput, len(inputs))
+	for i, input := range inputs {
+		var selectedIDs []uint64
+		if selected != nil {
+			selectedIDs = make([]uint64, 0, len(selected))
+			for id := range selected {
+				if input.Demo.Players[id] != nil {
+					selectedIDs = append(selectedIDs, id)
+				}
+			}
+		}
+		slices.Sort(selectedIDs)
+		stores[i] = history.StoreMatchInput{
+			SHA256:           input.SHA256,
+			AnalysedAt:       analysedAt,
+			AnalysisVersion:  currentVersion(),
+			Analysis:         input.Demo,
+			Facts:            input.Demo.PlayerAggregationFacts(),
+			SelectedSteamIDs: selectedIDs,
+		}
+	}
+	return stores
 }
 
 // saveAndReport wraps a save-file writer with the shared status output the

@@ -48,9 +48,18 @@ func entryScore(opening analysis.OpeningDuelStats) string {
 	return fmt.Sprintf("%d:%d", opening.OpeningKills.Total, opening.OpeningDeaths.Total)
 }
 
+// PrintCLIDataTable renders the main player table to standard output. It is
+// the compatibility wrapper over FprintCLIDataTable.
 func PrintCLIDataTable(playerToAnalyse map[uint64]*analysis.DemoPlayer, mapData *analysis.MapData, gameMode string) {
+	FprintCLIDataTable(os.Stdout, playerToAnalyse, mapData, gameMode)
+}
+
+// FprintCLIDataTable renders the main player table — the same one analyse
+// prints — to the given writer, so stored matches re-render identically and
+// command tests can capture the output.
+func FprintCLIDataTable(output io.Writer, playerToAnalyse map[uint64]*analysis.DemoPlayer, mapData *analysis.MapData, gameMode string) {
 	t := table.NewWriter()
-	t.SetOutputMirror(os.Stdout)
+	t.SetOutputMirror(output)
 	t.AppendHeader(table.Row{"Name", "Kills", "Deaths", "K/D", "HS", "Assists", "ADR", "KAST (%)", "Rating", "Entry", "Precision (%)", "Best Weapon"})
 	for _, player := range playerToAnalyse {
 		playerBestWeapon := analysis.GetPlayerBestWeapon(player.KillStats.WeaponsKills)
@@ -79,16 +88,22 @@ func PrintCLIDataTable(playerToAnalyse map[uint64]*analysis.DemoPlayer, mapData 
 }
 
 // PrintCLIDetailTables prints the stats that do not fit the main table,
-// each in its own narrow table. Only shown with --details.
+// each in its own narrow table. Only shown with --details. It is the
+// compatibility wrapper over FprintCLIDetailTables.
 func PrintCLIDetailTables(playerToAnalyse map[uint64]*analysis.DemoPlayer) {
+	FprintCLIDetailTables(os.Stdout, playerToAnalyse)
+}
+
+// FprintCLIDetailTables renders the detail tables to the given writer.
+func FprintCLIDetailTables(output io.Writer, playerToAnalyse map[uint64]*analysis.DemoPlayer) {
 	players := sortedByKills(playerToAnalyse)
-	printRatingTable(players, os.Stdout)
-	printApproxMetricsTable(players, os.Stdout)
-	printMultiKillTable(players, os.Stdout)
-	printTradeTable(players, os.Stdout)
-	printSideSplitTable(players, os.Stdout)
-	printUtilityEffectivenessTable(players, os.Stdout)
-	printGrenadesThrownTable(players, os.Stdout)
+	printRatingTable(players, output)
+	printApproxMetricsTable(players, output)
+	printMultiKillTable(players, output)
+	printTradeTable(players, output)
+	printSideSplitTable(players, output)
+	printUtilityEffectivenessTable(players, output)
+	printGrenadesThrownTable(players, output)
 }
 
 // ratingRow is one line of the rating breakdown. A nil rating means it was

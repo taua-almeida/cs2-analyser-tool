@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -12,6 +15,7 @@ import (
 	filepicker "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/file-picker"
 	multiselect "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/multi-select"
 	printstyle "github.com/taua-almeida/cs2-analyser-tool/cmd/ui/print-style"
+	"github.com/taua-almeida/cs2-analyser-tool/internal/history"
 )
 
 var players []string   // players is the list of players to analyse.
@@ -71,10 +75,14 @@ var analyseCmd = &cobra.Command{
 		lipgloss.Println(printstyle.StyleInfo.Render("Processing CS2 demo, hang tight... \n"))
 
 		startTime := time.Now()
-		processedDemoData, err := analysis.AnalyseFile(cmd.Context(), demoPath)
+		processedDemoData, digest, err := analyseAndHashDemoFile(cmd.Context(), demoPath)
 		if err != nil {
 			return err
 		}
+		// The stored analysis time is when parsing finished — captured now,
+		// before the interactive player selection below can sit open for
+		// minutes or hours and skew the history's ordering.
+		analysedAt := time.Now().UTC()
 
 		lipgloss.Println(printstyle.StyleSuccess.Render("\n\nProcessing is done! \n"))
 		fmt.Printf("Time taken for the analysis: %s\n\n", time.Since(startTime))
@@ -96,6 +104,10 @@ var analyseCmd = &cobra.Command{
 			players = selection.SelectedChoices
 		}
 
+		// An explicit choice — the flag or a nonempty multiselect — becomes
+		// this match's stored display preference; analysing everyone stores
+		// none, which reads back as everyone.
+		explicitSelection := len(players) > 0
 		if len(players) == 0 {
 			lipgloss.Println(printstyle.StyleInfo.Render("No players selected, analysing everyone."))
 			players = availablePlayers
@@ -111,13 +123,31 @@ var analyseCmd = &cobra.Command{
 			dataexport.PrintCLIDetailTables(playersToAnalyse)
 		}
 
+		var exportErr error
 		if save {
 			analysisToSave := *processedDemoData
 			analysisToSave.Players = playersToAnalyse
-			return saveAndReport(func() (string, error) {
+			exportErr = saveAndReport(func() (string, error) {
 				return dataexport.WriteAnalysisToFile(&analysisToSave, saveType)
 			})
 		}
-		return nil
+
+		// The complete unfiltered map is stored whatever was selected or
+		// exported; the rendered and exported output above stays valid even
+		// when storage fails, so the errors are joined rather than one
+		// hiding the other.
+		var selectedIDs []uint64
+		if explicitSelection {
+			selectedIDs = slices.Sorted(maps.Keys(playersToAnalyse))
+		}
+		storeErr := storeAnalysedMaps(cmd.Context(), cmd.OutOrStdout(), []history.StoreMatchInput{{
+			SHA256:           digest,
+			AnalysedAt:       analysedAt,
+			AnalysisVersion:  currentVersion(),
+			Analysis:         processedDemoData,
+			Facts:            processedDemoData.PlayerAggregationFacts(),
+			SelectedSteamIDs: selectedIDs,
+		}})
+		return errors.Join(exportErr, storeErr)
 	},
 }
