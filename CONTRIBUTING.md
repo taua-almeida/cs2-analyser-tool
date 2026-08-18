@@ -121,6 +121,63 @@ rejects unlisted test skips. A separate pull-request job checks the pinned
 GoReleaser configuration and verifies a snapshot release without publishing
 it.
 
+## Scan for known vulnerabilities
+
+Run the Go vulnerability scan locally with:
+
+```sh
+make vulncheck
+```
+
+`make vulncheck` builds the `golang.org/x/vuln` version pinned in
+`tools/go.mod` (govulncheck v1.7.0, the same pinning mechanism Staticcheck
+uses) and runs it once per released platform from the Makefile's
+`BUILD_TARGETS` matrix: linux/amd64, windows/amd64, darwin/amd64, and
+darwin/arm64. Reachability differs per platform, so a scan of the host
+platform alone could miss an advisory that only Windows- or Darwin-specific
+code reaches. Each run downloads the current vulnerability database from
+https://vuln.go.dev, so it needs network access and its result can change when
+new advisories are published; that is why it is not part of `make check`. The
+Vulnerability scan workflow runs the same command on relevant pull requests,
+on pushes to `main`, on a weekly schedule, and on manual dispatch.
+
+`govulncheck` reports only vulnerabilities reachable from the compiled
+packages. Do not silence a finding: fix it with a dependency update, or track
+it following the monitoring policy in [`SECURITY.md`](./SECURITY.md).
+
+## Dependency update pull requests
+
+Dependabot checks the application Go module, the `tools/` module, and GitHub
+Actions weekly, configured in `.github/dependabot.yml` with a `chore(deps)`
+commit prefix. Compatible minor and patch updates to the Charmbracelet UI
+modules (`charm.land/*`, `github.com/charmbracelet/*`) arrive as one grouped
+pull request, as do compatible minor and patch GitHub Actions updates. Every
+other update arrives individually, including major GitHub Actions updates.
+
+Go module major versions need a manual check that Dependabot cannot provide:
+a new major publishes a different module path (for example
+`charm.land/bubbles/v2` becomes `.../v3`, and
+`github.com/markus-wa/demoinfocs-golang/v5` becomes `.../v6`), which
+Dependabot treats as an unrelated dependency, so no update pull request ever
+appears. Maintainers watch upstream releases of the direct dependencies (for
+example GitHub Watch → Custom → Releases) and check for new majors when
+reviewing the weekly update batch. Each major migration is landed as its own
+pull request with the import-path rewrite and a full review.
+
+Dependency pull requests are never merged automatically. Each one must pass
+the normal pull-request CI and is reviewed like any other change. The
+behavior-sensitive direct dependencies are deliberately never grouped and need
+extra review:
+
+- `github.com/markus-wa/demoinfocs-golang/v5` drives the parser. Review
+  golden-fixture behavior with the restored public demos
+  (`make download-test-demos`, then `REQUIRE_TEST_DEMO=1 go test -count=1
+  ./...`), and consult the external regression evidence from
+  [`_docs/HLTV_REGRESSION.md`](./_docs/HLTV_REGRESSION.md) when available.
+- `modernc.org/sqlite` backs the local history database in
+  `internal/history/`.
+- `github.com/spf13/cobra` defines CLI flag and command behavior.
+
 ## Tests, goldens, and documentation
 
 - Add or update focused tests when behavior changes. Adding `t.Skip` also
