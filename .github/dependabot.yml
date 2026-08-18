@@ -1,0 +1,61 @@
+# Weekly version updates for Go modules and GitHub Actions. Dependency pull
+# requests are never merged automatically; every one passes normal CI and
+# human review (see CONTRIBUTING.md). Security updates are driven by
+# Dependabot alerts and do not wait for this weekly schedule.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    # The application module and the pinned development-tool module.
+    directories:
+      - "/"
+      - "/tools"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Charmbracelet UI modules move together; group their compatible minor
+      # and patch updates. Note that Dependabot cannot propose a new major of
+      # a Go module at all: the new major lives at a different module path
+      # (for example charm.land/bubbles/v2 -> /v3), so Go major migrations
+      # are found and landed manually (see CONTRIBUTING.md).
+      charm:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+        patterns:
+          - "charm.land/*"
+          - "github.com/charmbracelet/*"
+    # Behavior-sensitive direct dependencies stay ungrouped so each update is
+    # individually reviewable: github.com/markus-wa/demoinfocs-golang/v5
+    # (parser and golden fixtures), modernc.org/sqlite (history database),
+    # and github.com/spf13/cobra (CLI behavior).
+
+  - package-ecosystem: github-actions
+    # "/" covers .github/workflows; composite actions are listed explicitly.
+    directories:
+      - "/"
+      - "/.github/actions/goreleaser"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Compatible minor and patch action updates arrive as one pull request;
+      # major action updates stay individual.
+      actions:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+        patterns:
+          - "*"

@@ -1,0 +1,43 @@
+name: Vulnerability scan
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**.go"
+      - go.mod
+      - go.sum
+      - tools/go.mod
+      - tools/go.sum
+      - Makefile
+      - .github/workflows/vulncheck.yml
+  pull_request:
+    paths:
+      - "**.go"
+      - go.mod
+      - go.sum
+      - tools/go.mod
+      - tools/go.sum
+      - Makefile
+      - .github/workflows/vulncheck.yml
+  schedule:
+    # Weekly rescan of the default branch so newly published advisories are
+    # reported without waiting for a code change.
+    - cron: "20 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Run pinned govulncheck
+        run: make vulncheck

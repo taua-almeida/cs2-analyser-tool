@@ -57,7 +57,7 @@ endef
 # Ensure GOBIN is not set, which can conflict with cross compilation
 unexport GOBIN
 
-.PHONY: build-all check clean download-test-demos fmt fmt-check lint test tidy tidy-check $(BUILD_TARGETS)
+.PHONY: build-all check clean download-test-demos fmt fmt-check lint test tidy tidy-check vulncheck $(BUILD_TARGETS)
 
 build-all: $(BUILD_TARGETS)
 
@@ -89,6 +89,26 @@ lint:
 tidy-check:
 	$(GOTIDY) -diff
 	$(GOCMD) -C tools mod tidy -diff
+
+# Reachability scan of the compiled packages against the Go vulnerability
+# database, using the govulncheck version pinned in tools/go.mod. The pinned
+# tool is built once for the host, then the scan runs for every released
+# platform in BUILD_TARGETS with CGO_ENABLED=0 to match the release builds,
+# because an advisory can be reachable only through platform-specific code.
+# Each run fetches the current database from https://vuln.go.dev, so the
+# result can change without a code change; that is why it is a separate
+# target and CI workflow rather than part of check.
+vulncheck:
+	@mkdir -p $(BUILD_DIR)
+	$(GOCMD) -C tools build -o ../$(BUILD_DIR)/govulncheck golang.org/x/vuln/cmd/govulncheck
+	@set -e; \
+	for target in $(BUILD_TARGETS); do \
+		os=$${target%%-*}; \
+		arch=$${target#*-}; \
+		if [ "$$arch" = "$$target" ]; then arch=amd64; fi; \
+		echo "govulncheck $$os/$$arch"; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch ./$(BUILD_DIR)/govulncheck ./...; \
+	done
 
 check: fmt-check tidy-check lint test
 
